@@ -379,3 +379,38 @@ def test_load_train_csv_does_not_fall_back_to_other_projects_csv(tmp_path: Path)
 
     assert pipeline._load_train_csv("テスト社") is None
     assert pipeline._load_train_csv("別社") is not None
+
+def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
+    """runの結果に raw_answer / retrieved_sources が入り、summaryに時間・トークンが入る。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=data_dir, run_judge=True)
+    pipeline.generator._call_llm = (
+        lambda q, c: '{"answer": "5万円です。", "confidence": 0.9, "reasoning": "r"}'
+    )
+    pipeline.judge._call_llm = lambda p: '{"label": "Perfect", "reason": "ok"}'
+    pipeline.build_index()
+
+    results = pipeline.run([QAPair(question_id="0", question="宿泊費の上限は？")])
+
+    out_dir = tmp_path / "out"
+    pipeline.save_results(results, out_dir, run_name="diag")
+
+    out_file = next(out_dir.glob("diag_*.json"))
+    payload = json.loads(out_file.read_text(encoding="utf-8"))
+
+    result0 = payload["results"][0]
+    assert "raw_answer" in result0
+    assert "retrieved_sources" in result0
+    for source in result0["retrieved_sources"]:
+        assert "::" in source
+
+    summary = payload["summary"]
+    assert "elapsed_seconds" in summary
+    assert "generator_tokens" in summary
+    assert "judge_tokens" in summary
+    assert "models" in summary

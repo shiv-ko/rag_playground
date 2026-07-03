@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 import unicodedata
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from src.evaluator.judge import LocalJudge
@@ -25,6 +26,7 @@ from src.retriever.structured_context import (
 from src.structured.artifact_store import StructuredArtifactStore
 from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
+from src.utils.paths import to_repo_relative
 from src.utils.question_classifier import classify_question
 
 
@@ -45,6 +47,8 @@ class PipelineResult:
     judge_label: str
     judge_score: float
     judge_reason: str
+    raw_answer: str = ""
+    retrieved_sources: list[str] = field(default_factory=list)
 
 
 class Pipeline:
@@ -210,6 +214,10 @@ class Pipeline:
         else:
             judge_label, judge_score, judge_reason = "", 0.0, ""
 
+        retrieved_sources = [
+            f"{to_repo_relative(sd.document.source_path)}::{sd.document.location}"
+            for sd in contexts
+        ]
         return PipelineResult(
             question_id=qa.question_id,
             question=qa.question,
@@ -219,6 +227,8 @@ class Pipeline:
             judge_label=judge_label,
             judge_score=judge_score,
             judge_reason=judge_reason,
+            raw_answer=answer.raw_text,
+            retrieved_sources=retrieved_sources,
         )
 
     # ------------------------------------------------------------------ #
@@ -250,6 +260,7 @@ class Pipeline:
                     f"残り推定 {remaining/60:.1f}分"
                 )
 
+        self.last_elapsed = time.time() - start
         return results
 
     def run(self, qa_pairs: list[QAPair]) -> list[PipelineResult]:
@@ -281,6 +292,19 @@ class Pipeline:
                 "mean_score": summary.mean_score,
                 "total": summary.total,
                 "label_counts": summary.label_counts,
+                "elapsed_seconds": round(getattr(self, "last_elapsed", 0.0), 1),
+                "generator_tokens": {
+                    "input": self.generator.input_tokens,
+                    "output": self.generator.output_tokens,
+                },
+                "judge_tokens": {
+                    "input": self.judge.input_tokens,
+                    "output": self.judge.output_tokens,
+                },
+                "models": {
+                    "generator": os.environ.get("CLAUDE_MODEL", "claude-sonnet-5"),
+                    "judge": os.environ.get("CLAUDE_JUDGE_MODEL", "claude-sonnet-5"),
+                },
             },
             "results": [asdict(r) for r in results],
         }

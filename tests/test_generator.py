@@ -304,3 +304,54 @@ class TestSystemPromptConfidenceSemantics:
 
     def test_prompt_instructs_partial_answers_over_refusal(self) -> None:
         assert "部分的" in SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# raw_text（ゲート前の生回答を保持する）
+# ---------------------------------------------------------------------------
+
+
+def test_gated_answer_keeps_raw_text():
+    """ゲートで落ちてもゲート前の回答が raw_text に残る。"""
+
+    class FakeGen(AnswerGenerator):
+        def _call_llm(self, question, context):
+            return '{"answer": "生の回答", "confidence": 0.1, "citation": "本文", "reasoning": "低確信"}'
+
+    gen = FakeGen(threshold=0.4)
+    doc = ScoredDocument(
+        document=Document(text="本文", source_path=Path("dummy.txt")), score=1.0
+    )
+    ans = gen.generate("質問", [doc])
+    assert ans.was_gated is True
+    assert ans.raw_text == "生の回答"
+
+
+def test_citation_gated_answer_keeps_raw_text():
+    """引用実在チェックで落ちた場合もゲート前の回答が raw_text に残る。"""
+
+    class FakeGen(AnswerGenerator):
+        def _call_llm(self, question, context):
+            return '{"answer": "捏造回答", "confidence": 0.9, "citation": "存在しない引用", "reasoning": "r"}'
+
+    gen = FakeGen(threshold=0.4)
+    doc = ScoredDocument(
+        document=Document(text="本文", source_path=Path("dummy.txt")), score=1.0
+    )
+    ans = gen.generate("質問", [doc])
+    assert ans.was_gated is True
+    assert ans.raw_text == "捏造回答"
+
+
+def test_ungated_answer_raw_text_equals_text():
+    class FakeGen(AnswerGenerator):
+        def _call_llm(self, question, context):
+            return '{"answer": "採用された回答", "confidence": 0.9, "citation": "本文", "reasoning": "高確信"}'
+
+    gen = FakeGen(threshold=0.4)
+    doc = ScoredDocument(
+        document=Document(text="本文", source_path=Path("dummy.txt")), score=1.0
+    )
+    ans = gen.generate("質問", [doc])
+    assert ans.was_gated is False
+    assert ans.raw_text == ans.text == "採用された回答"

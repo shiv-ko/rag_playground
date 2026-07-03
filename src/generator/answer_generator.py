@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import threading
 
 from anthropic import Anthropic
 
@@ -62,6 +63,9 @@ class AnswerGenerator:
     def __init__(self, threshold: float = 0.4) -> None:
         self.gate = ConfidenceGate(threshold=threshold)
         self._client: Anthropic | None = None
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self._usage_lock = threading.Lock()
 
     def generate(self, question: str, contexts: list[ScoredDocument]) -> Answer:
         tags = classify_question(question)
@@ -91,6 +95,7 @@ class AnswerGenerator:
                 confidence=confidence,
                 source_docs=contexts,
                 was_gated=True,
+                raw_text=answer_text,
             )
 
         if not self.gate.should_answer(confidence, tags=tags):
@@ -99,6 +104,7 @@ class AnswerGenerator:
                 confidence=confidence,
                 source_docs=contexts,
                 was_gated=True,
+                raw_text=answer_text,
             )
 
         if not citation_supported(citation, context_text):
@@ -107,13 +113,17 @@ class AnswerGenerator:
                 confidence=confidence,
                 source_docs=contexts,
                 was_gated=True,
+                raw_text=answer_text,
             )
 
         # トークン制限チェック（暫定: 文字数で近似）
         if len(answer_text) > MAX_CHARS_APPROX:
             answer_text = answer_text[:MAX_CHARS_APPROX] + "…"
 
-        return Answer(text=answer_text, confidence=confidence, source_docs=contexts)
+        return Answer(
+            text=answer_text, confidence=confidence,
+            source_docs=contexts, raw_text=answer_text,
+        )
 
     def _get_client(self) -> Anthropic:
         if self._client is None:
@@ -131,6 +141,11 @@ class AnswerGenerator:
                 "content": f"【質問】\n{question}\n\n【参考文書】\n{context}",
             }],
         )
+        usage = getattr(message, "usage", None)
+        if usage is not None:
+            with self._usage_lock:
+                self.input_tokens += usage.input_tokens
+                self.output_tokens += usage.output_tokens
         return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     def _parse_response(self, raw: str) -> tuple[str, float, str]:

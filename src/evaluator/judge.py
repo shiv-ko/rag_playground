@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 
 from anthropic import Anthropic
 
@@ -40,6 +41,9 @@ class LocalJudge:
 
     def __init__(self) -> None:
         self._client: Anthropic | None = None
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self._usage_lock = threading.Lock()
 
     def score(
         self,
@@ -67,6 +71,11 @@ class LocalJudge:
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
+        usage = getattr(message, "usage", None)
+        if usage is not None:
+            with self._usage_lock:
+                self.input_tokens += usage.input_tokens
+                self.output_tokens += usage.output_tokens
         return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     def _parse(self, raw: str) -> JudgeResult:
