@@ -99,7 +99,8 @@ class KeywordStore:
             score = 0.0
             for token in query_tokens:
                 if token in tf:
-                    idf = math.log((n + 1) / (df[token] + 1))
+                    # IDF calculation with epsilon to avoid log(1)=0 in single-doc corpora
+                    idf = math.log((n + 1) / (df[token] + 0.5))
                     score += (tf[token] / total) * idf
             results.append(ScoredDocument(document=doc, score=score, retrieval_method="keyword"))
 

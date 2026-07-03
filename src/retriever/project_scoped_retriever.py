@@ -1,0 +1,66 @@
+"""案件フォルダ絞り込み＋BM25検索を行うRetriever。
+
+質問文から案件名を検出できた場合はその案件＋社内管理配下のみを対象にBM25検索し、
+検出できない場合は全体（社内管理含む）を対象に検索する。
+案件名リストはadd()時にDocument.metadata["project"]から動的に導出する（ハードコードしない）。
+"""
+from __future__ import annotations
+
+from src.indexer.keyword_store import KeywordStore
+from src.models import Document, ScoredDocument
+
+_CORPORATE_AFFIXES = ("株式会社", "医療法人社団", "有限会社", "合同会社")
+
+
+def _normalize_project_name(name: str) -> str:
+    result = name
+    for affix in _CORPORATE_AFFIXES:
+        result = result.replace(affix, "")
+    return result.strip()
+
+
+class ProjectScopedRetriever:
+    """
+    add() は全ドキュメントを1回でまとめて渡す想定（Pipeline.build_indexの使い方と一致）。
+    """
+
+    def __init__(self) -> None:
+        self._global_store = KeywordStore()
+        self._project_stores: dict[str, KeywordStore] = {}
+        self._project_names: list[str] = []
+
+    def add(self, documents: list[Document]) -> None:
+        self._global_store.add(documents)
+
+        internal_docs = [d for d in documents if d.metadata.get("is_internal")]
+        by_project: dict[str, list[Document]] = {}
+        for doc in documents:
+            project = doc.metadata.get("project")
+            if project:
+                by_project.setdefault(project, []).append(doc)
+
+        for project, docs in by_project.items():
+            if project not in self._project_stores:
+                self._project_stores[project] = KeywordStore()
+                self._project_names.append(project)
+            self._project_stores[project].add(docs)
+            if internal_docs:
+                self._project_stores[project].add(internal_docs)
+
+    def clear(self) -> None:
+        self._global_store.clear()
+        self._project_stores = {}
+        self._project_names = []
+
+    def detect_project(self, query: str) -> str | None:
+        for name in self._project_names:
+            normalized = _normalize_project_name(name)
+            if normalized and normalized in query:
+                return name
+        return None
+
+    def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
+        project = self.detect_project(query)
+        if project is not None:
+            return self._project_stores[project].search(query, top_k)
+        return self._global_store.search(query, top_k)
