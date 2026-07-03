@@ -7,6 +7,37 @@ from src.parsers.office_parser import OfficeParser
 from src.parsers.pdf_parser import PDFParser
 from src.parsers.text_parser import TextParser
 
+_NOISE_SUFFIXES = {".pyc", ".lock"}
+_NOISE_DIR_NAMES = {"__pycache__"}
+
+
+def _is_noise(file_path: Path) -> bool:
+    if file_path.name.startswith("~$"):
+        return True
+    if file_path.suffix.lower() in _NOISE_SUFFIXES:
+        return True
+    if any(part in _NOISE_DIR_NAMES for part in file_path.parts):
+        return True
+    return False
+
+
+def _extract_metadata(root: Path, file_path: Path) -> dict:
+    try:
+        rel_parts = file_path.relative_to(root).parts
+    except ValueError:
+        rel_parts = file_path.parts
+
+    metadata: dict = {"project": None, "category": None, "is_internal": False}
+    if "プロジェクト" in rel_parts:
+        idx = rel_parts.index("プロジェクト")
+        if idx + 1 < len(rel_parts):
+            metadata["project"] = rel_parts[idx + 1]
+        if idx + 2 < len(rel_parts):
+            metadata["category"] = rel_parts[idx + 2]
+    elif "社内管理" in rel_parts:
+        metadata["is_internal"] = True
+    return metadata
+
 
 class ParserDispatcher:
     def __init__(self) -> None:
@@ -30,6 +61,13 @@ class ParserDispatcher:
     def parse_directory(self, directory: Path) -> list[Document]:
         docs: list[Document] = []
         for file_path in sorted(directory.rglob("*")):
-            if file_path.is_file() and not file_path.name.startswith("."):
-                docs.extend(self.parse(file_path))
+            if not file_path.is_file() or file_path.name.startswith("."):
+                continue
+            if _is_noise(file_path):
+                continue
+            file_docs = self.parse(file_path)
+            metadata = _extract_metadata(directory, file_path)
+            for doc in file_docs:
+                doc.metadata.update(metadata)
+            docs.extend(file_docs)
         return docs

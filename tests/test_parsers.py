@@ -189,3 +189,45 @@ class TestParserDispatcher:
         assert any("ファイルA" in t for t in texts)
         assert any("ファイルB" in t for t in texts)
         assert any("ファイルC" in t for t in texts)
+
+    def test_parse_directory_extracts_project_metadata(self, tmp_path: Path) -> None:
+        """プロジェクト/<企業名>/<カテゴリ>/ 配下のファイルにproject/categoryメタデータを付与する"""
+        proj_dir = tmp_path / "プロジェクト" / "サンプル株式会社" / "00.提案"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "doc.txt").write_text("提案内容", encoding="utf-8")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+
+        assert len(docs) == 1
+        assert docs[0].metadata["project"] == "サンプル株式会社"
+        assert docs[0].metadata["category"] == "00.提案"
+        assert docs[0].metadata["is_internal"] is False
+
+    def test_parse_directory_marks_internal_docs(self, tmp_path: Path) -> None:
+        """社内管理/ 配下のファイルは is_internal=True, project=None になる"""
+        internal_dir = tmp_path / "社内管理"
+        internal_dir.mkdir()
+        (internal_dir / "用語集.txt").write_text("用語", encoding="utf-8")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+
+        assert docs[0].metadata["is_internal"] is True
+        assert docs[0].metadata["project"] is None
+
+    def test_parse_directory_skips_noise_files(self, tmp_path: Path) -> None:
+        """__pycache__/*.pyc, *.lock, ~$で始まる一時ファイルを除外する"""
+        (tmp_path / "a.txt").write_text("残す", encoding="utf-8")
+        cache_dir = tmp_path / "__pycache__"
+        cache_dir.mkdir()
+        (cache_dir / "mod.cpython-311.pyc").write_bytes(b"stub")
+        (tmp_path / "uv.lock").write_text("lock", encoding="utf-8")
+        (tmp_path / "~$temp.xlsx").write_bytes(b"lock")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+
+        texts = [d.text for d in docs]
+        assert len(docs) == 1
+        assert any("残す" in t for t in texts)
