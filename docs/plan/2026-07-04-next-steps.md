@@ -18,9 +18,9 @@
 診断情報があれば数分で切り分けられた。また±0.05のrun間ゆらぎにより、以降の実験は単一runの数値比較では
 判断できない — flip分析の標準化（Task 4）が全実験の前提になる。
 
-- [ ] worktree `.claude/worktrees/phase0-measurement-infra` の完了済みTask 1（パースキャッシュ）・Task 2（診断情報）を
-      現mainへ統合する。**注意: worktreeは`8ceb314`ベースでPhase 1/2以前。`pipeline.py`は大きく変わっているため
-      機械的マージではなく、差分の意図を現コードに適用し直す**（特に`_process_one`の構造化分岐と共存させる）
+- [x] worktree `.claude/worktrees/phase0-measurement-infra` の完了済みTask 1（パースキャッシュ）・Task 2（診断情報）を
+      現mainへ統合する（2026-07-04完了: `ac612e9` / `9c86d8e`。raw_textを現行の全ゲート経路に適応。
+      詳細は`docs/daily作業ログ/20260704_005800.md`）
 - [ ] Task 3: 検索単体評価（retrieval recall）スクリプト
 - [ ] Task 4: flip分析の標準化（`scripts/run_eval.py`にrun間差分出力）＋ **「同一コードでN=3 run→多数決ラベル」を標準手順化**（ゆらぎ対策）
 - [ ] Task 5: OpenAI CRAGジャッジとの較正（キーがあれば）。judgeゆらぎ（同一回答でラベル反転）の定量化もここで
@@ -70,7 +70,9 @@ low-riskの安定Missing（Q2/Q4/Q17/Q22）と唯一のIncorrect（Q28）はretr
 
 ## 6. 提出・運用
 
-- [ ] Phase 0マージ後、現状構成でLBに1回提出し、ローカル(0.13〜0.22)との乖離を確認（`plan_0703.md`運用ルール4）
+- [x] 提出ファイル生成済み（2026-07-04: `submission_20260704_phase1-2fix.zip`、回答19/Missing 81。
+      `make_predictions.py`がレジストリ未接続だった問題を修正してから生成 `1140bab`）
+- [ ] SIGNATEへアップロード → LB結果を`plan_0703.md`に記録し、ローカル(0.13〜0.22)との乖離を確認（`plan_0703.md`運用ルール4）
 - [ ] 以降も各フェーズ完了ごとに提出。判断は常にタイプ別フリップで（validは1問=3.3%揺れる）
 
 ## 推奨順序と目安
