@@ -1,5 +1,6 @@
 # RAG Competition
 
+- **セッション開始時はまず `vault.md` を読む**（計画・作業ログ・成果物の場所と最新状態の探し方）
 - venv: `.venv/bin/python`
 - テスト: `.venv/bin/pytest tests/ -v`
 - 実行: `.venv/bin/python scripts/run_pipeline.py`
