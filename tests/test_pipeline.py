@@ -74,10 +74,14 @@ def test_pipeline_uses_project_scoped_retriever(tmp_path: Path) -> None:
     assert isinstance(pipeline.retriever, ProjectScopedRetriever)
 
 
-def test_e2e_stub(tmp_path: Path, sample_docs: list[Document]) -> None:
-    """スタブ実装でパイプライン全体が通ることを確認する。"""
+def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> None:
+    """パイプライン全体が通ることを確認する（Anthropic APIはモック）。"""
+    from unittest.mock import patch
     from src.generator.answer_generator import AnswerGenerator
     from src.evaluator.judge import LocalJudge
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("CLAUDE_MODEL", "claude-sonnet-5")
 
     retriever = HybridRetriever()
     retriever.add(sample_docs)
@@ -87,7 +91,14 @@ def test_e2e_stub(tmp_path: Path, sample_docs: list[Document]) -> None:
 
     question = "宿泊費の上限は？"
     contexts = retriever.search(question, top_k=3)
-    answer = generator.generate(question, contexts)
+
+    fake_content = type("C", (), {"text": '{"answer": "5万円です。", "confidence": 0.9, "reasoning": "r"}'})()
+    fake_response = type("R", (), {"content": [fake_content]})()
+
+    with patch("src.generator.answer_generator.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake_response
+        answer = generator.generate(question, contexts)
+
     result = judge.score(question, answer.text, contexts[0].document.text if contexts else "")
 
     assert answer.text != ""
