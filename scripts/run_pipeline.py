@@ -34,15 +34,19 @@ def main() -> None:
         logger.info("先に python scripts/make_sample_data.py を実行してください")
         sys.exit(1)
 
-    qa_raw = json.loads(args.questions.read_text(encoding="utf-8"))
-    qa_pairs = [
-        QAPair(
-            question_id=item["id"],
-            question=item["question"],
-            reference_answer=item.get("answer", ""),
-        )
-        for item in qa_raw
-    ]
+    if args.questions.suffix.lower() == ".csv":
+        from src.utils.question_loader import load_questions_csv
+        qa_pairs = load_questions_csv(args.questions)
+    else:
+        qa_raw = json.loads(args.questions.read_text(encoding="utf-8"))
+        qa_pairs = [
+            QAPair(
+                question_id=item["id"],
+                question=item["question"],
+                reference_answer=item.get("answer", ""),
+            )
+            for item in qa_raw
+        ]
 
     pipeline = Pipeline(
         data_dir=args.data_dir,

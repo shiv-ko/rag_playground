@@ -43,10 +43,12 @@ class Pipeline:
         max_concurrent: int = 5,
         top_k: int = 5,
         confidence_threshold: float = 0.4,
+        run_judge: bool = True,
     ) -> None:
         self.data_dir = data_dir
         self.max_concurrent = max_concurrent
         self.top_k = top_k
+        self.run_judge = run_judge
         self.logger = setup_logging()
 
         self.dispatcher = ParserDispatcher()
@@ -73,14 +75,20 @@ class Pipeline:
         contexts = self.retriever.search(qa.question, top_k=self.top_k)
         answer: Answer = self.generator.generate(qa.question, contexts)
 
-        reference = qa.reference_answer or "\n".join(
-            sd.document.text[:300] for sd in contexts
-        )
-        judge_result: JudgeResult = self.judge.score(
-            question=qa.question,
-            generated_answer=answer.text,
-            reference_or_context=reference,
-        )
+        if self.run_judge:
+            reference = qa.reference_answer or "\n".join(
+                sd.document.text[:300] for sd in contexts
+            )
+            judge_result: JudgeResult = self.judge.score(
+                question=qa.question,
+                generated_answer=answer.text,
+                reference_or_context=reference,
+            )
+            judge_label = judge_result.label.value
+            judge_score = judge_result.score
+            judge_reason = judge_result.reason
+        else:
+            judge_label, judge_score, judge_reason = "", 0.0, ""
 
         return PipelineResult(
             question_id=qa.question_id,
@@ -88,9 +96,9 @@ class Pipeline:
             answer=answer.text,
             confidence=answer.confidence,
             was_gated=answer.was_gated,
-            judge_label=judge_result.label.value,
-            judge_score=judge_result.score,
-            judge_reason=judge_result.reason,
+            judge_label=judge_label,
+            judge_score=judge_score,
+            judge_reason=judge_reason,
         )
 
     # ------------------------------------------------------------------ #

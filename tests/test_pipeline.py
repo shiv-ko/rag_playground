@@ -109,3 +109,21 @@ def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> N
 
     assert answer.text != ""
     assert result.label in CRAGLabel
+
+
+def test_pipeline_skips_judge_when_run_judge_false(tmp_path: Path) -> None:
+    """run_judge=False のとき judge_label は空文字で、Judge._call_llmは呼ばれない"""
+    from unittest.mock import MagicMock
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+    pipeline.judge._call_llm = MagicMock(return_value='{"label": "Perfect", "reason": "r"}')
+    pipeline.generator._call_llm = lambda q, c: '{"answer": "回答", "confidence": 0.9, "reasoning": "r"}'
+
+    (tmp_path / "a.txt").write_text("参考テキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(question_id="0", question="質問"))
+
+    assert result.judge_label == ""
+    pipeline.judge._call_llm.assert_not_called()
