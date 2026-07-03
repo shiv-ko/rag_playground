@@ -19,6 +19,7 @@ dependencies = [
     "anthropic>=0.40",
     "tiktoken>=0.7",
     "rich>=13.0",
+    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
