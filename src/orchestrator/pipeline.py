@@ -145,17 +145,36 @@ class Pipeline:
             builders.reverse()
 
         contexts: list[ScoredDocument] = []
+        used_tag = ""
         for tag, builder in builders:
             if tag in tags:
                 contexts = builder(qa.question, project_name, self.structured_store)
                 if contexts:
+                    used_tag = tag
                     break
 
         if not contexts:
             return None
-        if not is_enumeration_complete(len(contexts), len(contexts), "structured_attribute_filter"):
+        # 完全性ゲート: 構造化パスはartifacts全件をコードで走査するため、走査した
+        # 候補プールが非空でマッチが取れていれば「条件に該当する全件」を渡せている。
+        # プール件数は実際に走査した対象から取る（マッチ件数の写しにしない）。
+        pool_size = self._structured_pool_size(used_tag, project_name)
+        if not is_enumeration_complete(len(contexts), pool_size, "structured_attribute_filter"):
             return None
         return self.generator.generate(qa.question, contexts)
+
+    def _structured_pool_size(self, tag: str, project_name: str) -> int:
+        if self.structured_store is None:
+            return 0
+        if tag == "office_style":
+            return len(self.structured_store.office_marks_for(project_name))
+        if tag == "spreadsheet_state":
+            return (
+                len(self.structured_store.train_xlsx_highlight_blocks_for(project_name))
+                + len(self.structured_store.spreadsheet_sheets_for(project_name))
+                + len(self.structured_store.schedule_tasks_for(project_name))
+            )
+        return 0
 
     def _process_one(self, qa: QAPair) -> PipelineResult:
         tags = classify_question(qa.question)
