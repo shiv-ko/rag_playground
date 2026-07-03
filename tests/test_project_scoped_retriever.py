@@ -1,6 +1,7 @@
 """ProjectScopedRetriever (案件フォルダ絞り込み＋BM25) のテスト。"""
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 
 from src.models import Document
@@ -27,6 +28,14 @@ class TestNormalizeProjectName:
 
     def test_strips_iryouhoujin_prefix(self) -> None:
         assert _normalize_project_name("医療法人社団 恒一会 かえで総合病院") == "恒一会 かえで総合病院"
+
+    def test_normalizes_nfd_to_nfc(self) -> None:
+        """macOSのファイルシステムはユニコードをNFD分解して返すため、
+        ディレクトリ名由来のproject名(NFD)とクエリ文字列(NFC)がバイト列として
+        不一致になりうる。正規化して同一視する。"""
+        nfd_name = unicodedata.normalize("NFD", "青潮モビリティサービス")
+        assert nfd_name != "青潮モビリティサービス"  # 前提: 実際に異なるバイト列
+        assert _normalize_project_name(nfd_name) == "青潮モビリティサービス"
 
 
 class TestProjectScopedRetriever:
@@ -81,6 +90,16 @@ class TestProjectScopedRetriever:
         retriever.add(docs)
 
         assert retriever.detect_project("青潮モビリティサービスについて") == "株式会社青潮モビリティサービス"
+
+    def test_detect_project_matches_despite_nfd_project_name(self) -> None:
+        """project名がNFD分解されたファイルシステム由来でも、NFCのクエリで検出できる。"""
+        retriever = ProjectScopedRetriever()
+        nfd_name = unicodedata.normalize("NFD", "株式会社青潮モビリティサービス")
+        assert nfd_name != "株式会社青潮モビリティサービス"
+        docs = [_doc("テキスト", project=nfd_name)]
+        retriever.add(docs)
+
+        assert retriever.detect_project("青潮モビリティサービスについて") == nfd_name
 
     def test_clear_resets_all_stores(self) -> None:
         retriever = ProjectScopedRetriever()

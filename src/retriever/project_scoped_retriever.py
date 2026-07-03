@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import unicodedata
+
 from src.indexer.keyword_store import KeywordStore
 from src.models import Document, ScoredDocument
 
@@ -13,7 +15,10 @@ _CORPORATE_AFFIXES = ("株式会社", "医療法人社団", "有限会社", "合
 
 
 def _normalize_project_name(name: str) -> str:
-    result = name
+    # macOSのファイルシステムはユニコードをNFD分解して返すため、
+    # ディレクトリ名由来のproject名とNFCのクエリ文字列がバイト列として
+    # 不一致になりうる。NFCに正規化してから比較する。
+    result = unicodedata.normalize("NFC", name)
     for affix in _CORPORATE_AFFIXES:
         result = result.replace(affix, "")
     return result.strip()
@@ -53,9 +58,10 @@ class ProjectScopedRetriever:
         self._project_names = []
 
     def detect_project(self, query: str) -> str | None:
+        normalized_query = unicodedata.normalize("NFC", query)
         for name in self._project_names:
             normalized = _normalize_project_name(name)
-            if normalized and normalized in query:
+            if normalized and normalized in normalized_query:
                 return name
         return None
 

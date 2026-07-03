@@ -2,79 +2,1226 @@
   {
     "term": "PP",
     "expansion": "提案書",
-    "document_type": "proposal",
-    "route_section": "00.提案"
+    "note": "Proposal Pack / Proposal Presentation"
+  },
+  {
+    "term": "PP-ADD",
+    "expansion": "提案補足資料",
+    "note": "提案書の補足・別冊"
   },
   {
     "term": "CT",
     "expansion": "契約書",
-    "document_type": "contract",
-    "route_section": "01.契約"
+    "note": "Contract"
   },
   {
-    "term": "PLAN",
-    "expansion": "計画",
-    "document_type": "plan",
-    "route_section": "02.計画"
+    "term": "CT-APP",
+    "expansion": "契約別紙",
+    "note": "契約付属文書"
   },
   {
     "term": "PL",
-    "expansion": "計画",
-    "document_type": "plan",
-    "route_section": "02.計画"
+    "expansion": "スケジュール",
+    "note": "Plan"
+  },
+  {
+    "term": "PLAN",
+    "expansion": "計画資料",
+    "note": "スケジュール以外の計画資料も含めるとき"
   },
   {
     "term": "MM",
-    "expansion": "会議資料/会議録",
-    "document_type": "meeting",
-    "route_section": "05.会議"
+    "expansion": "会議録",
+    "note": "Meeting Minutes"
+  },
+  {
+    "term": "RP",
+    "expansion": "報告資料",
+    "note": "Report Pack"
+  },
+  {
+    "term": "RP-DECK",
+    "expansion": "会議投影版",
+    "note": "会議で投影する版"
   },
   {
     "term": "FR",
-    "expansion": "最終報告",
-    "document_type": "final_report",
-    "route_section": "06.報告書"
+    "expansion": "最終報告書",
+    "note": "Final Report"
   },
   {
-    "term": "APR",
-    "expansion": "決裁基準",
-    "document_type": "approval_rule",
-    "route_section": "社内管理"
+    "term": "RS",
+    "expansion": "調査資料",
+    "note": "Research Sheet"
   },
   {
     "term": "FM",
     "expansion": "座席表",
-    "document_type": "seat_map",
-    "route_section": "社内管理"
+    "note": "Floor Map"
   },
   {
-    "term": "TG",
-    "expansion": "目的変数",
-    "document_type": "analysis_term",
-    "route_section": "04.分析"
+    "term": "IM",
+    "expansion": "社内管理資料",
+    "note": "Internal Management"
   },
   {
-    "term": "EXT",
-    "expansion": "内線番号",
-    "document_type": "people",
-    "route_section": "社内管理"
+    "term": "DIST",
+    "expansion": "配布版",
+    "note": "配布用に整えた版"
+  },
+  {
+    "term": "SCRIPT",
+    "expansion": "説明台本",
+    "note": "発表・説明用メモ"
+  },
+  {
+    "term": "RVLOG",
+    "expansion": "レビュー記録",
+    "note": "レビューコメント記録"
+  },
+  {
+    "term": "ANNEX",
+    "expansion": "参考別冊",
+    "note": "参考資料束"
+  },
+  {
+    "term": "CIRC",
+    "expansion": "社内回覧版",
+    "note": "社内だけで回す版"
+  },
+  {
+    "term": "TR",
+    "expansion": "train.csv",
+    "note": "Train Raw"
+  },
+  {
+    "term": "TX",
+    "expansion": "train.xlsx",
+    "note": "Train Workbook"
+  },
+  {
+    "term": "LB",
+    "expansion": "leaderboard.csv",
+    "note": "Leaderboard"
+  },
+  {
+    "term": "MT",
+    "expansion": "metrics.json",
+    "note": "Metrics"
+  },
+  {
+    "term": "CFG",
+    "expansion": "project_config.json",
+    "note": "Config"
+  },
+  {
+    "term": "EDA1",
+    "expansion": "01_eda.ipynb",
+    "note": "初回EDAノート"
+  },
+  {
+    "term": "FE",
+    "expansion": "features.py",
+    "note": "Feature Engineering"
+  },
+  {
+    "term": "PPROC",
+    "expansion": "preprocess.py",
+    "note": "Preprocess"
+  },
+  {
+    "term": "MDL",
+    "expansion": "modeling.py",
+    "note": "Modeling"
+  },
+  {
+    "term": "EV",
+    "expansion": "evaluate.py",
+    "note": "Evaluation"
+  },
+  {
+    "term": "INF",
+    "expansion": "infer.py",
+    "note": "Inference"
+  },
+  {
+    "term": "FIG",
+    "expansion": "reports/figures",
+    "note": "図表出力"
+  },
+  {
+    "term": "VAL",
+    "expansion": "validation出力",
+    "note": "validation用出力"
+  },
+  {
+    "term": "EXPLOG",
+    "expansion": "実験ログ",
+    "note": "trialログ・実験履歴"
+  },
+  {
+    "term": "SEL",
+    "expansion": "選択後データ",
+    "note": "特徴量選択後データ"
+  },
+  {
+    "term": "BASE",
+    "expansion": "ベースライン出力",
+    "note": "baseline結果"
+  },
+  {
+    "term": "TUNING",
+    "expansion": "チューニング結果",
+    "note": "パラメータ探索結果"
+  },
+  {
+    "term": "IMP-REP",
+    "expansion": "重要特徴量レポート",
+    "note": "feature importance系"
+  },
+  {
+    "term": "PRED",
+    "expansion": "予測結果",
+    "note": "prediction output"
+  },
+  {
+    "term": "ERR",
+    "expansion": "誤差分析出力",
+    "note": "error analysis"
+  },
+  {
+    "term": "ART",
+    "expansion": "artifacts",
+    "note": "artifacts全般"
+  },
+  {
+    "term": "NB-OUT",
+    "expansion": "notebook出力",
+    "note": "notebook生成物"
+  },
+  {
+    "term": "M01",
+    "expansion": "キックオフ",
+    "note": "会議ID運用と合わせやすい"
+  },
+  {
+    "term": "M02",
+    "expansion": "中間報告",
+    "note": "同上"
+  },
+  {
+    "term": "M03",
+    "expansion": "最終報告",
+    "note": "同上"
+  },
+  {
+    "term": "MR",
+    "expansion": "定例会",
+    "note": "Meeting Regular"
+  },
+  {
+    "term": "AI",
+    "expansion": "アクションアイテム",
+    "note": "既存運用と親和性あり"
+  },
+  {
+    "term": "PT",
+    "expansion": "優先タスク",
+    "note": "Priority Task"
+  },
+  {
+    "term": "PS",
+    "expansion": "進捗サマリ",
+    "note": "Progress Summary"
+  },
+  {
+    "term": "WBS-STAT",
+    "expansion": "WBS観点の進捗状況",
+    "note": "WBSステータスの短縮"
+  },
+  {
+    "term": "NEXT",
+    "expansion": "次回までの実施事項",
+    "note": "次アクション一覧"
+  },
+  {
+    "term": "OPEN-AI",
+    "expansion": "要アクション（未完事項）",
+    "note": "未完了アクション一覧"
+  },
+  {
+    "term": "PRE-POINT",
+    "expansion": "事前論点",
+    "note": "会議前論点整理"
+  },
+  {
+    "term": "DECISION",
+    "expansion": "決定事項",
+    "note": "決定済み事項"
+  },
+  {
+    "term": "CHECK",
+    "expansion": "確認事項",
+    "note": "会議中確認対象"
+  },
+  {
+    "term": "PENDING",
+    "expansion": "未決事項",
+    "note": "ペンディング論点"
+  },
+  {
+    "term": "KEEP",
+    "expansion": "継続課題",
+    "note": "次回持越し課題"
+  },
+  {
+    "term": "HOMEWORK",
+    "expansion": "宿題一覧",
+    "note": "宿題タスク群"
+  },
+  {
+    "term": "PROG-DELTA",
+    "expansion": "進捗差分",
+    "note": "前回との差分"
+  },
+  {
+    "term": "MEET-ID",
+    "expansion": "会議体ID",
+    "note": "M系ID全般"
+  },
+  {
+    "term": "FLOW",
+    "expansion": "資料説明順",
+    "note": "発表順序"
+  },
+  {
+    "term": "POINT-PRI",
+    "expansion": "論点優先度",
+    "note": "論点の強弱"
+  },
+  {
+    "term": "PRE-READ",
+    "expansion": "事前読み込み",
+    "note": "先読み前提"
+  },
+  {
+    "term": "POINT-SET",
+    "expansion": "論点整理済み",
+    "note": "事前論点調整済み"
+  },
+  {
+    "term": "TAKEBACK",
+    "expansion": "持ち帰り",
+    "note": "即決しない事項"
+  },
+  {
+    "term": "TASK-SET",
+    "expansion": "宿題化",
+    "note": "次回まで対応事項"
+  },
+  {
+    "term": "CL-WAIT",
+    "expansion": "先方確認待ち",
+    "note": "顧客返答待ち"
+  },
+  {
+    "term": "MIN-BEFORE",
+    "expansion": "議事反映前",
+    "note": "会議録未反映"
+  },
+  {
+    "term": "MIN-DONE",
+    "expansion": "議事反映済",
+    "note": "会議録更新済み"
+  },
+  {
+    "term": "NEXT-HOLD",
+    "expansion": "次回持越し",
+    "note": "継続事項"
+  },
+  {
+    "term": "REG-A",
+    "expansion": "定例A枠",
+    "note": "社内便宜上の会議枠"
+  },
+  {
+    "term": "REG-B",
+    "expansion": "定例B枠",
+    "note": "社内便宜上の会議枠"
+  },
+  {
+    "term": "FP",
+    "expansion": "固定価格契約",
+    "note": "Fixed Price"
+  },
+  {
+    "term": "TM",
+    "expansion": "実費精算契約",
+    "note": "Time and Materials"
+  },
+  {
+    "term": "EST",
+    "expansion": "見込金額",
+    "note": "Estimate"
+  },
+  {
+    "term": "FIN",
+    "expansion": "最終請求金額",
+    "note": "Final Billing"
+  },
+  {
+    "term": "RATE",
+    "expansion": "時間単価",
+    "note": "Hourly Rate"
   },
   {
     "term": "ESTH",
     "expansion": "見込工数",
-    "document_type": "contract_metric",
-    "route_section": "01.契約"
+    "note": "Estimated Hours"
   },
   {
     "term": "ACTH",
     "expansion": "実績工数",
-    "document_type": "contract_metric",
-    "route_section": "06.報告書"
+    "note": "Actual Hours"
   },
   {
-    "term": "RATE",
-    "expansion": "単価",
-    "document_type": "contract_metric",
-    "route_section": "01.契約"
+    "term": "GROSS",
+    "expansion": "税込金額",
+    "note": "Tax Included"
+  },
+  {
+    "term": "NET",
+    "expansion": "税抜金額",
+    "note": "Tax Excluded"
+  },
+  {
+    "term": "APR",
+    "expansion": "決裁基準",
+    "note": "Approval Rule"
+  },
+  {
+    "term": "APR-M1",
+    "expansion": "課長承認",
+    "note": "Manager Lv1"
+  },
+  {
+    "term": "APR-M2",
+    "expansion": "部長承認",
+    "note": "Manager Lv2"
+  },
+  {
+    "term": "APR-M3",
+    "expansion": "本部長承認",
+    "note": "Manager Lv3"
+  },
+  {
+    "term": "PAYTERM",
+    "expansion": "支払条件",
+    "note": "Payment Term"
+  },
+  {
+    "term": "ACC-DATE",
+    "expansion": "検収基準日",
+    "note": "Acceptance Date"
+  },
+  {
+    "term": "EST-CAP",
+    "expansion": "概算上限",
+    "note": "見積上限"
+  },
+  {
+    "term": "ACT-CAP",
+    "expansion": "精算上限",
+    "note": "精算上限"
+  },
+  {
+    "term": "OVH",
+    "expansion": "超過工数",
+    "note": "over hours"
+  },
+  {
+    "term": "OVBILL",
+    "expansion": "超過請求",
+    "note": "超過分請求"
+  },
+  {
+    "term": "ACC-COND",
+    "expansion": "検収条件",
+    "note": "受入条件"
+  },
+  {
+    "term": "BILL-HOLD",
+    "expansion": "請求保留",
+    "note": "請求一時保留"
+  },
+  {
+    "term": "PAY-HOLD",
+    "expansion": "支払留保",
+    "note": "支払留保"
+  },
+  {
+    "term": "REFUND",
+    "expansion": "返金対象",
+    "note": "減額・返金対象"
+  },
+  {
+    "term": "RE-EST",
+    "expansion": "再見積",
+    "note": "見積再提示"
+  },
+  {
+    "term": "CT-DELTA",
+    "expansion": "契約差分",
+    "note": "契約変更点"
+  },
+  {
+    "term": "APR-1",
+    "expansion": "一次稟議",
+    "note": "基本承認"
+  },
+  {
+    "term": "APR-2",
+    "expansion": "二次稟議",
+    "note": "追加承認"
+  },
+  {
+    "term": "EX-APR",
+    "expansion": "特例承認",
+    "note": "例外案件向け"
+  },
+  {
+    "term": "REMAND",
+    "expansion": "差戻し",
+    "note": "修正差戻し"
+  },
+  {
+    "term": "COND-APR",
+    "expansion": "条件付き承認",
+    "note": "条件付きで通す場合"
+  },
+  {
+    "term": "AUD-CHK",
+    "expansion": "監査確認",
+    "note": "監査室経由確認"
+  },
+  {
+    "term": "LEGAL-ROT",
+    "expansion": "法務回覧",
+    "note": "法務の閲覧承認"
+  },
+  {
+    "term": "SEAL-PEND",
+    "expansion": "押印待ち",
+    "note": "手続き進行中状態"
+  },
+  {
+    "term": "PRE-EST",
+    "expansion": "概算見積",
+    "note": "初期見積"
+  },
+  {
+    "term": "SETTLE-EST",
+    "expansion": "精算見込",
+    "note": "実績精算前の見込"
+  },
+  {
+    "term": "ACC-PEND",
+    "expansion": "検収待ち",
+    "note": "顧客受領待ち"
+  },
+  {
+    "term": "BILL-PREP",
+    "expansion": "請求準備中",
+    "note": "発行前状態"
+  },
+  {
+    "term": "BILL-FIX",
+    "expansion": "請求確定",
+    "note": "金額確定済み"
+  },
+  {
+    "term": "PAY-CHECK",
+    "expansion": "未入金確認中",
+    "note": "追跡中"
+  },
+  {
+    "term": "PAY-CLEAR",
+    "expansion": "入金消込済み",
+    "note": "消込完了"
+  },
+  {
+    "term": "NEXT-SETTLE",
+    "expansion": "次月精算",
+    "note": "翌月持越し精算"
+  },
+  {
+    "term": "RATE-HOLD",
+    "expansion": "単価据置",
+    "note": "単価変更なし"
+  },
+  {
+    "term": "NO-CT-DELTA",
+    "expansion": "契約差分なし",
+    "note": "条件変更なし"
+  },
+  {
+    "term": "TG",
+    "expansion": "目的変数",
+    "note": "Target"
+  },
+  {
+    "term": "FT",
+    "expansion": "説明変数",
+    "note": "Feature"
+  },
+  {
+    "term": "NUM",
+    "expansion": "数値特徴量",
+    "note": "Numeric Feature"
+  },
+  {
+    "term": "CAT",
+    "expansion": "カテゴリ特徴量",
+    "note": "Categorical Feature"
+  },
+  {
+    "term": "SEL-FT",
+    "expansion": "選択特徴量",
+    "note": "Selected Feature"
+  },
+  {
+    "term": "ENG-FT",
+    "expansion": "エンジニアリング特徴量",
+    "note": "Engineered Feature"
+  },
+  {
+    "term": "INT-FT",
+    "expansion": "交互作用特徴量",
+    "note": "Interaction Feature"
+  },
+  {
+    "term": "HC-CAT",
+    "expansion": "高カーディナリティ列",
+    "note": "High Cardinality Category"
+  },
+  {
+    "term": "IMP",
+    "expansion": "欠損補完",
+    "note": "Imputation"
+  },
+  {
+    "term": "MED-IMP",
+    "expansion": "中央値補完",
+    "note": "Median Imputation"
+  },
+  {
+    "term": "MODE-IMP",
+    "expansion": "最頻値補完",
+    "note": "Mode Imputation"
+  },
+  {
+    "term": "OHE",
+    "expansion": "One-Hot Encoding",
+    "note": "One-Hot Encoding"
+  },
+  {
+    "term": "STD",
+    "expansion": "標準化",
+    "note": "Standardization"
+  },
+  {
+    "term": "FILTER-COND",
+    "expansion": "抽出条件",
+    "note": "条件付き抽出"
+  },
+  {
+    "term": "RAW-FT",
+    "expansion": "生特徴量",
+    "note": "元列そのままの特徴量"
+  },
+  {
+    "term": "DROP-FT",
+    "expansion": "除外特徴量",
+    "note": "モデル入力から除外"
+  },
+  {
+    "term": "DATE-FT",
+    "expansion": "日付由来特徴量",
+    "note": "date展開特徴量"
+  },
+  {
+    "term": "CYCLE-FT",
+    "expansion": "周期特徴量",
+    "note": "sin/cosなど"
+  },
+  {
+    "term": "TEXT-FT",
+    "expansion": "文字列特徴量",
+    "note": "文字列由来"
+  },
+  {
+    "term": "ID-FT",
+    "expansion": "識別子列",
+    "note": "id, code系"
+  },
+  {
+    "term": "TARGET-LEAK",
+    "expansion": "リーク疑い特徴量",
+    "note": "target leakage候補"
+  },
+  {
+    "term": "FT-IMP",
+    "expansion": "重要特徴量",
+    "note": "importance対象"
+  },
+  {
+    "term": "FT-RANK",
+    "expansion": "特徴量順位",
+    "note": "ranking"
+  },
+  {
+    "term": "BIN-FT",
+    "expansion": "ビニング特徴量",
+    "note": "離散化特徴量"
+  },
+  {
+    "term": "EDA-INIT",
+    "expansion": "初回EDA",
+    "note": "初回探索分析"
+  },
+  {
+    "term": "RETRAIN-CAND",
+    "expansion": "再学習候補",
+    "note": "追加学習候補"
+  },
+  {
+    "term": "THR-WIN",
+    "expansion": "閾値調整枠",
+    "note": "しきい値調整工程"
+  },
+  {
+    "term": "FE-REVIEW",
+    "expansion": "特徴量再検討",
+    "note": "FE見直し"
+  },
+  {
+    "term": "ADOPT-MDL",
+    "expansion": "採択モデル",
+    "note": "最終採用モデル"
+  },
+  {
+    "term": "TEMP-ADOPT",
+    "expansion": "暫定採用",
+    "note": "一時採用"
+  },
+  {
+    "term": "NO-PROD",
+    "expansion": "本番化対象外",
+    "note": "PoC止まり"
+  },
+  {
+    "term": "VAL-ONLY",
+    "expansion": "検証専用",
+    "note": "本番転用なし"
+  },
+  {
+    "term": "ADD-VAL-WAIT",
+    "expansion": "追加検証待ち",
+    "note": "継続評価予定"
+  },
+  {
+    "term": "REPRO-OK",
+    "expansion": "再現確認済み",
+    "note": "結果再現済み"
+  },
+  {
+    "term": "ACC",
+    "expansion": "Accuracy",
+    "note": "分類"
+  },
+  {
+    "term": "F1M",
+    "expansion": "F1-macro",
+    "note": "分類"
+  },
+  {
+    "term": "AUC",
+    "expansion": "ROC-AUC",
+    "note": "分類"
+  },
+  {
+    "term": "PRC",
+    "expansion": "Precision",
+    "note": "分類"
+  },
+  {
+    "term": "REC",
+    "expansion": "Recall",
+    "note": "分類"
+  },
+  {
+    "term": "RMSE",
+    "expansion": "RMSE",
+    "note": "回帰"
+  },
+  {
+    "term": "MAE",
+    "expansion": "MAE",
+    "note": "回帰"
+  },
+  {
+    "term": "R2",
+    "expansion": "R2",
+    "note": "回帰"
+  },
+  {
+    "term": "DELTA",
+    "expansion": "改善幅",
+    "note": "前後比較"
+  },
+  {
+    "term": "RAW-METRIC",
+    "expansion": "実測値",
+    "note": "丸め前の実測値"
+  },
+  {
+    "term": "VIEW-METRIC",
+    "expansion": "表示値",
+    "note": "丸め後の資料表示値"
+  },
+  {
+    "term": "BAL-ACC",
+    "expansion": "Balanced Accuracy",
+    "note": "分類"
+  },
+  {
+    "term": "MCC",
+    "expansion": "Matthews相関係数",
+    "note": "分類"
+  },
+  {
+    "term": "LOGLOSS",
+    "expansion": "Log Loss",
+    "note": "分類"
+  },
+  {
+    "term": "PR-AUC",
+    "expansion": "PR-AUC",
+    "note": "分類"
+  },
+  {
+    "term": "TOPK",
+    "expansion": "Top-K指標",
+    "note": "上位K評価"
+  },
+  {
+    "term": "LIFT",
+    "expansion": "Lift",
+    "note": "スコアリング"
+  },
+  {
+    "term": "GAIN",
+    "expansion": "Gain",
+    "note": "スコアリング"
+  },
+  {
+    "term": "ERR-RATE",
+    "expansion": "エラー率",
+    "note": "誤分類率"
+  },
+  {
+    "term": "VAR-DELTA",
+    "expansion": "変動幅",
+    "note": "ばらつき"
+  },
+  {
+    "term": "STAB",
+    "expansion": "安定性指標",
+    "note": "stability"
+  },
+  {
+    "term": "HIST",
+    "expansion": "ヒストグラム",
+    "note": "Histogram"
+  },
+  {
+    "term": "CHM",
+    "expansion": "相関ヒートマップ",
+    "note": "Correlation Heatmap"
+  },
+  {
+    "term": "DG",
+    "expansion": "ドーナツグラフ",
+    "note": "Donut Graph"
+  },
+  {
+    "term": "BC",
+    "expansion": "バブルチャート",
+    "note": "Bubble Chart"
+  },
+  {
+    "term": "CH-1",
+    "expansion": "グラフ1",
+    "note": "Chart 1"
+  },
+  {
+    "term": "CH-2",
+    "expansion": "グラフ2",
+    "note": "Chart 2"
+  },
+  {
+    "term": "YL",
+    "expansion": "黄色ハイライト",
+    "note": "Yellow Highlight"
+  },
+  {
+    "term": "RED",
+    "expansion": "赤字",
+    "note": "Red Font"
+  },
+  {
+    "term": "B",
+    "expansion": "太字",
+    "note": "Bold"
+  },
+  {
+    "term": "U",
+    "expansion": "下線",
+    "note": "Underline"
+  },
+  {
+    "term": "I",
+    "expansion": "イタリック",
+    "note": "Italic"
+  },
+  {
+    "term": "CMT",
+    "expansion": "コメント付き",
+    "note": "Word コメント等"
+  },
+  {
+    "term": "IMG-PDF",
+    "expansion": "画像PDF",
+    "note": "OCR前提PDF"
+  },
+  {
+    "term": "WM-PDF",
+    "expansion": "ウォーターマーク付きPDF",
+    "note": "Watermark PDF"
+  },
+  {
+    "term": "LEG",
+    "expansion": "凡例",
+    "note": "legend"
+  },
+  {
+    "term": "AX",
+    "expansion": "軸ラベル",
+    "note": "axis label"
+  },
+  {
+    "term": "XTICK",
+    "expansion": "x軸目盛",
+    "note": "x ticks"
+  },
+  {
+    "term": "YTICK",
+    "expansion": "y軸目盛",
+    "note": "y ticks"
+  },
+  {
+    "term": "SER-1",
+    "expansion": "系列1",
+    "note": "series 1"
+  },
+  {
+    "term": "SER-2",
+    "expansion": "系列2",
+    "note": "series 2"
+  },
+  {
+    "term": "BIN",
+    "expansion": "ビン",
+    "note": "ヒストグラムのビン"
+  },
+  {
+    "term": "NOTE",
+    "expansion": "スピーカーノート",
+    "note": "notes"
+  },
+  {
+    "term": "POP",
+    "expansion": "吹き出し注記",
+    "note": "callout"
+  },
+  {
+    "term": "LAYER",
+    "expansion": "レイヤー",
+    "note": "前面/背面・重なり"
+  },
+  {
+    "term": "PW-RULE",
+    "expansion": "パスワード導出規則",
+    "note": "Password Rule"
+  },
+  {
+    "term": "APR-RULE",
+    "expansion": "決裁基準",
+    "note": "Approval Rule"
+  },
+  {
+    "term": "EXT",
+    "expansion": "内線番号",
+    "note": "Extension"
+  },
+  {
+    "term": "TERM-BOOK",
+    "expansion": "社内用語集",
+    "note": "本資料"
+  },
+  {
+    "term": "APPROVER",
+    "expansion": "承認者",
+    "note": "決裁者"
+  },
+  {
+    "term": "LOCKDOC",
+    "expansion": "鍵付き文書",
+    "note": "password protected document"
+  },
+  {
+    "term": "UNLOCK-KEY",
+    "expansion": "開錠キー",
+    "note": "復号キー"
+  },
+  {
+    "term": "PW-HINT",
+    "expansion": "パスワードヒント",
+    "note": "ヒント文"
+  },
+  {
+    "term": "DESK-ID",
+    "expansion": "席ID",
+    "note": "座席識別子"
+  },
+  {
+    "term": "POD",
+    "expansion": "島/エリア",
+    "note": "seating island"
+  },
+  {
+    "term": "SHARE-ROOT",
+    "expansion": "共有ドライブ起点",
+    "note": "share root"
+  },
+  {
+    "term": "CTRL-RULE",
+    "expansion": "アクセス制御規則",
+    "note": "control rule"
+  },
+  {
+    "term": "VIEW-LVL",
+    "expansion": "閲覧権限レベル",
+    "note": "viewing level"
+  },
+  {
+    "term": "MASK-RULE",
+    "expansion": "マスキング規則",
+    "note": "masking rule"
+  },
+  {
+    "term": "ANON",
+    "expansion": "匿名化済み",
+    "note": "個人特定不可状態"
+  },
+  {
+    "term": "PSEUDO",
+    "expansion": "仮名化",
+    "note": "一部識別子変換"
+  },
+  {
+    "term": "SEC-VAULT",
+    "expansion": "秘匿領域",
+    "note": "社内限定保護領域"
+  },
+  {
+    "term": "VIEW-L1/L2/L3",
+    "expansion": "閲覧制限レベル1/2/3",
+    "note": "セキュリティレベル"
+  },
+  {
+    "term": "NO-CARRY",
+    "expansion": "持ち出し禁止",
+    "note": "共有ドライブ外禁止"
+  },
+  {
+    "term": "MASTER-HOLD",
+    "expansion": "原本保管",
+    "note": "元データ保全"
+  },
+  {
+    "term": "NO-REDIST",
+    "expansion": "二次配布禁止",
+    "note": "外部再共有不可"
+  },
+  {
+    "term": "PURGE-DATE",
+    "expansion": "削除予定日",
+    "note": "保存期限管理"
+  },
+  {
+    "term": "READ-ONLY",
+    "expansion": "参照専用",
+    "note": "編集不可"
+  },
+  {
+    "term": "AUD-LOG",
+    "expansion": "監査ログ対象",
+    "note": "追跡対象ファイル"
+  },
+  {
+    "term": "DFT",
+    "expansion": "ドラフト版",
+    "note": "作成途中"
+  },
+  {
+    "term": "RV",
+    "expansion": "レビュー版",
+    "note": "社内レビュー用"
+  },
+  {
+    "term": "IN-CHECK",
+    "expansion": "社内確認版",
+    "note": "対外提出前"
+  },
+  {
+    "term": "CL-SUBMIT",
+    "expansion": "顧客提出版",
+    "note": "提出済み版"
+  },
+  {
+    "term": "FROZEN",
+    "expansion": "旧版凍結",
+    "note": "変更不可版"
+  },
+  {
+    "term": "DELTA-CHK",
+    "expansion": "差分確認中",
+    "note": "比較作業中"
+  },
+  {
+    "term": "RERENDER",
+    "expansion": "再出力版",
+    "note": "再生成済み版"
+  },
+  {
+    "term": "INT-NOTE",
+    "expansion": "内部補足あり",
+    "note": "ノートや備考付"
+  },
+  {
+    "term": "TAG-LEFT",
+    "expansion": "注記残し",
+    "note": "確認ポイント残存"
+  },
+  {
+    "term": "FIG-SWAP",
+    "expansion": "図差替済",
+    "note": "図版のみ修正済み"
+  },
+  {
+    "term": "ISLAND",
+    "expansion": "座席島",
+    "note": "座席のまとまり"
+  },
+  {
+    "term": "SEAT-V",
+    "expansion": "紫色の席",
+    "note": "色ベース俗称"
+  },
+  {
+    "term": "SEAT-Y",
+    "expansion": "黄色の席",
+    "note": "色ベース俗称"
+  },
+  {
+    "term": "DOC-BOX",
+    "expansion": "資料置き場",
+    "note": "ファイル群全体"
+  },
+  {
+    "term": "LEDGER",
+    "expansion": "マスター管理表",
+    "note": "台帳類の俗称"
+  },
+  {
+    "term": "PARENT-DOC",
+    "expansion": "元資料",
+    "note": "ソース資料"
+  },
+  {
+    "term": "CHILD-DOC",
+    "expansion": "派生資料",
+    "note": "加工後資料"
+  },
+  {
+    "term": "SIDE-COPY",
+    "expansion": "他案件流用",
+    "note": "使い回し"
+  },
+  {
+    "term": "CASE-BOX",
+    "expansion": "案件フォルダ一式",
+    "note": "案件単位の塊"
+  },
+  {
+    "term": "SHARE-BAY",
+    "expansion": "共有ドライブ",
+    "note": "社内俗称"
+  },
+  {
+    "term": "INT-RULE",
+    "expansion": "社内ルール",
+    "note": "決裁・PW規則等含む"
+  },
+  {
+    "term": "DS-HQ",
+    "expansion": "データサイエンス本部",
+    "note": "組織略称"
+  },
+  {
+    "term": "CASE-HUB",
+    "expansion": "案件推進室",
+    "note": "PMO系チーム"
+  },
+  {
+    "term": "BIZ-PLAN",
+    "expansion": "営業企画",
+    "note": "営業支援・提案管理"
+  },
+  {
+    "term": "LEGAL-INFO",
+    "expansion": "法務・情報管理",
+    "note": "法務確認・情報統制"
+  },
+  {
+    "term": "LEAD-MGR",
+    "expansion": "統括マネージャー",
+    "note": "役職略称"
+  },
+  {
+    "term": "EXEC-SP",
+    "expansion": "経営スポンサー",
+    "note": "役職英語表記"
+  },
+  {
+    "term": "CASE-OWN",
+    "expansion": "案件オーナー",
+    "note": "営業責任者・主管部門長"
+  },
+  {
+    "term": "QA-HEAD",
+    "expansion": "品質レビュー責任者",
+    "note": "QA統括者"
   }
 ]

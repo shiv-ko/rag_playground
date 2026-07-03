@@ -3,15 +3,23 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
+from docx import Document as DocxDocument
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from src.utils.glossary import parse_project_aliases, parse_term_entries
+
 SHARE_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ"
 PROJECT_ROOT = SHARE_ROOT / "プロジェクト"
 INTERNAL_ROOT = SHARE_ROOT / "社内管理"
 ARTIFACTS = ROOT / "artifacts"
+GLOSSARY_PATH = INTERNAL_ROOT / "社内用語集.docx"
 
 
 SECTION_PREFIXES = {
@@ -25,36 +33,10 @@ SECTION_PREFIXES = {
 }
 
 
-TERM_REGISTRY = [
-    {"term": "PP", "expansion": "提案書", "document_type": "proposal", "route_section": "00.提案"},
-    {"term": "CT", "expansion": "契約書", "document_type": "contract", "route_section": "01.契約"},
-    {"term": "PLAN", "expansion": "計画", "document_type": "plan", "route_section": "02.計画"},
-    {"term": "PL", "expansion": "計画", "document_type": "plan", "route_section": "02.計画"},
-    {"term": "MM", "expansion": "会議資料/会議録", "document_type": "meeting", "route_section": "05.会議"},
-    {"term": "FR", "expansion": "最終報告", "document_type": "final_report", "route_section": "06.報告書"},
-    {"term": "APR", "expansion": "決裁基準", "document_type": "approval_rule", "route_section": "社内管理"},
-    {"term": "FM", "expansion": "座席表", "document_type": "seat_map", "route_section": "社内管理"},
-    {"term": "TG", "expansion": "目的変数", "document_type": "analysis_term", "route_section": "04.分析"},
-    {"term": "EXT", "expansion": "内線番号", "document_type": "people", "route_section": "社内管理"},
-    {"term": "ESTH", "expansion": "見込工数", "document_type": "contract_metric", "route_section": "01.契約"},
-    {"term": "ACTH", "expansion": "実績工数", "document_type": "contract_metric", "route_section": "06.報告書"},
-    {"term": "RATE", "expansion": "単価", "document_type": "contract_metric", "route_section": "01.契約"},
-]
-
-
-PROJECT_ALIASES = {
-    "京橋信用ソリューションズ株式会社": ["京橋", "京ソ", "KSS"],
-    "医療法人社団 恒 一会 かえで総合病院": ["恒一", "かえで"],
-    "医療法人社団 恒一会 かえで総合病院": ["恒一", "かえで"],
-    "医療法人社団 蒼樹会 みなみ野女性医療センター": ["蒼樹", "みなみ野", "MINAMINO"],
-    "医療法人社団 蒼泉会 ひがし丘総合病院": ["蒼泉", "ひがし丘"],
-    "株式会社東都人材プラットフォーム": ["東都", "TOTO"],
-    "株式会社青嶺不動産アセットマネジメント": ["青嶺", "AOMINE"],
-    "株式会社青潮モビリティサービス": ["青潮", "AOSHIO"],
-    "株式会社青葉バイオメディカル機器": ["青葉バイオ", "AOBM"],
-    "白峰信用リスク評価株式会社": ["白峰", "SHR"],
-    "青葉与信マネジメント株式会社": ["青葉与信", "AYM"],
-}
+def read_docx_tables(path: Path) -> list[list[list[str]]]:
+    """docxの全テーブルを list[表] / 表=list[行] / 行=list[セル文字列] として読む。"""
+    doc = DocxDocument(path)
+    return [[[cell.text for cell in row.cells] for row in table.rows] for table in doc.tables]
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -70,20 +52,22 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def normalize_project_name(name: str) -> str:
-    return name.replace(" ", "")
+    # macOSのファイルシステムはユニコードをNFD分解して返すため、
+    # ディレクトリ名(NFD)とdocx由来の案件名(NFC)がバイト列として不一致になりうる。
+    return unicodedata.normalize("NFC", name).replace(" ", "")
 
 
-def aliases_for(project_name: str) -> list[str]:
-    aliases = {project_name}
+def aliases_for(project_name: str, project_aliases: dict[str, list[str]]) -> list[str]:
     normalized = normalize_project_name(project_name)
-    aliases.add(normalized)
-    for key, values in PROJECT_ALIASES.items():
+    aliases = {normalized}
+    for key, values in project_aliases.items():
         if normalize_project_name(key) == normalized:
             aliases.update(values)
-    # Conservative short aliases from company name.
+    # Conservative short aliases from company name (NFC正規化後の文字列に対して判定する。
+    # ディレクトリ名がNFD分解されている場合、正規化前の文字列だとtoken一致に失敗するため)。
     for token in ("株式会社", "医療法人社団", "総合病院", "女性医療センター"):
-        if token in project_name:
-            aliases.add(project_name.replace(token, "").strip())
+        if token in normalized:
+            aliases.add(normalized.replace(token, "").strip())
     return sorted(alias for alias in aliases if alias)
 
 
@@ -180,14 +164,14 @@ def ids_from_path(path: Path) -> list[str]:
     return sorted(set(re.findall(r"\b(?:M|MS|T|A|CP)\d{1,3}\b", text)))
 
 
-def build_project_registry() -> list[dict[str, Any]]:
+def build_project_registry(project_aliases: dict[str, list[str]]) -> list[dict[str, Any]]:
     projects = []
     for project_dir in sorted(p for p in PROJECT_ROOT.iterdir() if p.is_dir()):
         files = [p for p in project_dir.rglob("*") if p.is_file()]
         projects.append(
             {
                 "project_name": project_dir.name,
-                "aliases": aliases_for(project_dir.name),
+                "aliases": aliases_for(project_dir.name, project_aliases),
                 "file_count": len(files),
                 "sections": sorted({section_for(p)[0] for p in files if section_for(p)[0]}),
             }
@@ -195,7 +179,7 @@ def build_project_registry() -> list[dict[str, Any]]:
     return projects
 
 
-def build_document_registry() -> list[dict[str, Any]]:
+def build_document_registry(project_aliases: dict[str, list[str]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     all_files = [p for p in PROJECT_ROOT.rglob("*") if p.is_file()]
     all_files.extend(p for p in INTERNAL_ROOT.rglob("*") if p.is_file())
@@ -212,7 +196,7 @@ def build_document_registry() -> list[dict[str, Any]]:
             {
                 "source_path": str(path.relative_to(ROOT)),
                 "project_name": project_name,
-                "project_aliases": aliases_for(project_name) if project_name else [],
+                "project_aliases": aliases_for(project_name, project_aliases) if project_name else [],
                 "section": section,
                 "raw_section": raw_section,
                 "document_type": document_type(path, section),
@@ -230,14 +214,18 @@ def build_document_registry() -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    projects = build_project_registry()
-    documents = build_document_registry()
+    tables = read_docx_tables(GLOSSARY_PATH)
+    project_aliases = parse_project_aliases(tables)
+    term_registry = parse_term_entries(tables)
+
+    projects = build_project_registry(project_aliases)
+    documents = build_document_registry(project_aliases)
     write_json(ARTIFACTS / "project_registry.json", projects)
     write_jsonl(ARTIFACTS / "document_registry.jsonl", documents)
-    write_json(ARTIFACTS / "term_registry.json", TERM_REGISTRY)
+    write_json(ARTIFACTS / "term_registry.json", term_registry)
     print(f"projects={len(projects)}")
     print(f"documents={len(documents)}")
-    print(f"terms={len(TERM_REGISTRY)}")
+    print(f"terms={len(term_registry)}")
 
 
 if __name__ == "__main__":
