@@ -274,8 +274,7 @@ class TestJudgeCallLLMRealIntegration:
         assert raw == '{"label": "Perfect", "reason": "正確"}'
         _, kwargs = MockAnthropic.return_value.messages.create.call_args
         assert kwargs["model"] == "claude-sonnet-5"
-        # valid実測でrun間のラベル反転（判定ゆらぎ）が観測されたため決定的にする
-        assert kwargs["temperature"] == 0.0
+        assert "temperature" not in kwargs
         assert kwargs["messages"][0]["content"] == "この回答を評価してください"
 
     def test_call_llm_defaults_to_claude_sonnet_5_when_env_unset(self, monkeypatch) -> None:
