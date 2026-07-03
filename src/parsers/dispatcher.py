@@ -1,4 +1,5 @@
 """ファイル拡張子に応じて適切なパーサーへ振り分ける。"""
+import unicodedata
 from pathlib import Path
 
 from src.models import Document
@@ -28,6 +29,9 @@ def _extract_metadata(root: Path, file_path: Path) -> dict:
         rel_parts = file_path.relative_to(root).parts
     except ValueError:
         rel_parts = file_path.parts
+    # macOSのファイルシステム／zip展開由来のパスはNFD分解されていることがあり、
+    # ソースコード内のNFCリテラル（"プロジェクト"等）と一致しない。NFCに揃える。
+    rel_parts = tuple(unicodedata.normalize("NFC", part) for part in rel_parts)
 
     metadata: dict = {"project": None, "category": None, "is_internal": False}
     if "プロジェクト" in rel_parts:

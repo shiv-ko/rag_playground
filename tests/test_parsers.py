@@ -246,6 +246,28 @@ class TestParserDispatcher:
         assert docs[0].metadata["category"] == "00.提案"
         assert docs[0].metadata["is_internal"] is False
 
+    def test_parse_directory_extracts_project_metadata_from_nfd_paths(self, tmp_path: Path) -> None:
+        """macOSのファイルシステム／zip展開由来のNFDパス（「プロジェクト」の「ジ」が
+        分解されている等）でもproject/categoryメタデータを付与できる。
+        これが失敗すると実データで全ドキュメントのprojectがNoneになり、
+        案件スコープ検索・構造化ルーティングが一切機能しなくなる。"""
+        import unicodedata
+
+        nfd_projects = unicodedata.normalize("NFD", "プロジェクト")
+        nfd_company = unicodedata.normalize("NFD", "青葉与信マネジメント株式会社")
+        assert nfd_projects != "プロジェクト"  # 前提: 分解可能な文字を含む
+
+        proj_dir = tmp_path / nfd_projects / nfd_company / "02.計画"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "doc.txt").write_text("計画内容", encoding="utf-8")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+
+        assert len(docs) == 1
+        assert docs[0].metadata["project"] == "青葉与信マネジメント株式会社"  # NFCで返る
+        assert docs[0].metadata["category"] == "02.計画"
+
     def test_parse_directory_marks_internal_docs(self, tmp_path: Path) -> None:
         """社内管理/ 配下のファイルは is_internal=True, project=None になる"""
         internal_dir = tmp_path / "社内管理"
