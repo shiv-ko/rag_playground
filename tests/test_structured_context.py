@@ -236,3 +236,32 @@ class TestOfficeStyleHighlightAndNarrowing:
             "P99において赤で強調されている箇所を抜き出してください。", "A社", store
         )
         assert len(docs) == 1
+
+
+class TestOfficeStyleContextSelfDescription:
+    """LLMに渡すdocument textに「どの装飾に一致したか」を明記する。
+    生のrun断片だけだと、LLMがそれをハイライト箇所と確信できずゲートしてしまう。"""
+
+    def test_highlight_match_text_describes_decoration(self):
+        store = _store_with_marks([
+            {"source_path": "x/M02.docx", "file_name": "M02.docx", "extension": ".docx",
+             "slide_number": None, "text": "見込金額（税込）", "bold": False, "italic": False,
+             "underline": False, "font_color": None, "fill_color": None,
+             "highlight_color": "YELLOW (7)"},
+        ])
+        docs = build_office_style_context(
+            "M02資料（docx）において、黄色でハイライトされている部分を抜き出してください。", "A社", store
+        )
+        assert len(docs) == 1
+        text = docs[0].document.text
+        assert "見込金額（税込）" in text
+        assert "黄色" in text and "ハイライト" in text  # 装飾の説明が含まれる
+
+    def test_bold_match_text_describes_decoration(self):
+        store = _store_with_marks([
+            {"source_path": "x/契約書.docx", "file_name": "契約書.docx", "extension": ".docx",
+             "slide_number": None, "text": "重要条項", "bold": True, "italic": False,
+             "underline": False, "font_color": None, "fill_color": None},
+        ])
+        docs = build_office_style_context("契約書で太字の箇所を抽出してください。", "A社", store)
+        assert "太字" in docs[0].document.text

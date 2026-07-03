@@ -13,6 +13,12 @@ _STYLE_KEYWORD_MAP = {
     "italic": ("イタリック",),
     "underline": ("下線",),
 }
+_STYLE_LABELS = {"bold": "太字", "italic": "イタリック", "underline": "下線"}
+_COLOR_LABELS = {
+    "red": "赤", "yellow": "黄色", "blue": "青", "green": "緑",
+    "orange": "オレンジ", "purple": "紫", "pink": "ピンク",
+    "black": "黒", "white": "白", "gray": "灰色", "brown": "茶", "cyan": "シアン",
+}
 _COLOR_KEYWORD_MAP = {
     "red": ("赤",),
     "yellow": ("黄", "黄色"),
@@ -111,27 +117,35 @@ def build_office_style_context(
     for mark in marks:
         if not mark.get("text", "").strip():
             continue
-        if style_attrs and any(mark.get(attr) for attr in style_attrs):
-            matched.append(mark)
-            continue
+        decorations = [
+            _STYLE_LABELS[attr] for attr in style_attrs if mark.get(attr)
+        ]
         if color_names:
             font_name = nearest_basic_color_name(mark.get("font_color"))
             fill_name = nearest_basic_color_name(mark.get("fill_color"))
-            if (
-                font_name in color_names
-                or fill_name in color_names
-                or _highlight_color_name(mark) in color_names
-            ):
-                matched.append(mark)
+            highlight_name = _highlight_color_name(mark)
+            if font_name in color_names:
+                decorations.append(f"{_COLOR_LABELS.get(font_name, font_name)}の文字色")
+            if fill_name in color_names:
+                decorations.append(f"{_COLOR_LABELS.get(fill_name, fill_name)}の背景色")
+            if highlight_name in color_names:
+                decorations.append(f"{_COLOR_LABELS.get(highlight_name, highlight_name)}のハイライト")
+        if decorations:
+            matched.append((mark, decorations))
 
-    matched = _narrow_marks_by_question_hints(question, matched)
+    narrowed_marks = _narrow_marks_by_question_hints(question, [m for m, _ in matched])
+    narrowed_ids = {id(m) for m in narrowed_marks}
+    matched = [(m, d) for m, d in matched if id(m) in narrowed_ids]
 
     docs = []
-    for mark in matched:
+    for mark, decorations in matched:
         slide_number = mark.get("slide_number")
         location = f"slide_{slide_number}" if slide_number is not None else mark.get("unit_type", "")
+        # LLMが「この断片は質問の装飾条件に一致した箇所だ」と確信できるよう自己記述にする
+        file_name = mark.get("file_name") or Path(str(mark.get("source_path") or "")).name
+        text = f"{file_name} 内の装飾箇所（{'、'.join(decorations)}）: {mark['text']}"
         doc = Document(
-            text=mark["text"],
+            text=text,
             source_path=Path(mark["source_path"]),
             location=location,
         )
