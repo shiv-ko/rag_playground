@@ -34,3 +34,38 @@ def test_question_can_have_multiple_tags() -> None:
     tags = classify_question(q)
     assert "image_or_graph" in tags
     assert "version_diff" in tags
+
+
+def test_detects_spreadsheet_state_question() -> None:
+    assert "spreadsheet_state" in classify_question(
+        "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。"
+    )
+    assert "spreadsheet_state" in classify_question(
+        "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。"
+    )
+    assert "spreadsheet_state" in classify_question(
+        "青葉与信マネジメントのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。"
+    )
+
+
+def test_detects_office_style_question() -> None:
+    assert "office_style" in classify_question(
+        "恒一会 かえで総合病院の契約書において、太字で記載されている箇所のうち、日付以外のものをすべて抽出してください。"
+    )
+    assert "office_style" in classify_question(
+        "東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。"
+    )
+
+
+def test_detects_spreadsheet_calc_question() -> None:
+    assert "spreadsheet_calc" in classify_question(
+        "青葉与信マネジメントの分析対象データにおいて、term=3 years、grade=B1、purpose=credit_cardに該当するloan_amntの平均を算出してください。四捨五入して整数値で出してください。"
+    )
+    assert "spreadsheet_calc" in classify_question(
+        "恒一会 かえで総合病院のプロジェクトデータ（train.csv）において、disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。"
+    )
+
+
+def test_question_can_have_both_spreadsheet_state_and_highlight_style_tags() -> None:
+    tags = classify_question("提案書.pptxで黄色ハイライトされている数値を抜き出してください。")
+    assert "office_style" in tags
