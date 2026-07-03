@@ -1,8 +1,11 @@
-"""CRAG基準ローカルジャッジ。本番差し替えポイント: _call_llm() にClaude API呼び出しを入れる。"""
+"""CRAG基準ローカルジャッジ。_call_llm() はAnthropic APIを呼び出す。"""
 from __future__ import annotations
 
 import json
+import os
 import re
+
+from anthropic import Anthropic
 
 from src.models import CRAGLabel, JudgeResult
 
@@ -32,8 +35,11 @@ JUDGE_PROMPT_TEMPLATE = """\
 
 class LocalJudge:
     """
-    本番差し替えポイント: _call_llm() を Claude API 呼び出しに置き換える。
+    CRAG基準ローカルジャッジ。_call_llm() でAnthropic APIを呼び出す。
     """
+
+    def __init__(self) -> None:
+        self._client: Anthropic | None = None
 
     def score(
         self,
@@ -49,9 +55,20 @@ class LocalJudge:
         raw = self._call_llm(prompt)
         return self._parse(raw)
 
+    def _get_client(self) -> Anthropic:
+        if self._client is None:
+            self._client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        return self._client
+
     def _call_llm(self, prompt: str) -> str:
-        """本番差し替えポイント。今はルールベーススタブ。"""
-        return '{"label": "Missing", "reason": "LLM未接続のためスタブ判定"}'
+        model = os.environ.get("CLAUDE_JUDGE_MODEL", "claude-sonnet-5")
+        message = self._get_client().messages.create(
+            model=model,
+            max_tokens=300,
+            temperature=0.0,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return message.content[0].text
 
     def _parse(self, raw: str) -> JudgeResult:
         try:

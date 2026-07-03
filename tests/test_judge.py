@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from src.models import CRAGLabel, JudgeResult
@@ -249,3 +251,43 @@ class TestSummarize:
         summary = summarize(results)
         assert summary.total == 1
         assert summary.mean_score == 0.5
+
+
+# ---------------------------------------------------------------------------
+# LocalJudge._call_llm  ―  実際のAnthropic API接続（モックで検証）
+# ---------------------------------------------------------------------------
+
+
+class TestJudgeCallLLMRealIntegration:
+    def test_call_llm_sends_prompt_and_returns_text(self, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("CLAUDE_JUDGE_MODEL", "claude-sonnet-5")
+
+        judge = LocalJudge()
+        fake_content = type("C", (), {"text": '{"label": "Perfect", "reason": "正確"}'})()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        with patch("src.evaluator.judge.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            raw = judge._call_llm("この回答を評価してください")
+
+        assert raw == '{"label": "Perfect", "reason": "正確"}'
+        _, kwargs = MockAnthropic.return_value.messages.create.call_args
+        assert kwargs["model"] == "claude-sonnet-5"
+        assert kwargs["temperature"] == 0.0
+        assert kwargs["messages"][0]["content"] == "この回答を評価してください"
+
+    def test_call_llm_defaults_to_claude_sonnet_5_when_env_unset(self, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.delenv("CLAUDE_JUDGE_MODEL", raising=False)
+
+        judge = LocalJudge()
+        fake_content = type("C", (), {"text": "{}"})()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        with patch("src.evaluator.judge.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            judge._call_llm("プロンプト")
+
+        _, kwargs = MockAnthropic.return_value.messages.create.call_args
+        assert kwargs["model"] == "claude-sonnet-5"
