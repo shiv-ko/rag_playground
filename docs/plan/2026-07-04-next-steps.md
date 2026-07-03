@@ -1,0 +1,86 @@
+# 次アクション計画（2026-07-04策定）
+
+> 位置づけ: `plan_0703.md`（ロードマップ）の進捗更新版。Phase 1+2 是正後（valid mean 0.13〜0.22、3run）を起点に、
+> 次に何をどの順でやるかを定める。各項目の着手時は従来通り実装計画を別途作ってから進める（1実験1変更・TDD）。
+
+## 0. 現在地（2026-07-04時点の実測）
+
+- valid 30問: mean **0.13〜0.22**（同一コード3run。ゆらぎ±0.05は既知の制約 — temperature指定不可のため）
+- **安定Perfect（3/3）**: Q8（契約条件計算）/ Q13（spreadsheet_calc）/ Q20（scheduleタスク列挙）
+- **フリップ（1〜2/3のみ成功）**: Q5 / Q14 / Q18 / Q27 — 能力はあるのに安定しない層。**回収すれば+0.10〜0.15相当**
+- **安定Incorrect傾向**: Q28（notebookチャンク分割で判定条件が泣き別れ→部分コードから誤断定）
+- 安定Missing 21問の内訳: office_style 3 / spreadsheet_state 3 / calc 2 / single_text 2 / list_extraction 2 / internal_terms 2 / notebook_output 2 / その他5
+- test 100問の規模感: **spreadsheet_state 21** / version_diff 11 / internal_terms 11 / contract_rule 10 / office_style 9 / calc 9 / cross_project 9
+
+## 1. 【最優先】Phase 0 計測基盤の完成とマージ
+
+**理由**: 今回のNFDバグ診断は `retrieved_sources` が無いために実データ再現を何度も要した。Phase 0 Task 2の
+診断情報があれば数分で切り分けられた。また±0.05のrun間ゆらぎにより、以降の実験は単一runの数値比較では
+判断できない — flip分析の標準化（Task 4）が全実験の前提になる。
+
+- [ ] worktree `.claude/worktrees/phase0-measurement-infra` の完了済みTask 1（パースキャッシュ）・Task 2（診断情報）を
+      現mainへ統合する。**注意: worktreeは`8ceb314`ベースでPhase 1/2以前。`pipeline.py`は大きく変わっているため
+      機械的マージではなく、差分の意図を現コードに適用し直す**（特に`_process_one`の構造化分岐と共存させる）
+- [ ] Task 3: 検索単体評価（retrieval recall）スクリプト
+- [ ] Task 4: flip分析の標準化（`scripts/run_eval.py`にrun間差分出力）＋ **「同一コードでN=3 run→多数決ラベル」を標準手順化**（ゆらぎ対策）
+- [ ] Task 5: OpenAI CRAGジャッジとの較正（キーがあれば）。judgeゆらぎ（同一回答でラベル反転）の定量化もここで
+- [ ] Task 6-7: Missing切り分け表の生成と`plan_0703.md`更新
+
+**完了条件**: 「変更→30問評価→flip確認」が数分で回り、安定Missing 21問が「検索失敗/生成失敗/較正失敗」に分類されている。
+
+## 2. フリップ層の安定化（安価・+0.10〜0.15）
+
+Q5/Q14/Q18/Q27は正解を出せることが実証済みで、落ちる原因はゲート境界（conf 0.4付近）と引用のゆらぎ。
+
+- [ ] 落ちたrunの`was_gated`・confidence・（Phase 0マージ後は）ゲート前回答を突き合わせ、どのゲートで落ちたか特定
+- [ ] 引用の安定化: SYSTEM_PROMPTで「citationは文書中の連続する短い一節（30字以内）をそのまま」と制約を強める
+      （長い引用ほど写し間違いで実在チェックに落ちる）
+- [ ] しきい値調整はPhase 5のグリッドサーチまで温存（単発でいじらない）
+
+## 3. Phase 2 残課題（test 39問に直結、期待値最大）
+
+完了条件「該当タイプでPerfect過半」は未達（9問中1）。診断済みの残ギャップを潰す。優先はtest問数の多い順。
+
+- [ ] **spreadsheet_state（test 21問・最大）**:
+  - フィルタ条件質問: ヘッダ＋非表示行番号だけでは条件を導けない。`spreadsheet_cells.jsonl`（全セル保持）から
+    **可視行と非表示行の列ごとの値差分**を計算してコンテキスト化（Q11）
+  - Pivot質問: `train_xlsx_highlight_blocks/context` をspreadsheet_stateパスに接続強化（Q6/Q21。
+    かえで総合病院はファイル破損で`failures=1`のため、`scan_train_xlsx_xml.py`側の到達可否も確認）
+- [ ] **office_style（test 9問）**: 「M02資料」→`報告資料_2025-08-06.docx`の対応付け。
+  スケジュールxlsxのマイルストーン表（MS ID→日付）が実行時に取れるので、**「M0N資料」= MS0Nの日付近傍の
+  報告系ファイル**として汎用導出する（ファイル名ハードコード禁止の規約に適合）。対応付け後もLLMが確信を
+  持てない場合はコンテキストに対応根拠を明記（Q0/Q23/Q25）
+- [ ] **spreadsheet_calc（test 9問）**: CalcSpecに `group_by` + `select`（argmax/argmin）を追加し、
+  現在意図的にMissingへ倒しているgroupby系（Q7/Q26）を決定的pandasで処理。ゲート（0行・列不在→Missing）は維持
+
+## 4. Phase 3 着手（test 30問、Phase 2と並行可）
+
+`plan_0703.md` §Phase 3 の既定路線。資産（`version_diff_poc.jsonl`全11ペアdiff成功等）があり着手可能。
+
+- [ ] version_diff（11問）→ contract_rule（10問）→ cross_project（9問）の順（valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め）
+- [ ] internal_terms（test 11問）はPhase 3扱いで追加検討: valid Q15/Q16はMS日付・営業日計算系で、
+  上記スケジュール/マイルストーン資産（§3のMS表）を流用できる可能性が高い
+
+## 5. チャンク・検索の修正（Phase 0の切り分け結果待ち）
+
+low-riskの安定Missing（Q2/Q4/Q17/Q22）と唯一のIncorrect（Q28）はretrieval/chunking起因の疑い。
+**Phase 0 Task 3のrecall実測で規模を確定してから**着手（Phase 1計画で意図的に先送りした項目。感覚で直さない）。
+
+- [ ] Q28型の対策: notebook/コードのチャンク分割で条件式が泣き別れないよう、セル単位・関数単位の境界を優先
+
+## 6. 提出・運用
+
+- [ ] Phase 0マージ後、現状構成でLBに1回提出し、ローカル(0.13〜0.22)との乖離を確認（`plan_0703.md`運用ルール4）
+- [ ] 以降も各フェーズ完了ごとに提出。判断は常にタイプ別フリップで（validは1問=3.3%揺れる）
+
+## 推奨順序と目安
+
+| 順 | 項目 | 期待効果 | 目安 |
+|---|---|---|---|
+| 1 | §1 Phase 0完成・マージ | 全実験の判定精度（前提投資） | 〜7/6 |
+| 2 | §2 フリップ安定化 | +0.10〜0.15 | 7/6前後 |
+| 3 | §3 Phase 2残課題 | test 39問×成功率向上 | 〜7/13 |
+| 4 | §4 Phase 3 | test 30問（+internal_terms 11） | 〜7/27 |
+| 5 | §5 チャンク・検索 | low-risk Missing回収＋Incorrect根絶 | 切り分け後 |
+
+※ 締切8/20・フリーズ目安8/13（`plan_0703.md` §5）。元計画より約1週間先行しているので、貯金は§3〜4の精度向上に使う。
