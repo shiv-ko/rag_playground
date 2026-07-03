@@ -20,14 +20,21 @@ class PDFParser:
                 location="stub",
             )]
 
-        docs: list[Document] = []
-        reader = pypdf.PdfReader(str(file_path))
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text() or ""
-            if text.strip():
-                docs.append(Document(
-                    text=text,
-                    source_path=file_path,
-                    location=f"page_{i+1}",
-                ))
+        try:
+            docs: list[Document] = []
+            reader = pypdf.PdfReader(str(file_path))
+            for i, page in enumerate(reader.pages):
+                text = page.extract_text() or ""
+                if text.strip():
+                    docs.append(Document(
+                        text=text,
+                        source_path=file_path,
+                        location=f"page_{i+1}",
+                    ))
+        except Exception:
+            return [Document(
+                text=f"[PDF解析失敗: パスワード保護または破損の可能性] {file_path.name}",
+                source_path=file_path,
+                location="stub",
+            )]
         return docs or [Document(text="", source_path=file_path, location="empty")]

@@ -75,6 +75,15 @@ class TestPDFParser:
         assert len(docs) == 1
         assert "[PDF未解析" in docs[0].text
 
+    def test_pdf_parse_failure_returns_stub_not_raises(self, tmp_path: Path) -> None:
+        """暗号化・破損したPDFでも例外を投げずスタブを返す"""
+        f = tmp_path / "broken.pdf"
+        f.write_bytes(b"%PDF-1.4 this is not a valid pdf structure")
+        parser = PDFParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text or "empty" == docs[0].location
+
 
 # ─────────────────────── OfficeParser ───────────────────────
 
@@ -124,6 +133,31 @@ class TestOfficeParser:
             docs = parser.parse(f)
         assert len(docs) == 1
         assert "PPTX未解析" in docs[0].text
+
+    def test_docx_parse_failure_returns_stub_not_raises(self, tmp_path: Path) -> None:
+        """壊れた/パスワード保護されたdocxでも例外を投げずスタブを返す"""
+        f = tmp_path / "broken.docx"
+        f.write_bytes(b"not a real docx file, definitely not a valid zip")
+        parser = OfficeParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
+
+    def test_xlsx_parse_failure_returns_stub_not_raises(self, tmp_path: Path) -> None:
+        f = tmp_path / "broken.xlsx"
+        f.write_bytes(b"not a real xlsx file")
+        parser = OfficeParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
+
+    def test_pptx_parse_failure_returns_stub_not_raises(self, tmp_path: Path) -> None:
+        f = tmp_path / "broken.pptx"
+        f.write_bytes(b"not a real pptx file")
+        parser = OfficeParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
 
 
 # ─────────────────────── ImageParser ───────────────────────
