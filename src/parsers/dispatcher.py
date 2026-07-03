@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from src.models import Document
+from src.parsers.chunker import chunk_documents
 from src.parsers.image_parser import ImageParser
 from src.parsers.office_parser import OfficeParser
 from src.parsers.pdf_parser import PDFParser
@@ -70,4 +71,4 @@ class ParserDispatcher:
             for doc in file_docs:
                 doc.metadata.update(metadata)
             docs.extend(file_docs)
-        return docs
+        return chunk_documents(docs)
