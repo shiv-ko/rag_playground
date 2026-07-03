@@ -23,6 +23,16 @@ _COLOR_KEYWORD_MAP = {
 }
 
 
+_SPREADSHEET_HINTS = (".xlsx", "シート", "セル", "ピボット", "pivot")
+
+
+def question_mentions_spreadsheet(question: str) -> bool:
+    """質問がxlsx系ファイルを指しているか（office_style/spreadsheet_state両タグが
+    付いた場合に、どちらの構造化パスを先に試すかの判定に使う）。"""
+    lower = question.lower()
+    return any(hint in lower for hint in _SPREADSHEET_HINTS)
+
+
 def _requested_style_attrs(question: str) -> list[str]:
     return [
         attr

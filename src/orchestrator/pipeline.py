@@ -17,7 +17,11 @@ from src.models import Answer, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.retriever.query_expander import QueryExpander
-from src.retriever.structured_context import build_office_style_context, build_spreadsheet_state_context
+from src.retriever.structured_context import (
+    build_office_style_context,
+    build_spreadsheet_state_context,
+    question_mentions_spreadsheet,
+)
 from src.structured.artifact_store import StructuredArtifactStore
 from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
@@ -125,11 +129,21 @@ class Pipeline:
         if self.structured_store is None:
             return None
 
+        # 「ハイライト」等のキーワードは両タグに付きうるため排他にせず、
+        # 質問中のファイル種別ヒントで優先順を決め、空なら他方も試す
+        builders = [
+            ("office_style", build_office_style_context),
+            ("spreadsheet_state", build_spreadsheet_state_context),
+        ]
+        if question_mentions_spreadsheet(qa.question):
+            builders.reverse()
+
         contexts: list[ScoredDocument] = []
-        if "office_style" in tags:
-            contexts = build_office_style_context(qa.question, project_name, self.structured_store)
-        elif "spreadsheet_state" in tags:
-            contexts = build_spreadsheet_state_context(qa.question, project_name, self.structured_store)
+        for tag, builder in builders:
+            if tag in tags:
+                contexts = builder(qa.question, project_name, self.structured_store)
+                if contexts:
+                    break
 
         if not contexts:
             return None

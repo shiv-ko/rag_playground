@@ -229,3 +229,110 @@ def test_pipeline_routes_spreadsheet_calc_question_to_calc_answerer(tmp_path: Pa
     ))
 
     assert "1500" in result.answer
+
+
+def test_pipeline_falls_through_to_spreadsheet_state_when_office_style_has_no_match(tmp_path: Path) -> None:
+    """「黄色ハイライトされている」等の質問はoffice_styleタグも付くが、
+    office_marksに該当が無ければspreadsheet_stateパスを試す（elifで排他にしない）。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "train_xlsx_highlight_blocks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/train.xlsx",
+            "project_name": "テスト社",
+            "sheet_name": "Pivot",
+            "range": "F22",
+            "fill_color_name": "yellow",
+            "first_value": "35.95",
+            "column_header": {"cell": "F3", "value": "平均 / bmi", "formula": None},
+            "same_row_values": [{"cell": "E22", "value": "39", "formula": None}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    captured_contexts: list[str] = []
+
+    def _fake_llm(question: str, context: str) -> str:
+        captured_contexts.append(context)
+        return json.dumps({
+            "answer": "列見出し「平均 / bmi」のF22セル（値35.95）です。",
+            "confidence": 0.9,
+            "citation": "平均 / bmi",
+            "reasoning": "r",
+        }, ensure_ascii=False)
+
+    pipeline.generator._call_llm = _fake_llm
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxのPivotシートで黄色ハイライトされているセルの抽出条件を教えてください。",
+    ))
+
+    assert captured_contexts and "平均 / bmi" in captured_contexts[0]
+    assert "平均 / bmi" in result.answer
+
+
+def test_pipeline_prefers_spreadsheet_state_for_xlsx_questions_over_office_marks(tmp_path: Path) -> None:
+    """xlsx系の手がかり（.xlsx/シート/セル）がある質問では、同じ案件のpptx/docxの
+    ハイライトrunではなくspreadsheet_state側のコンテキストを使う。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "office_marks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/提案書.pptx",
+            "project_name": "テスト社",
+            "file_name": "提案書.pptx",
+            "slide_number": 1,
+            "text": "無関係な黄色ハイライトのスライド文言",
+            "bold": False,
+            "italic": False,
+            "underline": False,
+            "font_color": None,
+            "fill_color": "FFFF00",
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (artifacts_dir / "train_xlsx_highlight_blocks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/train.xlsx",
+            "project_name": "テスト社",
+            "sheet_name": "Pivot",
+            "range": "F22",
+            "fill_color_name": "yellow",
+            "first_value": "35.95",
+            "column_header": {"cell": "F3", "value": "平均 / bmi", "formula": None},
+            "same_row_values": [],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    captured_contexts: list[str] = []
+
+    def _fake_llm(question: str, context: str) -> str:
+        captured_contexts.append(context)
+        return json.dumps({
+            "answer": "F22", "confidence": 0.9, "citation": "F22", "reasoning": "r",
+        }, ensure_ascii=False)
+
+    pipeline.generator._call_llm = _fake_llm
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxのPivotシートで黄色ハイライトされているセルの抽出条件を教えてください。",
+    ))
+
+    assert captured_contexts
+    assert "平均 / bmi" in captured_contexts[0]
+    assert "無関係な黄色ハイライトのスライド文言" not in captured_contexts[0]
