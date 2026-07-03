@@ -82,6 +82,7 @@ def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> N
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("CLAUDE_MODEL", "claude-sonnet-5")
+    monkeypatch.setenv("CLAUDE_JUDGE_MODEL", "claude-sonnet-5")
 
     retriever = HybridRetriever()
     retriever.add(sample_docs)
@@ -99,7 +100,12 @@ def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> N
         MockAnthropic.return_value.messages.create.return_value = fake_response
         answer = generator.generate(question, contexts)
 
-    result = judge.score(question, answer.text, contexts[0].document.text if contexts else "")
+    fake_judge_content = type("C", (), {"text": '{"label": "Perfect", "reason": "r"}'})()
+    fake_judge_response = type("R", (), {"content": [fake_judge_content]})()
+
+    with patch("src.evaluator.judge.Anthropic") as MockJudgeAnthropic:
+        MockJudgeAnthropic.return_value.messages.create.return_value = fake_judge_response
+        result = judge.score(question, answer.text, contexts[0].document.text if contexts else "")
 
     assert answer.text != ""
     assert result.label in CRAGLabel
