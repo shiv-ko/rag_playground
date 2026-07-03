@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from src.generator.confidence_gate import ConfidenceGate
-from src.generator.answer_generator import AnswerGenerator, MAX_CHARS_APPROX
+from src.generator.answer_generator import AnswerGenerator, MAX_CHARS_APPROX, SYSTEM_PROMPT
 from src.models import Answer, Document, ScoredDocument
 
 
@@ -141,3 +142,46 @@ class TestAnswerGeneratorGenerate:
         assert answer.text.endswith("…")
         # MAX_CHARS_APPROX 文字 + "…" の 1 文字
         assert len(answer.text) == MAX_CHARS_APPROX + 1
+
+
+# ---------------------------------------------------------------------------
+# AnswerGenerator._call_llm  ―  実際のAnthropic API接続（モックで検証）
+# ---------------------------------------------------------------------------
+
+
+class TestCallLLMRealIntegration:
+    def test_call_llm_sends_system_prompt_and_returns_text(self, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("CLAUDE_MODEL", "claude-sonnet-5")
+
+        gen = AnswerGenerator()
+
+        fake_content = type("C", (), {"text": '{"answer": "テスト回答", "confidence": 0.9, "reasoning": "r"}'})()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        with patch("src.generator.answer_generator.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            raw = gen._call_llm("質問文です", "文脈です")
+
+        assert raw == '{"answer": "テスト回答", "confidence": 0.9, "reasoning": "r"}'
+        _, kwargs = MockAnthropic.return_value.messages.create.call_args
+        assert kwargs["model"] == "claude-sonnet-5"
+        assert kwargs["temperature"] == 0.0
+        assert kwargs["system"] == SYSTEM_PROMPT
+        assert "質問文です" in kwargs["messages"][0]["content"]
+        assert "文脈です" in kwargs["messages"][0]["content"]
+
+    def test_call_llm_defaults_to_claude_sonnet_5_when_env_unset(self, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.delenv("CLAUDE_MODEL", raising=False)
+
+        gen = AnswerGenerator()
+        fake_content = type("C", (), {"text": "{}"})()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        with patch("src.generator.answer_generator.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            gen._call_llm("質問", "文脈")
+
+        _, kwargs = MockAnthropic.return_value.messages.create.call_args
+        assert kwargs["model"] == "claude-sonnet-5"

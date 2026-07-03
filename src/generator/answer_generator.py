@@ -1,5 +1,9 @@
-"""回答生成。本番差し替えポイント: _call_llm() に実際のClaude API呼び出しを入れる。"""
+"""回答生成。_call_llm() はAnthropic APIを呼び出す。"""
 from __future__ import annotations
+
+import os
+
+from anthropic import Anthropic
 
 from src.generator.confidence_gate import ConfidenceGate
 from src.models import Answer, ScoredDocument
@@ -42,12 +46,13 @@ def _build_context(contexts: list[ScoredDocument]) -> str:
 
 class AnswerGenerator:
     """
-    本番差し替えポイント: _call_llm() を Claude API 呼び出しに置き換える。
+    _call_llm() は Claude API 呼び出しを行う。
     それ以外のロジック（プロンプト構築・ゲート・トークン制限）はそのまま使える。
     """
 
     def __init__(self, threshold: float = 0.4) -> None:
         self.gate = ConfidenceGate(threshold=threshold)
+        self._client: Anthropic | None = None
 
     def generate(self, question: str, contexts: list[ScoredDocument]) -> Answer:
         if not contexts:
@@ -77,12 +82,24 @@ class AnswerGenerator:
 
         return Answer(text=answer_text, confidence=confidence, source_docs=contexts)
 
+    def _get_client(self) -> Anthropic:
+        if self._client is None:
+            self._client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        return self._client
+
     def _call_llm(self, question: str, context: str) -> str:
-        """本番差し替えポイント。今はスタブを返す。"""
-        return (
-            '{"answer": "スタブ回答: LLM未接続のため回答できません。", '
-            '"confidence": 0.0, "reasoning": "stub"}'
+        model = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
+        message = self._get_client().messages.create(
+            model=model,
+            max_tokens=1500,
+            temperature=0.0,
+            system=SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": f"【質問】\n{question}\n\n【参考文書】\n{context}",
+            }],
         )
+        return message.content[0].text
 
     def _parse_response(self, raw: str) -> tuple[str, float]:
         import json
