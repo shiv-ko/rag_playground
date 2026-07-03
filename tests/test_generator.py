@@ -80,6 +80,16 @@ class TestLooksLikeMissing:
     def test_normal_answer_is_not_missing(self) -> None:
         assert looks_like_missing("宿泊費の上限は15,000円です。") is False
 
+    def test_partial_answer_containing_missing_phrase_is_not_missing(self) -> None:
+        """実質的な回答を含む部分回答は、末尾に「わかりません」があってもMissing扱いしない
+        （プロンプトの部分回答推奨と矛盾する過剰ゲートの緩和）。"""
+        assert looks_like_missing(
+            "宿泊費の上限は15,000円です。日当については資料に記載がなくわかりません。"
+        ) is False
+
+    def test_multi_sentence_pure_missing_is_still_missing(self) -> None:
+        assert looks_like_missing("わかりません。該当箇所が見つかりません。") is True
+
 
 # ---------------------------------------------------------------------------
 # AnswerGenerator._parse_response

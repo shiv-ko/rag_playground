@@ -33,5 +33,13 @@ _MISSING_PHRASES = ("わかりません", "見つかりません", "不明です
 
 
 def looks_like_missing(text: str) -> bool:
-    """LLMの回答本文がMissing相当の自己申告かどうかを判定する。"""
-    return any(phrase in text for phrase in _MISSING_PHRASES)
+    """LLMの回答本文がMissing相当の自己申告かどうかを判定する。
+
+    全文が「わかりません」系の文で構成されている場合のみMissingとみなす。
+    実質的な回答文を1つでも含む部分回答（例:「Xは15,000円です。Yはわかりません。」）
+    はMissing扱いしない（部分回答を推奨するプロンプトと矛盾させないため）。
+    """
+    sentences = [s.strip() for s in text.replace("\n", "。").split("。") if s.strip()]
+    if not sentences:
+        return False
+    return all(any(phrase in s for phrase in _MISSING_PHRASES) for s in sentences)

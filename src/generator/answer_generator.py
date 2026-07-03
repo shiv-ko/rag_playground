@@ -14,7 +14,7 @@ from src.utils.question_classifier import classify_question
 MAX_CHARS_APPROX = 3500
 
 SYSTEM_PROMPT = """\
-あなたは社内共有ドライブの文書を参照して質問に答るアシスタントです。
+あなたは社内共有ドライブの文書を参照して質問に答えるアシスタントです。
 
 【評価基準】
 - Perfect (1点): 正確かつ虚偽のない回答
