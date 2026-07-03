@@ -29,10 +29,14 @@ class ProjectScopedRetriever:
     add() は全ドキュメントを1回でまとめて渡す想定（Pipeline.build_indexの使い方と一致）。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, project_aliases: dict[str, list[str]] | None = None) -> None:
         self._global_store = KeywordStore()
         self._project_stores: dict[str, KeywordStore] = {}
         self._project_names: list[str] = []
+        self._aliases_by_normalized_name: dict[str, list[str]] = {
+            _normalize_project_name(name): aliases
+            for name, aliases in (project_aliases or {}).items()
+        }
 
     def add(self, documents: list[Document]) -> None:
         self._global_store.add(documents)
@@ -63,6 +67,12 @@ class ProjectScopedRetriever:
             normalized = _normalize_project_name(name)
             if normalized and normalized in normalized_query:
                 return name
+        for name in self._project_names:
+            aliases = self._aliases_by_normalized_name.get(_normalize_project_name(name), [])
+            for alias in aliases:
+                normalized_alias = _normalize_project_name(alias)
+                if normalized_alias and normalized_alias in normalized_query:
+                    return name
         return None
 
     def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:

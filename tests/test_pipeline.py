@@ -127,3 +127,33 @@ def test_pipeline_skips_judge_when_run_judge_false(tmp_path: Path) -> None:
 
     assert result.judge_label == ""
     pipeline.judge._call_llm.assert_not_called()
+
+
+def test_pipeline_expands_search_query_with_term_registry(tmp_path: Path) -> None:
+    """term_registryが渡されると検索クエリに用語展開が反映される。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    pipeline = Pipeline(
+        data_dir=tmp_path,
+        run_judge=False,
+        term_registry=[{"term": "TG", "expansion": "目的変数", "note": "Target"}],
+    )
+    pipeline.generator._call_llm = (
+        lambda q, c: '{"answer": "回答", "confidence": 0.9, "citation": "", "reasoning": "r"}'
+    )
+
+    captured_queries: list[str] = []
+    original_search = pipeline.retriever.search
+
+    def _spy_search(query: str, top_k: int = 5):
+        captured_queries.append(query)
+        return original_search(query, top_k=top_k)
+
+    pipeline.retriever.search = _spy_search
+
+    (tmp_path / "a.txt").write_text("目的変数についての説明です。", encoding="utf-8")
+    pipeline.build_index()
+
+    pipeline._process_one(QAPair(question_id="0", question="TGの定義は？"))
+
+    assert captured_queries == ["TGの定義は？ 目的変数"]

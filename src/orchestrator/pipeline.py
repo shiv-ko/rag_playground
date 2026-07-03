@@ -13,6 +13,7 @@ from src.generator.answer_generator import AnswerGenerator
 from src.models import Answer, JudgeResult
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
+from src.retriever.query_expander import QueryExpander
 from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
 
@@ -44,6 +45,8 @@ class Pipeline:
         top_k: int = 5,
         confidence_threshold: float = 0.4,
         run_judge: bool = True,
+        project_aliases: dict[str, list[str]] | None = None,
+        term_registry: list[dict] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.max_concurrent = max_concurrent
@@ -52,7 +55,8 @@ class Pipeline:
         self.logger = setup_logging()
 
         self.dispatcher = ParserDispatcher()
-        self.retriever = ProjectScopedRetriever()
+        self.retriever = ProjectScopedRetriever(project_aliases=project_aliases)
+        self.query_expander = QueryExpander(term_registry or [])
         self.generator = AnswerGenerator(threshold=confidence_threshold)
         self.judge = LocalJudge()
 
@@ -72,7 +76,8 @@ class Pipeline:
     # ------------------------------------------------------------------ #
 
     def _process_one(self, qa: QAPair) -> PipelineResult:
-        contexts = self.retriever.search(qa.question, top_k=self.top_k)
+        search_query = self.query_expander.expand_terms(qa.question)
+        contexts = self.retriever.search(search_query, top_k=self.top_k)
         answer: Answer = self.generator.generate(qa.question, contexts)
 
         if self.run_judge:

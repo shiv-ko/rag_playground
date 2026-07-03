@@ -28,6 +28,8 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--concurrent", type=int, default=5)
     parser.add_argument("--threshold", type=float, default=0.4)
+    parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
+                        help="レジストリJSONのディレクトリ")
     args = parser.parse_args()
 
     logger = setup_logging()
@@ -51,11 +53,23 @@ def main() -> None:
             for item in qa_raw
         ]
 
+    project_aliases: dict[str, list[str]] = {}
+    term_registry: list[dict] = []
+    projects_path = args.artifacts_dir / "project_registry.json"
+    terms_path = args.artifacts_dir / "term_registry.json"
+    if projects_path.exists():
+        projects = json.loads(projects_path.read_text(encoding="utf-8"))
+        project_aliases = {p["project_name"]: p.get("aliases", []) for p in projects}
+    if terms_path.exists():
+        term_registry = json.loads(terms_path.read_text(encoding="utf-8"))
+
     pipeline = Pipeline(
         data_dir=args.data_dir,
         max_concurrent=args.concurrent,
         top_k=args.top_k,
         confidence_threshold=args.threshold,
+        project_aliases=project_aliases,
+        term_registry=term_registry,
     )
 
     pipeline.build_index()

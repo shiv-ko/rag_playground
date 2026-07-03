@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.generator.confidence_gate import ConfidenceGate
+from src.generator.confidence_gate import ConfidenceGate, looks_like_missing
 from src.generator.answer_generator import AnswerGenerator, MAX_CHARS_APPROX, SYSTEM_PROMPT
 from src.models import Answer, Document, ScoredDocument
 
@@ -43,6 +43,44 @@ class TestConfidenceGate:
         assert len(text) > 0
 
 
+class TestConfidenceGateTags:
+    def test_capability_blocked_tag_forces_false_regardless_of_confidence(self) -> None:
+        gate = ConfidenceGate(threshold=0.0)
+        assert gate.should_answer(1.0, tags=["image_or_graph"]) is False
+        assert gate.should_answer(1.0, tags=["password_protected"]) is False
+
+    def test_high_risk_tag_raises_effective_threshold(self) -> None:
+        gate = ConfidenceGate(threshold=0.4)
+        assert gate.should_answer(0.5, tags=["multi_hop"]) is False
+        assert gate.should_answer(0.7, tags=["multi_hop"]) is True
+
+    def test_normal_tags_do_not_change_threshold(self) -> None:
+        gate = ConfidenceGate(threshold=0.4)
+        assert gate.should_answer(0.4, tags=["text_only"]) is True
+
+    def test_should_answer_without_tags_argument_still_works(self) -> None:
+        gate = ConfidenceGate(threshold=0.4)
+        assert gate.should_answer(0.5) is True
+        assert gate.should_answer(0.3) is False
+
+    def test_is_capability_blocked(self) -> None:
+        gate = ConfidenceGate()
+        assert gate.is_capability_blocked(["image_or_graph"]) is True
+        assert gate.is_capability_blocked(["text_only"]) is False
+        assert gate.is_capability_blocked([]) is False
+
+
+class TestLooksLikeMissing:
+    def test_detects_wakarimasen(self) -> None:
+        assert looks_like_missing("提供された資料からはわかりません") is True
+
+    def test_detects_mitsukarimasen(self) -> None:
+        assert looks_like_missing("該当箇所が見つかりません") is True
+
+    def test_normal_answer_is_not_missing(self) -> None:
+        assert looks_like_missing("宿泊費の上限は15,000円です。") is False
+
+
 # ---------------------------------------------------------------------------
 # AnswerGenerator._parse_response
 # ---------------------------------------------------------------------------
@@ -53,33 +91,43 @@ class TestParseResponse:
         self.gen = AnswerGenerator()
 
     def test_parses_clean_json(self) -> None:
-        """正常な JSON からアンサーと確信度を取得できる。"""
-        raw = '{"answer": "foo", "confidence": 0.8, "reasoning": "some reason"}'
-        answer, confidence = self.gen._parse_response(raw)
+        """正常な JSON からアンサー・確信度・引用を取得できる。"""
+        raw = '{"answer": "foo", "confidence": 0.8, "citation": "bar", "reasoning": "some reason"}'
+        answer, confidence, citation = self.gen._parse_response(raw)
         assert answer == "foo"
         assert confidence == pytest.approx(0.8)
+        assert citation == "bar"
 
     def test_parses_json_surrounded_by_text(self) -> None:
         """JSON が前後テキストに囲まれていてもパースできる。"""
-        raw = 'Here is the result: {"answer": "bar", "confidence": 0.7, "reasoning": "r"} done.'
-        answer, confidence = self.gen._parse_response(raw)
+        raw = 'Here is the result: {"answer": "bar", "confidence": 0.7, "citation": "baz", "reasoning": "r"} done.'
+        answer, confidence, citation = self.gen._parse_response(raw)
         assert answer == "bar"
         assert confidence == pytest.approx(0.7)
+        assert citation == "baz"
 
-    def test_invalid_json_returns_raw_and_zero_confidence(self) -> None:
-        """不正な JSON のとき (raw_text, 0.0) を返す。"""
+    def test_invalid_json_returns_raw_zero_confidence_and_empty_citation(self) -> None:
+        """不正な JSON のとき (raw_text, 0.0, "") を返す。"""
         raw = "this is not JSON at all"
-        answer, confidence = self.gen._parse_response(raw)
+        answer, confidence, citation = self.gen._parse_response(raw)
         assert answer == raw
         assert confidence == 0.0
+        assert citation == ""
 
     def test_confidence_as_string_is_converted_to_float(self) -> None:
         """JSON 内の confidence が文字列 "0.8" でも float に変換される。"""
-        raw = '{"answer": "baz", "confidence": "0.8", "reasoning": "r"}'
-        answer, confidence = self.gen._parse_response(raw)
+        raw = '{"answer": "baz", "confidence": "0.8", "citation": "c", "reasoning": "r"}'
+        answer, confidence, citation = self.gen._parse_response(raw)
         assert answer == "baz"
         assert isinstance(confidence, float)
         assert confidence == pytest.approx(0.8)
+        assert citation == "c"
+
+    def test_missing_citation_key_defaults_to_empty_string(self) -> None:
+        """citationキーが無いJSONでも空文字にフォールバックする。"""
+        raw = '{"answer": "foo", "confidence": 0.8, "reasoning": "r"}'
+        _, _, citation = self.gen._parse_response(raw)
+        assert citation == ""
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +156,8 @@ def _scored_doc(tmp_path: Path, text: str = "some relevant text") -> ScoredDocum
 
 class TestAnswerGeneratorGenerate:
     def test_high_confidence_answer_is_returned_ungated(self, tmp_path: Path) -> None:
-        """確信度 0.9 の回答はゲートを通過してそのまま返る（was_gated=False）。"""
-        fake_response = '{"answer": "correct answer", "confidence": 0.9, "reasoning": "r"}'
+        """確信度 0.9 かつ引用が実在する回答はゲートを通過してそのまま返る。"""
+        fake_response = '{"answer": "correct answer", "confidence": 0.9, "citation": "some relevant text", "reasoning": "r"}'
         gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
         answer = gen.generate("what?", [_scored_doc(tmp_path)])
         assert answer.was_gated is False
@@ -135,13 +183,65 @@ class TestAnswerGeneratorGenerate:
         """回答テキストが MAX_CHARS_APPROX を超えた場合、"…" で切り捨てられる。"""
         long_answer = "a" * (MAX_CHARS_APPROX + 100)
         fake_response = json.dumps(
-            {"answer": long_answer, "confidence": 0.9, "reasoning": "r"}
+            {
+                "answer": long_answer,
+                "confidence": 0.9,
+                "citation": "some relevant text",
+                "reasoning": "r",
+            }
         )
         gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
         answer = gen.generate("what?", [_scored_doc(tmp_path)])
         assert answer.text.endswith("…")
         # MAX_CHARS_APPROX 文字 + "…" の 1 文字
         assert len(answer.text) == MAX_CHARS_APPROX + 1
+
+    def test_capability_blocked_question_skips_llm_call(self, tmp_path: Path) -> None:
+        """image_or_graph等の能力外タイプはLLMを呼ばずに即Missing。"""
+
+        class BoomGenerator(AnswerGenerator):
+            def _call_llm(self, question: str, context: str) -> str:
+                raise AssertionError("能力外タイプでLLMを呼んではいけない")
+
+        gen = BoomGenerator(threshold=0.4)
+        answer = gen.generate("この画像の意味を教えてください", [_scored_doc(tmp_path)])
+        assert answer.was_gated is True
+        assert answer.text == gen.gate.missing_text()
+
+    def test_multi_hop_question_needs_higher_confidence(self, tmp_path: Path) -> None:
+        fake_response = '{"answer": "回答", "confidence": 0.5, "reasoning": "r"}'
+        gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
+        answer = gen.generate("すべての案件の合計金額を教えてください", [_scored_doc(tmp_path)])
+        assert answer.was_gated is True
+
+    def test_multi_hop_question_passes_with_high_confidence(self, tmp_path: Path) -> None:
+        fake_response = '{"answer": "回答", "confidence": 0.8, "citation": "some relevant text", "reasoning": "r"}'
+        gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
+        answer = gen.generate("すべての案件の合計金額を教えてください", [_scored_doc(tmp_path)])
+        assert answer.was_gated is False
+
+    def test_fabricated_citation_is_gated_even_with_high_confidence(self, tmp_path: Path) -> None:
+        """confidenceが高くても、citationが参考文書に実在しなければMissingにする。"""
+        fake_response = '{"answer": "捏造回答", "confidence": 0.95, "citation": "文書に存在しない架空の一節", "reasoning": "r"}'
+        gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
+        answer = gen.generate("what?", [_scored_doc(tmp_path)])
+        assert answer.was_gated is True
+        assert answer.text == gen.gate.missing_text()
+
+    def test_missing_citation_field_is_gated(self, tmp_path: Path) -> None:
+        """citationフィールド自体が無い場合もMissingにする。"""
+        fake_response = '{"answer": "回答", "confidence": 0.9, "reasoning": "r"}'
+        gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
+        answer = gen.generate("what?", [_scored_doc(tmp_path)])
+        assert answer.was_gated is True
+
+    def test_missing_phrase_answer_is_gated_even_with_high_confidence(self, tmp_path: Path) -> None:
+        """「わかりません」と答えつつconfidenceが高い場合もMissing扱いする。"""
+        fake_response = '{"answer": "わかりません", "confidence": 0.9, "citation": "some relevant text", "reasoning": "r"}'
+        gen = FakeGenerator(fake_response=fake_response, threshold=0.4)
+        answer = gen.generate("what?", [_scored_doc(tmp_path)])
+        assert answer.was_gated is True
+        assert answer.text == gen.gate.missing_text()
 
 
 # ---------------------------------------------------------------------------
@@ -185,3 +285,12 @@ class TestCallLLMRealIntegration:
 
         _, kwargs = MockAnthropic.return_value.messages.create.call_args
         assert kwargs["model"] == "claude-sonnet-5"
+
+
+class TestSystemPromptConfidenceSemantics:
+    def test_prompt_defines_low_confidence_for_missing_answers(self) -> None:
+        assert "わからない" in SYSTEM_PROMPT or "わかりません" in SYSTEM_PROMPT
+        assert "0.0" in SYSTEM_PROMPT and "0.2" in SYSTEM_PROMPT
+
+    def test_prompt_instructs_partial_answers_over_refusal(self) -> None:
+        assert "部分的" in SYSTEM_PROMPT

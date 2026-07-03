@@ -109,3 +109,36 @@ class TestProjectScopedRetriever:
 
         assert retriever.detect_project("青潮モビリティサービス") is None
         assert retriever.search("青潮モビリティサービス", top_k=5) == []
+
+    def test_detect_project_matches_via_alias(self) -> None:
+        """project_registry.json由来のエイリアスでも案件を検出できる。"""
+        retriever = ProjectScopedRetriever(
+            project_aliases={"株式会社青潮モビリティサービス": ["AOSHIO", "青潮"]}
+        )
+        docs = [_doc("需要予測データです。", project="株式会社青潮モビリティサービス")]
+        retriever.add(docs)
+
+        assert retriever.detect_project("AOSHIOの需要予測について") == "株式会社青潮モビリティサービス"
+
+    def test_detect_project_alias_does_not_leak_to_other_project(self) -> None:
+        retriever = ProjectScopedRetriever(
+            project_aliases={
+                "株式会社青潮モビリティサービス": ["AOSHIO"],
+                "医療法人社団 恒一会 かえで総合病院": ["KAEDE"],
+            }
+        )
+        docs = [
+            _doc("需要予測データです。", project="株式会社青潮モビリティサービス"),
+            _doc("患者数データです。", project="医療法人社団 恒一会 かえで総合病院"),
+        ]
+        retriever.add(docs)
+
+        assert retriever.detect_project("KAEDEの患者数について") == "医療法人社団 恒一会 かえで総合病院"
+
+    def test_detect_project_without_aliases_arg_still_works(self) -> None:
+        """project_aliases省略時は従来通り正式名称のみで検出する。"""
+        retriever = ProjectScopedRetriever()
+        docs = [_doc("テキスト", project="株式会社青潮モビリティサービス")]
+        retriever.add(docs)
+
+        assert retriever.detect_project("青潮モビリティサービスについて") == "株式会社青潮モビリティサービス"
