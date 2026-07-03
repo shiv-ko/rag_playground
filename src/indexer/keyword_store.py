@@ -7,6 +7,12 @@ from collections import Counter
 
 from src.models import Document, ScoredDocument
 
+# BM25 (rank_bm25.BM25Okapi) のIDFは非常に小さいコーパスで退化し
+# （近似0や不安定な値になり）順位付けが信頼できなくなる。
+# ProjectScopedRetriever ではプロジェクトごとに小規模なKeywordStoreを
+# 作る設計のため、実運用でも頻繁に起こりうる状況として閾値を設ける。
+MIN_DOCS_FOR_BM25 = 10
+
 
 def _is_cjk(ch: str) -> bool:
     cp = ord(ch)
@@ -43,9 +49,15 @@ class KeywordStore:
 
     def clear(self) -> None:
         self._docs = []
+        self._use_bm25 = False
         self._bm25 = None
 
     def _rebuild(self) -> None:
+        if len(self._docs) < MIN_DOCS_FOR_BM25:
+            # コーパスが小さすぎるとBM25のIDFが退化するため、TF-IDF fallbackを使う。
+            self._use_bm25 = False
+            self._bm25 = None
+            return
         try:
             from rank_bm25 import BM25Okapi
             corpus = [_tokenize(d.text) for d in self._docs]

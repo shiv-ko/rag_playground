@@ -7,14 +7,12 @@
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from src.models import Document, ScoredDocument
-from src.indexer.keyword_store import KeywordStore
+from src.indexer.keyword_store import MIN_DOCS_FOR_BM25, KeywordStore
 from src.indexer.vector_store import VectorStore
 from src.retriever.hybrid_retriever import HybridRetriever
 
@@ -89,33 +87,62 @@ class TestKeywordStore:
     ) -> None:
         """クエリに関連するドキュメントが無関係なドキュメントより上位になる（日本語）。
 
-        小規模コーパス(2件)ではBM25がIDF=0になるため、TF-IDF fallbackを使用。
+        小規模コーパス(2件)は MIN_DOCS_FOR_BM25 未満のため TF-IDF fallback が
+        自動的に使われる（BM25はIDFが退化して順位が不安定になるため）。
         """
-        # Force TF-IDF fallback for small corpora where BM25 gives 0 IDF
-        with patch.dict(sys.modules, {"rank_bm25": None}):
-            # Clear the keyword_store module cache to force reimport
-            if "src.indexer.keyword_store" in sys.modules:
-                del sys.modules["src.indexer.keyword_store"]
+        relevant = Document(
+            text="宿泊費の精算には領収書が必要です。上限は20,000円。",
+            source_path=tmp_path / "relevant.txt",
+        )
+        irrelevant = Document(
+            text="バッテリーの充電時間は2時間です。",
+            source_path=tmp_path / "irrelevant.txt",
+        )
+        store = KeywordStore()
+        store.add([relevant, irrelevant])
 
-            from src.indexer.keyword_store import KeywordStore as KeywordStoreWithoutBM25
+        results = store.search("宿泊費 精算", top_k=2)
 
-            relevant = Document(
-                text="宿泊費の精算には領収書が必要です。上限は20,000円。",
-                source_path=tmp_path / "relevant.txt",
+        assert len(results) > 0, "クエリに関連する結果が 1 件以上返るべき"
+        assert results[0].document.text == relevant.text, (
+            f"関連ドキュメントが先頭に来るべき。実際: {results[0].document.text!r}"
+        )
+
+    def test_small_corpus_uses_tfidf_fallback(self, tmp_path: Path) -> None:
+        """MIN_DOCS_FOR_BM25 未満のドキュメント数では TF-IDF fallback が使われる。"""
+        store = KeywordStore()
+        docs = [
+            Document(text=f"テストドキュメント{i}番", source_path=tmp_path / f"{i}.txt")
+            for i in range(MIN_DOCS_FOR_BM25 - 1)
+        ]
+        store.add(docs)
+
+        assert store._use_bm25 is False
+
+    def test_large_corpus_uses_real_bm25(
+        self, tmp_path: Path, tmp_docs: list[Document]
+    ) -> None:
+        """MIN_DOCS_FOR_BM25 以上のドキュメント数では実際のBM25が使われる。"""
+        filler_docs = [
+            Document(
+                text=f"雑談用のフィラードキュメントその{i}番です。",
+                source_path=tmp_path / f"filler_{i}.txt",
             )
-            irrelevant = Document(
-                text="バッテリーの充電時間は2時間です。",
-                source_path=tmp_path / "irrelevant.txt",
-            )
-            store = KeywordStoreWithoutBM25()
-            store.add([relevant, irrelevant])
+            for i in range(MIN_DOCS_FOR_BM25)
+        ]
+        store = KeywordStore()
+        store.add(tmp_docs + filler_docs)
 
-            results = store.search("宿泊費 精算", top_k=2)
+        assert len(store._docs) >= MIN_DOCS_FOR_BM25
+        assert store._use_bm25 is True
 
-            assert len(results) > 0, "クエリに関連する結果が 1 件以上返るべき"
-            assert results[0].document.text == relevant.text, (
-                f"関連ドキュメントが先頭に来るべき。実際: {results[0].document.text!r}"
-            )
+        results = store.search("宿泊費 上限", top_k=3)
+
+        assert len(results) > 0
+        assert any("宿泊費" in r.document.text for r in results[:3]), (
+            f"宿泊費に関連するドキュメントが上位に来るべき。実際: "
+            f"{[r.document.text for r in results[:3]]}"
+        )
 
     def test_clear_then_search_returns_empty_list(
         self, tmp_docs: list[Document]
