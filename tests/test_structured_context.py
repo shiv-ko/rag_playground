@@ -160,3 +160,79 @@ class TestScheduleTaskMatchingGeneralization:
             "フェーズと担当者とタスクIDの一覧を教えてください。", "A社", self._aym_like_store()
         )
         assert all("row_2" not in d.document.location for d in docs)
+
+
+class TestOfficeStyleHighlightAndNarrowing:
+    """docxのhighlight_colorキー対応と、質問中のヒント（拡張子・ファイル名・ページ番号）
+    によるコンテキスト絞り込み。"""
+
+    def _mark(self, **over) -> dict:
+        base = {
+            "source_path": "x/提案書.pptx", "file_name": "提案書.pptx", "extension": ".pptx",
+            "slide_number": 1, "text": "テキスト", "bold": False, "italic": False,
+            "underline": False, "font_color": None, "fill_color": None, "highlight_color": None,
+        }
+        base.update(over)
+        return base
+
+    def test_docx_highlight_color_key_is_matched(self):
+        store = _store_with_marks([
+            self._mark(file_name="M02.docx", extension=".docx", slide_number=None,
+                       text="黄色ハイライトの一文", highlight_color="YELLOW (7)"),
+            self._mark(file_name="M02.docx", extension=".docx", slide_number=None,
+                       text="無印の一文"),
+        ])
+        docs = build_office_style_context(
+            "M02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("黄色ハイライトの一文" in t for t in texts)
+        assert not any("無印の一文" in t for t in texts)
+
+    def test_extension_hint_restricts_to_matching_files(self):
+        store = _store_with_marks([
+            self._mark(file_name="M02.docx", extension=".docx", slide_number=None,
+                       text="docxの黄色", highlight_color="YELLOW (7)"),
+            self._mark(text="pptxの黄色", fill_color="FFFF00"),
+        ])
+        docs = build_office_style_context(
+            "M02資料（docx）において、黄色でハイライトされている部分を抜き出してください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("docxの黄色" in t for t in texts)
+        assert not any("pptxの黄色" in t for t in texts)
+
+    def test_page_number_hint_restricts_slides(self):
+        store = _store_with_marks([
+            self._mark(slide_number=7, text="7ページの赤字", font_color="FF0000"),
+            self._mark(slide_number=2, text="2ページの赤字", font_color="FF0000"),
+        ])
+        docs = build_office_style_context(
+            "提案書P7において、赤で強調されている箇所の文字列を抜き出してください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("7ページの赤字" in t for t in texts)
+        assert not any("2ページの赤字" in t for t in texts)
+
+    def test_file_stem_hint_restricts_files(self):
+        store = _store_with_marks([
+            self._mark(text="提案書の赤字", font_color="FF0000"),
+            self._mark(file_name="最終報告.pptx", source_path="x/最終報告.pptx",
+                       text="最終報告の赤字", font_color="FF0000"),
+        ])
+        docs = build_office_style_context(
+            "提案書において赤で強調されている箇所を抜き出してください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("提案書の赤字" in t for t in texts)
+        assert not any("最終報告の赤字" in t for t in texts)
+
+    def test_hints_do_not_empty_out_results_when_nothing_matches_hint(self):
+        """ヒントで絞った結果が0件になる場合は絞り込みを適用しない（安全側）。"""
+        store = _store_with_marks([
+            self._mark(slide_number=2, text="2ページの赤字", font_color="FF0000"),
+        ])
+        docs = build_office_style_context(
+            "P99において赤で強調されている箇所を抜き出してください。", "A社", store
+        )
+        assert len(docs) == 1

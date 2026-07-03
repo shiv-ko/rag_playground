@@ -50,6 +50,54 @@ def _requested_color_names(question: str) -> list[str]:
     ]
 
 
+# docxのrun.font.highlight_colorはWD_COLOR_INDEXの文字列（例: "YELLOW (7)"）で入る
+_HIGHLIGHT_NAME_ALIASES = {"bright_green": "green", "dark_yellow": "yellow", "dark_red": "red"}
+
+
+def _highlight_color_name(mark: dict) -> str:
+    raw = mark.get("highlight_color")
+    if not raw:
+        return "none"
+    token = str(raw).split("(")[0].strip().lower()
+    return _HIGHLIGHT_NAME_ALIASES.get(token, token)
+
+
+def _narrow_marks_by_question_hints(question: str, marks: list[dict]) -> list[dict]:
+    """質問中のファイル種別・ファイル名・ページ番号ヒントで候補を絞る。
+    絞った結果が0件になるヒントは適用しない（安全側）。すべて汎用ヒントで、
+    特定の案件名・ファイル名のハードコードはしない。"""
+    lower = question.lower()
+
+    ext = None
+    if "docx" in lower:
+        ext = ".docx"
+    elif "pptx" in lower or "スライド" in question:
+        ext = ".pptx"
+    if ext:
+        narrowed = [
+            m for m in marks
+            if str(m.get("extension") or Path(str(m.get("file_name") or "")).suffix).lower() == ext
+        ]
+        if narrowed:
+            marks = narrowed
+
+    stems = {Path(str(m.get("file_name") or "")).stem for m in marks}
+    hinted_stems = {s for s in stems if s and s in question}
+    if hinted_stems:
+        narrowed = [m for m in marks if Path(str(m.get("file_name") or "")).stem in hinted_stems]
+        if narrowed:
+            marks = narrowed
+
+    page = re.search(r"[PpＰ]\s*(\d+)|スライド\s*(\d+)|(\d+)\s*ページ", question)
+    if page:
+        num = int(next(g for g in page.groups() if g))
+        narrowed = [m for m in marks if m.get("slide_number") == num]
+        if narrowed:
+            marks = narrowed
+
+    return marks
+
+
 def build_office_style_context(
     question: str, project_name: str, store: StructuredArtifactStore
 ) -> list[ScoredDocument]:
@@ -69,8 +117,14 @@ def build_office_style_context(
         if color_names:
             font_name = nearest_basic_color_name(mark.get("font_color"))
             fill_name = nearest_basic_color_name(mark.get("fill_color"))
-            if font_name in color_names or fill_name in color_names:
+            if (
+                font_name in color_names
+                or fill_name in color_names
+                or _highlight_color_name(mark) in color_names
+            ):
                 matched.append(mark)
+
+    matched = _narrow_marks_by_question_hints(question, matched)
 
     docs = []
     for mark in matched:
