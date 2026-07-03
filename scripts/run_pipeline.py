@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.4)
     parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
                         help="レジストリJSONのディレクトリ")
+    parser.add_argument("--no-cache", action="store_true", help="パース結果キャッシュを使わない")
     args = parser.parse_args()
 
     logger = setup_logging()
@@ -71,6 +72,7 @@ def main() -> None:
         project_aliases=project_aliases,
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
+        cache_dir=None if args.no_cache else ROOT / ".cache",
     )
 
     pipeline.build_index()
