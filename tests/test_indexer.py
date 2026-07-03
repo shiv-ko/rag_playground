@@ -173,6 +173,38 @@ class TestKeywordStore:
 
         assert results == []
 
+    def test_single_doc_corpus_tfidf_fallback_returns_nonzero_score(
+        self, tmp_path: Path
+    ) -> None:
+        """単一ドキュメント（df[token] == n の退化ケース）でも TF-IDF fallback が
+        スコア0ではない結果を返す。
+
+        単一ドキュメントコーパスでは、クエリに含まれる全トークンについて
+        df[token] == n (=1) となる。IDF の分母が (df + 1) だと
+        idf = log((n+1)/(df+1)) = log(1) = 0 となり、全トークンのスコア
+        寄与が消えてしまう。さらに _search_tfidf は score > 0 の結果しか
+        返さないため、明らかに関連するドキュメントであっても除外されて
+        しまう回帰が起こり得る。IDF の分母を (df + 0.5) にすることで
+        n == df[token] のケースでも idf > 0 を保証し、この回帰を防ぐ。
+        """
+        doc = Document(
+            text="宿泊費の上限は15,000円です。",
+            source_path=tmp_path / "solo.txt",
+        )
+        store = KeywordStore()
+        store.add([doc])
+
+        results = store.search("宿泊費", top_k=5)
+
+        assert len(results) > 0, (
+            "単一ドキュメントコーパスでも関連クエリの結果が返るべき"
+            "（IDFが0になり全結果が除外される回帰が起きていないか確認）"
+        )
+        assert results[0].score > 0, (
+            f"単一ドキュメントコーパスでもスコアは正であるべき。"
+            f"実際: {results[0].score}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # VectorStore
