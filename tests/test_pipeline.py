@@ -336,3 +336,46 @@ def test_pipeline_prefers_spreadsheet_state_for_xlsx_questions_over_office_marks
     assert captured_contexts
     assert "平均 / bmi" in captured_contexts[0]
     assert "無関係な黄色ハイライトのスライド文言" not in captured_contexts[0]
+
+
+def test_pipeline_falls_back_to_search_when_calc_answer_is_gated(tmp_path: Path) -> None:
+    """spreadsheet_calcパスがspecを解釈できずゲートした場合、Missing固定にせず
+    通常のBM25検索パスへフォールバックする。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    csv_dir = tmp_path / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト" / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("term,loan_amnt\n3 years,1000\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+    pipeline.spreadsheet_calc_answerer._call_llm = lambda q, cols: "not json"
+    pipeline.generator._call_llm = lambda q, c: json.dumps({
+        "answer": "通常パスの回答", "confidence": 0.9,
+        "citation": "宿泊費の上限は15,000円です", "reasoning": "r",
+    }, ensure_ascii=False)
+
+    # 案件スコープ検索で拾われるよう、テキストもテスト社のフォルダ内に置く
+    (csv_dir / "旅費規程.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.csvにおいて、宿泊費の平均を算出してください。",
+    ))
+
+    assert result.answer == "通常パスの回答"
+
+
+def test_load_train_csv_does_not_fall_back_to_other_projects_csv(tmp_path: Path) -> None:
+    """案件名にマッチしないtrain.csvは、全体で1つしか無くても使わない
+    （別案件のデータで計算した数値はIncorrect直行のため）。"""
+    from src.orchestrator.pipeline import Pipeline
+
+    csv_dir = tmp_path / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト" / "別社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+
+    assert pipeline._load_train_csv("テスト社") is None
+    assert pipeline._load_train_csv("別社") is not None

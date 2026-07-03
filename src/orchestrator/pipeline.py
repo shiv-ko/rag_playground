@@ -105,13 +105,17 @@ class Pipeline:
     def _load_train_csv(self, project_name: str):
         import pandas as pd
 
-        candidates = list(self.data_dir.rglob("train.csv"))
-        matching = [p for p in candidates if project_name in str(p)]
-        target = matching[0] if matching else (candidates[0] if len(candidates) == 1 else None)
-        if target is None:
+        # 案件名にマッチしないtrain.csvは使わない（別案件のデータで計算するとIncorrect直行）。
+        # macOSのパスはNFDになりうるためNFCに揃えて比較する。
+        normalized_project = unicodedata.normalize("NFC", project_name)
+        matching = sorted(
+            p for p in self.data_dir.rglob("train.csv")
+            if normalized_project in unicodedata.normalize("NFC", str(p))
+        )
+        if not matching:
             return None
         try:
-            return pd.read_csv(target)
+            return pd.read_csv(matching[0])
         except Exception:
             return None
 
@@ -122,9 +126,11 @@ class Pipeline:
 
         if "spreadsheet_calc" in tags:
             df = self._load_train_csv(project_name)
-            if df is not None:
-                return self.spreadsheet_calc_answerer.answer(qa.question, df)
-            return None
+            if df is None:
+                return None
+            calc_answer = self.spreadsheet_calc_answerer.answer(qa.question, df)
+            # 集計仕様に落とせなかった質問はMissing固定にせず通常の検索パスへ委ねる
+            return None if calc_answer.was_gated else calc_answer
 
         if self.structured_store is None:
             return None

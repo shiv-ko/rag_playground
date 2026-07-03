@@ -42,7 +42,13 @@ SYSTEM_PROMPT = """\
 }
 
 "round_to"は四捨五入する小数桁数（整数なら0）。指定が無ければnullにすること。
+質問がこの形式で表現できない場合（グループ別の集計、複数列の組み合わせ等）や、
+与えられた列名では答えられない場合は {"not_applicable": true} のみを返すこと。
 """
+
+# CalcSpec（単一フィルタ＋単一集計）で表現できない質問のヒント。
+# もっともらしいspecで誤った数値を返す（Incorrect=-1）よりゲートしてフォールバックさせる。
+_UNSUPPORTED_QUESTION_HINTS = ("最も", "ごとの", "ごとに", "毎に", "それぞれ")
 
 
 @dataclass(frozen=True)
@@ -120,6 +126,9 @@ class SpreadsheetCalcAnswerer:
         self._client: Anthropic | None = None
 
     def answer(self, question: str, df: pd.DataFrame) -> Answer:
+        if any(hint in question for hint in _UNSUPPORTED_QUESTION_HINTS):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True)
+
         columns_preview = ", ".join(df.columns)
         raw = self._call_llm(question, columns_preview)
         spec = parse_calc_spec(raw)

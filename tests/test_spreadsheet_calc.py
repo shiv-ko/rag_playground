@@ -107,3 +107,22 @@ def test_answerer_gates_when_filter_matches_nothing() -> None:
     answerer = FakeAnswerer(fake)
     answer = answerer.answer("term=99 yearsの中でloan_amntの平均を教えてください。", _sample_df())
     assert answer.was_gated is True
+
+
+def test_answerer_gates_groupby_style_question_without_calling_llm():
+    """CalcSpecで表現できないグループ別・argmax系の質問（「最も高い」「〜ごと」）は、
+    もっともらしいspecで誤った数値を返すリスクがあるためLLMを呼ばずにゲートする。"""
+
+    class BoomAnswerer(SpreadsheetCalcAnswerer):
+        def _call_llm(self, question: str, columns_preview: str) -> str:
+            raise AssertionError("表現できない質問ではLLMを呼ばない")
+
+    answerer = BoomAnswerer()
+    answer = answerer.answer(
+        "disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。", _sample_df()
+    )
+    assert answer.was_gated is True
+
+
+def test_parse_calc_spec_not_applicable_returns_none():
+    assert parse_calc_spec('{"not_applicable": true}') is None

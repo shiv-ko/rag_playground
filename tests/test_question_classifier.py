@@ -69,3 +69,13 @@ def test_detects_spreadsheet_calc_question() -> None:
 def test_question_can_have_both_spreadsheet_state_and_highlight_style_tags() -> None:
     tags = classify_question("提案書.pptxで黄色ハイライトされている数値を抜き出してください。")
     assert "office_style" in tags
+
+
+def test_generic_phrases_alone_do_not_trigger_spreadsheet_calc():
+    """「の中で」「該当する」は一般文に頻出するため、単独ではcalcタグを付けない。"""
+    assert "spreadsheet_calc" not in classify_question(
+        "定例会議の出席者の中で議事録に記載されている決定事項を教えてください。"
+    )
+    assert "spreadsheet_calc" not in classify_question(
+        "この条件に該当する契約条項を教えてください。"
+    )
