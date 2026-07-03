@@ -1,0 +1,80 @@
+[
+  {
+    "term": "PP",
+    "expansion": "提案書",
+    "document_type": "proposal",
+    "route_section": "00.提案"
+  },
+  {
+    "term": "CT",
+    "expansion": "契約書",
+    "document_type": "contract",
+    "route_section": "01.契約"
+  },
+  {
+    "term": "PLAN",
+    "expansion": "計画",
+    "document_type": "plan",
+    "route_section": "02.計画"
+  },
+  {
+    "term": "PL",
+    "expansion": "計画",
+    "document_type": "plan",
+    "route_section": "02.計画"
+  },
+  {
+    "term": "MM",
+    "expansion": "会議資料/会議録",
+    "document_type": "meeting",
+    "route_section": "05.会議"
+  },
+  {
+    "term": "FR",
+    "expansion": "最終報告",
+    "document_type": "final_report",
+    "route_section": "06.報告書"
+  },
+  {
+    "term": "APR",
+    "expansion": "決裁基準",
+    "document_type": "approval_rule",
+    "route_section": "社内管理"
+  },
+  {
+    "term": "FM",
+    "expansion": "座席表",
+    "document_type": "seat_map",
+    "route_section": "社内管理"
+  },
+  {
+    "term": "TG",
+    "expansion": "目的変数",
+    "document_type": "analysis_term",
+    "route_section": "04.分析"
+  },
+  {
+    "term": "EXT",
+    "expansion": "内線番号",
+    "document_type": "people",
+    "route_section": "社内管理"
+  },
+  {
+    "term": "ESTH",
+    "expansion": "見込工数",
+    "document_type": "contract_metric",
+    "route_section": "01.契約"
+  },
+  {
+    "term": "ACTH",
+    "expansion": "実績工数",
+    "document_type": "contract_metric",
+    "route_section": "06.報告書"
+  },
+  {
+    "term": "RATE",
+    "expansion": "単価",
+    "document_type": "contract_metric",
+    "route_section": "01.契約"
+  }
+]

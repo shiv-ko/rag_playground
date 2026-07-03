@@ -92,14 +92,13 @@ class AnswerGenerator:
         message = self._get_client().messages.create(
             model=model,
             max_tokens=1500,
-            temperature=0.0,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
                 "content": f"【質問】\n{question}\n\n【参考文書】\n{context}",
             }],
         )
-        return message.content[0].text
+        return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     def _parse_response(self, raw: str) -> tuple[str, float]:
         import json

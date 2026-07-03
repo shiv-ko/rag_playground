@@ -1,0 +1,15 @@
+split,index,project_name,condition,status,candidate_count,sample_text,notes,question
+valid,0,株式会社青潮モビリティサービス,page,not_covered,0,,page number needs PDF/DOCX layout extraction,青潮モビリティサービスの最終報告における、モビリティ需要の要因分析のページで、マーカーされている単語をすべて抜き出してください。
+valid,23,株式会社青潮モビリティサービス,highlight,covered_artifact,241,"課題認識 / ▲ / 需要ピーク時の
+サービス可用性確保",style-conditioned candidates exist,AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。
+valid,25,株式会社東都人材プラットフォーム,red,covered_artifact,158,"分析対象： / train.csv（11,529件の人材属性データ）｜ target を収入クラスとする初期分析 / 重視する点：",style-conditioned candidates exist,東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。
+test,3,医療法人社団 恒一会 かえで総合病院,bold,covered_artifact,646,データ分析プロジェクト提案書 / 目次 / 01,style-conditioned candidates exist,恒一会 かえで総合病院の契約書において、太字で記載されている箇所のうち、日付以外のものをすべて抽出してください。
+test,7,株式会社青潮モビリティサービス,highlight,covered_artifact,241,"課題認識 / ▲ / 需要ピーク時の
+サービス可用性確保",style-conditioned candidates exist,青潮モビリティサービスの基礎分析.pptxにおいて、黄色ハイライトされている数値に対応するデータの抽出条件と集計内容を答えてください。
+test,11,株式会社青嶺不動産アセットマネジメント,bold_underline_italic,covered_artifact,1,"4,250,000円",style-conditioned candidates exist,青嶺不動産アセットマネジメントの報告資料の中で、太字、下線、イタリックのすべてに該当する箇所を抽出してください。
+test,16,青葉与信マネジメント株式会社,yellow_and_red,covered_artifact,411,"固定価格契約（事後精算なし） / 契約形態：固定価格 ｜ 契約金額： / 4,620,000",style-conditioned candidates exist,青葉与信マネジメントの中間報告資料にて、黄色ハイライトかつ赤字となっている部分を抜き出してください。
+test,17,青葉与信マネジメント株式会社,yellow_and_red,covered_artifact,411,"固定価格契約（事後精算なし） / 契約形態：固定価格 ｜ 契約金額： / 4,620,000",style-conditioned candidates exist,AYMのMMにおいて、黄色ハイライトかつREDになっている数値を対象に、最初のMMから最後のMMまでの上昇率を計算してください。上昇率は （最後の値 - 最初の値） / 最初の値 × 100 で求め、小数第2位まで答えてください。
+test,33,株式会社青潮モビリティサービス,graph_value,not_covered,0,,graph numeric reading needs chart/VLM extraction,青潮モビリティサービスの基礎分析.docxのグラフ2で、x=3のときの青色の折れ線のyの値を小数第5位で答えてください。
+test,49,株式会社東都人材プラットフォーム,comment,not_covered,0,,comments are not extracted by current office_marks artifact,東都人材プラットフォームの会議録において、コメントがついている部分をそのまま抽出してください。
+test,71,株式会社青嶺不動産アセットマネジメント,bold_underline_italic,covered_artifact,1,"4,250,000円",style-conditioned candidates exist,青嶺不動産アセットマネジメントの会議録の中で、太字、下線、イタリックのすべてに該当する箇所を抽出してください。
+test,81,京橋信用ソリューションズ株式会社,bold,covered_artifact,451,データ分析プロジェクト提案書 / 1. 背景 / 現状の課題,style-conditioned candidates exist,京橋信用ソリューションズとの契約書において、太字で記載されている部分を抽出してください。

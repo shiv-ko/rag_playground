@@ -65,10 +65,9 @@ class LocalJudge:
         message = self._get_client().messages.create(
             model=model,
             max_tokens=300,
-            temperature=0.0,
             messages=[{"role": "user", "content": prompt}],
         )
-        return message.content[0].text
+        return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     def _parse(self, raw: str) -> JudgeResult:
         try:
