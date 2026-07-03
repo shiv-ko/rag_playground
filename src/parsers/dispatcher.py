@@ -4,6 +4,7 @@ from pathlib import Path
 from src.models import Document
 from src.parsers.chunker import chunk_documents
 from src.parsers.image_parser import ImageParser
+from src.parsers.notebook_parser import NotebookParser
 from src.parsers.office_parser import OfficeParser
 from src.parsers.pdf_parser import PDFParser
 from src.parsers.text_parser import TextParser
@@ -46,6 +47,7 @@ class ParserDispatcher:
             TextParser(),
             PDFParser(),
             OfficeParser(),
+            NotebookParser(),
             ImageParser(),
         ]
 

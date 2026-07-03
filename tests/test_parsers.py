@@ -44,6 +44,14 @@ class TestTextParser:
         parser = TextParser()
         assert parser.can_handle(tmp_path / "file.pdf") is False
 
+    def test_can_handle_json(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "metrics.json") is True
+
+    def test_can_handle_tsv(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "data.tsv") is True
+
 
 # ─────────────────────── PDFParser ───────────────────────
 
@@ -231,3 +239,64 @@ class TestParserDispatcher:
         texts = [d.text for d in docs]
         assert len(docs) == 1
         assert any("残す" in t for t in texts)
+
+
+# ─────────────────────── NotebookParser ───────────────────────
+
+class TestNotebookParser:
+    def test_can_handle_ipynb(self, tmp_path: Path) -> None:
+        from src.parsers.notebook_parser import NotebookParser
+        parser = NotebookParser()
+        assert parser.can_handle(tmp_path / "01_eda.ipynb") is True
+
+    def test_cannot_handle_txt(self, tmp_path: Path) -> None:
+        from src.parsers.notebook_parser import NotebookParser
+        parser = NotebookParser()
+        assert parser.can_handle(tmp_path / "file.txt") is False
+
+    def test_extracts_markdown_and_code_cell_text(self, tmp_path: Path) -> None:
+        import json as jsonlib
+        from src.parsers.notebook_parser import NotebookParser
+
+        notebook = {
+            "cells": [
+                {"cell_type": "markdown", "source": ["# EDA\n", "欠損値を確認する"]},
+                {"cell_type": "code", "source": ["df.isnull().sum()"]},
+                {"cell_type": "code", "source": [""]},
+            ]
+        }
+        f = tmp_path / "01_eda.ipynb"
+        f.write_text(jsonlib.dumps(notebook), encoding="utf-8")
+
+        parser = NotebookParser()
+        docs = parser.parse(f)
+
+        assert len(docs) == 2  # 空セルは除外される
+        assert any("欠損値を確認する" in d.text for d in docs)
+        assert any("df.isnull().sum()" in d.text for d in docs)
+
+    def test_invalid_notebook_returns_stub(self, tmp_path: Path) -> None:
+        from src.parsers.notebook_parser import NotebookParser
+
+        f = tmp_path / "broken.ipynb"
+        f.write_text("not valid json {{{", encoding="utf-8")
+
+        parser = NotebookParser()
+        docs = parser.parse(f)
+
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
+
+
+# ─────────────────────── dispatcherへのNotebook登録 ───────────────────────
+
+class TestDispatcherHandlesNotebook:
+    def test_dispatch_ipynb_file(self, tmp_path: Path) -> None:
+        import json as jsonlib
+        notebook = {"cells": [{"cell_type": "markdown", "source": ["EDAメモ"]}]}
+        f = tmp_path / "01_eda.ipynb"
+        f.write_text(jsonlib.dumps(notebook), encoding="utf-8")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse(f)
+        assert any("EDAメモ" in d.text for d in docs)
