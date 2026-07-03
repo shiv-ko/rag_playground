@@ -21,10 +21,13 @@ def _tokenize(text: str) -> list[str]:
     for word in re.findall(r"[a-zA-Z0-9]+", text.lower()):
         tokens.append(word)
     # CJK文字はバイグラム（unigram+bigram）
-    cjk_chars = [ch for ch in text if _is_cjk(ch)]
-    tokens.extend(cjk_chars)  # unigram
-    for i in range(len(cjk_chars) - 1):
-        tokens.append(cjk_chars[i] + cjk_chars[i + 1])  # bigram
+    # 空白や句読点で分割して、各セグメント内でバイグラムを作成（単語境界を超えない）
+    segments = re.split(r'[\s\W]+', text)  # 空白と非単語文字で分割
+    for segment in segments:
+        cjk_chars = [ch for ch in segment if _is_cjk(ch)]
+        tokens.extend(cjk_chars)  # unigram
+        for i in range(len(cjk_chars) - 1):
+            tokens.append(cjk_chars[i] + cjk_chars[i + 1])  # bigram
     return tokens
 
 
