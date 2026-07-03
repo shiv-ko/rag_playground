@@ -4,18 +4,24 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
-from src.models import Answer, JudgeResult
+from src.generator.enumeration_gate import is_enumeration_complete
+from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
+from src.models import Answer, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.retriever.query_expander import QueryExpander
+from src.retriever.structured_context import build_office_style_context, build_spreadsheet_state_context
+from src.structured.artifact_store import StructuredArtifactStore
 from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
+from src.utils.question_classifier import classify_question
 
 
 @dataclass
@@ -47,6 +53,7 @@ class Pipeline:
         run_judge: bool = True,
         project_aliases: dict[str, list[str]] | None = None,
         term_registry: list[dict] | None = None,
+        artifacts_dir: Path | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.max_concurrent = max_concurrent
@@ -59,6 +66,10 @@ class Pipeline:
         self.query_expander = QueryExpander(term_registry or [])
         self.generator = AnswerGenerator(threshold=confidence_threshold)
         self.judge = LocalJudge()
+        self.structured_store = (
+            StructuredArtifactStore.from_artifacts_dir(artifacts_dir) if artifacts_dir else None
+        )
+        self.spreadsheet_calc_answerer = SpreadsheetCalcAnswerer(threshold=confidence_threshold)
 
     # ------------------------------------------------------------------ #
     # インデックス構築
@@ -75,10 +86,69 @@ class Pipeline:
     # 1問処理
     # ------------------------------------------------------------------ #
 
+    def _resolve_project_name(self, question: str) -> str | None:
+        project = self.retriever.detect_project(question)
+        if project is not None:
+            return project
+        if self.structured_store is None:
+            return None
+        normalized_question = unicodedata.normalize("NFC", question)
+        for name in self.structured_store.project_names():
+            if name and unicodedata.normalize("NFC", name) in normalized_question:
+                return name
+        return None
+
+    def _load_train_csv(self, project_name: str):
+        import pandas as pd
+
+        candidates = list(self.data_dir.rglob("train.csv"))
+        matching = [p for p in candidates if project_name in str(p)]
+        target = matching[0] if matching else (candidates[0] if len(candidates) == 1 else None)
+        if target is None:
+            return None
+        try:
+            return pd.read_csv(target)
+        except Exception:
+            return None
+
+    def _process_structured(self, qa: QAPair, tags: list[str]) -> Answer | None:
+        project_name = self._resolve_project_name(qa.question)
+        if project_name is None:
+            return None
+
+        if "spreadsheet_calc" in tags:
+            df = self._load_train_csv(project_name)
+            if df is not None:
+                return self.spreadsheet_calc_answerer.answer(qa.question, df)
+            return None
+
+        if self.structured_store is None:
+            return None
+
+        contexts: list[ScoredDocument] = []
+        if "office_style" in tags:
+            contexts = build_office_style_context(qa.question, project_name, self.structured_store)
+        elif "spreadsheet_state" in tags:
+            contexts = build_spreadsheet_state_context(qa.question, project_name, self.structured_store)
+
+        if not contexts:
+            return None
+        if not is_enumeration_complete(len(contexts), len(contexts), "structured_attribute_filter"):
+            return None
+        return self.generator.generate(qa.question, contexts)
+
     def _process_one(self, qa: QAPair) -> PipelineResult:
-        search_query = self.query_expander.expand_terms(qa.question)
-        contexts = self.retriever.search(search_query, top_k=self.top_k)
-        answer: Answer = self.generator.generate(qa.question, contexts)
+        tags = classify_question(qa.question)
+        answer = None
+        if any(t in tags for t in ("office_style", "spreadsheet_state", "spreadsheet_calc")):
+            answer = self._process_structured(qa, tags)
+
+        if answer is None:
+            search_query = self.query_expander.expand_terms(qa.question)
+            contexts = self.retriever.search(search_query, top_k=self.top_k)
+            answer = self.generator.generate(qa.question, contexts)
+        else:
+            contexts = answer.source_docs
 
         if self.run_judge:
             reference = qa.reference_answer or "\n".join(

@@ -70,6 +70,7 @@ def main() -> None:
         confidence_threshold=args.threshold,
         project_aliases=project_aliases,
         term_registry=term_registry,
+        artifacts_dir=args.artifacts_dir,
     )
 
     pipeline.build_index()

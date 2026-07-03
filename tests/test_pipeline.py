@@ -157,3 +157,75 @@ def test_pipeline_expands_search_query_with_term_registry(tmp_path: Path) -> Non
     pipeline._process_one(QAPair(question_id="0", question="TGの定義は？"))
 
     assert captured_queries == ["TGの定義は？ 目的変数"]
+
+
+def test_pipeline_routes_office_style_question_through_structured_context(tmp_path: Path) -> None:
+    """office_styleタグの質問は構造化コンテキストを使う。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "office_marks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/提案書.pptx",
+            "project_name": "テスト社",
+            "file_name": "提案書.pptx",
+            "slide_number": 1,
+            "text": "太字の重要事項",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+            "font_color": None,
+            "fill_color": None,
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator._call_llm = lambda q, c: json.dumps({
+        "answer": "太字の重要事項",
+        "confidence": 0.9,
+        "citation": "太字の重要事項",
+        "reasoning": "r",
+    })
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(
+        QAPair(question_id="0", question="太字で記載されている箇所を抽出してください。案件はテスト社です。")
+    )
+
+    assert "太字の重要事項" in result.answer
+
+
+def test_pipeline_routes_spreadsheet_calc_question_to_calc_answerer(tmp_path: Path) -> None:
+    """spreadsheet_calcタグの質問はSpreadsheetCalcAnswererへ渡る。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    csv_dir = tmp_path / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト" / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("term,loan_amnt\n3 years,1000\n3 years,2000\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+
+    def _boom(question, contexts):
+        raise AssertionError("spreadsheet_calcは通常のgenerate()を使ってはいけない")
+
+    pipeline.generator.generate = _boom
+    pipeline.spreadsheet_calc_answerer._call_llm = lambda q, cols: json.dumps({
+        "filters": [{"column": "term", "op": "==", "value": "3 years"}],
+        "target_column": "loan_amnt",
+        "aggregation": "mean",
+        "round_to": 0,
+    })
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.csvにおいて、term=3 yearsの中でloan_amntの平均を算出してください。",
+    ))
+
+    assert "1500" in result.answer
