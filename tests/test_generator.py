@@ -276,7 +276,8 @@ class TestCallLLMRealIntegration:
         assert raw == '{"answer": "テスト回答", "confidence": 0.9, "reasoning": "r"}'
         _, kwargs = MockAnthropic.return_value.messages.create.call_args
         assert kwargs["model"] == "claude-sonnet-5"
-        assert "temperature" not in kwargs
+        # valid実測でrun間のラベル反転（判定ゆらぎ）が観測されたため決定的にする
+        assert kwargs["temperature"] == 0.0
         assert kwargs["system"] == SYSTEM_PROMPT
         assert "質問文です" in kwargs["messages"][0]["content"]
         assert "文脈です" in kwargs["messages"][0]["content"]

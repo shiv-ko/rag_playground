@@ -64,6 +64,7 @@ class LocalJudge:
         model = os.environ.get("CLAUDE_JUDGE_MODEL", "claude-sonnet-5")
         message = self._get_client().messages.create(
             model=model,
+            temperature=0.0,  # 実験の再現性と回答の安定性のため決定的にする
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )

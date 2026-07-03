@@ -150,6 +150,7 @@ class SpreadsheetCalcAnswerer:
         model = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
         message = self._get_client().messages.create(
             model=model,
+            temperature=0.0,  # 実験の再現性と回答の安定性のため決定的にする
             max_tokens=500,
             system=SYSTEM_PROMPT,
             messages=[{
