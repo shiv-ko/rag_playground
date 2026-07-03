@@ -110,3 +110,53 @@ class TestSpreadsheetStateContext:
         store = _full_store()
         docs = build_spreadsheet_state_context("何かの質問", "A社", store)
         assert docs == []
+
+
+class TestScheduleTaskMatchingGeneralization:
+    """実データ形式への対応: 列名「フェーズ」（「フェーズ名」でない）、
+    番号接頭辞付きの値（「3. 探索的分析・仮説整理」）、複合担当者（「A / B」）。"""
+
+    def _aym_like_store(self) -> StructuredArtifactStore:
+        return _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 11,
+             "values": {"タスクID": "T09", "フェーズ": "3. 探索的分析・仮説整理", "タスク名": "基準不良率・単変量分析", "担当者": "山本 彩乃"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 12,
+             "values": {"タスクID": "T10", "フェーズ": "3. 探索的分析・仮説整理", "タスク名": "セグメント別分析", "担当者": "山本 彩乃 / 藤田 彩"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 20,
+             "values": {"タスクID": "T16", "フェーズ": "5. モデル構築", "タスク名": "学習実行", "担当者": "斎藤 悠斗"}},
+            # ヘッダ行の残骸（値==列名）はマッチさせない
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 2,
+             "values": {"タスクID": "タスクID", "フェーズ": "フェーズ", "担当者": "担当者"}},
+        ]})
+
+    def test_numbered_phase_value_matches_question_without_number(self) -> None:
+        docs = build_spreadsheet_state_context(
+            "探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。", "A社", self._aym_like_store()
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T09" in texts
+        assert "T10" in texts
+        assert "T16" not in texts
+
+    def test_phase_key_without_mei_suffix_is_recognized(self) -> None:
+        """列名が「フェーズ名」でなく「フェーズ」でもマッチ対象になる。"""
+        docs = build_spreadsheet_state_context(
+            "モデル構築フェーズのタスクIDを教えてください。", "A社", self._aym_like_store()
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T16" in texts
+        assert "T09" not in texts
+
+    def test_compound_assignee_value_matches_single_person_question(self) -> None:
+        docs = build_spreadsheet_state_context(
+            "藤田 彩さんが担当しているタスクIDを教えてください。", "A社", self._aym_like_store()
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T10" in texts
+        assert "T09" not in texts
+
+    def test_header_echo_row_is_not_matched(self) -> None:
+        docs = build_spreadsheet_state_context(
+            "フェーズと担当者とタスクIDの一覧を教えてください。", "A社", self._aym_like_store()
+        )
+        assert all("row_2" not in d.document.location for d in docs)

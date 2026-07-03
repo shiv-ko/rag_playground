@@ -1,6 +1,7 @@
 """質問タイプ別の構造化コンテキストビルダー。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from src.generator.color_names import nearest_basic_color_name
@@ -100,6 +101,35 @@ def _render_highlight_block(block: dict) -> str:
     return "\n".join(parts)
 
 
+# スケジュール表の列名はプロジェクトごとに揺れる（「フェーズ名」/「フェーズ」等）ため、
+# 列名の部分一致で「質問の絞り込み条件になりうる列」を判定する
+_SCHEDULE_MATCH_KEY_PARTS = ("フェーズ", "担当", "ステータス", "成果物")
+# 値の先頭の番号接頭辞（「3. 探索的分析・仮説整理」等）は質問文には現れないことが多い
+_NUMBER_PREFIX_RE = re.compile(r"^\s*\d+\s*[\.．]\s*")
+
+
+def _schedule_value_match_parts(raw_value: str) -> list[str]:
+    """マッチ判定に使う値の候補: 番号接頭辞を除いた全体＋区切り文字で分割した各要素
+    （担当者「山本 彩乃 / 藤田 彩」のような複合値に対応）。短すぎる断片は誤マッチ源なので捨てる。"""
+    value = _NUMBER_PREFIX_RE.sub("", raw_value).strip()
+    parts = [value] + [p.strip() for p in re.split(r"[/、,]", value)]
+    return [p for p in parts if len(p) >= 2]
+
+
+def _schedule_row_matches_question(values: dict, question: str) -> bool:
+    question_no_space = re.sub(r"[ 　]", "", question)
+    for key, raw in values.items():
+        if not any(part in str(key) for part in _SCHEDULE_MATCH_KEY_PARTS):
+            continue
+        raw_str = str(raw or "").strip()
+        if not raw_str or raw_str == str(key):  # 空値・ヘッダ行の残骸は除外
+            continue
+        for part in _schedule_value_match_parts(raw_str):
+            if part in question or re.sub(r"[ 　]", "", part) in question_no_space:
+                return True
+    return False
+
+
 def _requests_filter_condition(question: str) -> bool:
     return any(k in question for k in ("フィルター", "フィルタ"))
 
@@ -150,14 +180,10 @@ def build_spreadsheet_state_context(
 
     schedule_rows = store.schedule_tasks_for(project_name)
     if schedule_rows:
-        matched_rows = []
-        for row in schedule_rows:
-            values = row.get("values", {})
-            for key in ("フェーズ名", "担当者", "ステータス", "成果物"):
-                cell_value = str(values.get(key, ""))
-                if cell_value and cell_value in question:
-                    matched_rows.append(row)
-                    break
+        matched_rows = [
+            row for row in schedule_rows
+            if _schedule_row_matches_question(row.get("values", {}), question)
+        ]
         for row in matched_rows:
             values = row.get("values", {})
             text = ", ".join(f"{k}={v}" for k, v in values.items())
