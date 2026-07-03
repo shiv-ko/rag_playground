@@ -1,0 +1,191 @@
+"""Parserコンポーネントのテスト (TDD)"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from src.models import Document
+from src.parsers.text_parser import TextParser
+from src.parsers.pdf_parser import PDFParser
+from src.parsers.office_parser import OfficeParser
+from src.parsers.image_parser import ImageParser
+from src.parsers.dispatcher import ParserDispatcher
+
+
+# ─────────────────────── TextParser ───────────────────────
+
+class TestTextParser:
+    def test_parse_txt_returns_document(self, tmp_path: Path) -> None:
+        """.txtファイルをパースしてDocumentを返す"""
+        f = tmp_path / "sample.txt"
+        f.write_text("こんにちは、世界！", encoding="utf-8")
+        parser = TextParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert isinstance(docs[0], Document)
+        assert "こんにちは" in docs[0].text
+
+    def test_can_handle_txt(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "file.txt") is True
+
+    def test_can_handle_md(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "file.md") is True
+
+    def test_can_handle_csv(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "file.csv") is True
+
+    def test_cannot_handle_pdf(self, tmp_path: Path) -> None:
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "file.pdf") is False
+
+
+# ─────────────────────── PDFParser ───────────────────────
+
+class TestPDFParser:
+    def test_can_handle_pdf(self, tmp_path: Path) -> None:
+        parser = PDFParser()
+        assert parser.can_handle(tmp_path / "file.pdf") is True
+
+    def test_cannot_handle_txt(self, tmp_path: Path) -> None:
+        parser = PDFParser()
+        assert parser.can_handle(tmp_path / "file.txt") is False
+
+    def test_stub_when_pypdf_not_installed(self, tmp_path: Path) -> None:
+        """pypdf未インストール時にスタブDocumentを返す（文字列に '[PDF未解析' が含まれる）"""
+        f = tmp_path / "sample.pdf"
+        f.write_bytes(b"%PDF-1.4 stub")
+        parser = PDFParser()
+        # sys.modules に None を設定すると ImportError 扱いになる
+        with patch.dict(sys.modules, {"pypdf": None}):
+            docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "[PDF未解析" in docs[0].text
+
+
+# ─────────────────────── OfficeParser ───────────────────────
+
+class TestOfficeParser:
+    def test_can_handle_docx(self, tmp_path: Path) -> None:
+        parser = OfficeParser()
+        assert parser.can_handle(tmp_path / "file.docx") is True
+
+    def test_can_handle_xlsx(self, tmp_path: Path) -> None:
+        parser = OfficeParser()
+        assert parser.can_handle(tmp_path / "file.xlsx") is True
+
+    def test_can_handle_pptx(self, tmp_path: Path) -> None:
+        parser = OfficeParser()
+        assert parser.can_handle(tmp_path / "file.pptx") is True
+
+    def test_cannot_handle_pdf(self, tmp_path: Path) -> None:
+        parser = OfficeParser()
+        assert parser.can_handle(tmp_path / "file.pdf") is False
+
+    def test_stub_docx_when_not_installed(self, tmp_path: Path) -> None:
+        """python-docx未インストール時にスタブ文字列を含むDocumentを返す"""
+        f = tmp_path / "sample.docx"
+        f.write_bytes(b"PK stub")
+        parser = OfficeParser()
+        with patch.dict(sys.modules, {"docx": None}):
+            docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "DOCX未解析" in docs[0].text
+
+    def test_stub_xlsx_when_not_installed(self, tmp_path: Path) -> None:
+        """openpyxl未インストール時にスタブ文字列を含むDocumentを返す"""
+        f = tmp_path / "sample.xlsx"
+        f.write_bytes(b"PK stub")
+        parser = OfficeParser()
+        with patch.dict(sys.modules, {"openpyxl": None}):
+            docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "XLSX未解析" in docs[0].text
+
+    def test_stub_pptx_when_not_installed(self, tmp_path: Path) -> None:
+        """python-pptx未インストール時にスタブ文字列を含むDocumentを返す"""
+        f = tmp_path / "sample.pptx"
+        f.write_bytes(b"PK stub")
+        parser = OfficeParser()
+        with patch.dict(sys.modules, {"pptx": None}):
+            docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "PPTX未解析" in docs[0].text
+
+
+# ─────────────────────── ImageParser ───────────────────────
+
+class TestImageParser:
+    def test_can_handle_png(self, tmp_path: Path) -> None:
+        parser = ImageParser()
+        assert parser.can_handle(tmp_path / "file.png") is True
+
+    def test_can_handle_jpg(self, tmp_path: Path) -> None:
+        parser = ImageParser()
+        assert parser.can_handle(tmp_path / "file.jpg") is True
+
+    def test_can_handle_jpeg(self, tmp_path: Path) -> None:
+        parser = ImageParser()
+        assert parser.can_handle(tmp_path / "file.jpeg") is True
+
+    def test_parse_returns_stub_document(self, tmp_path: Path) -> None:
+        """parse() がスタブ文字列を含む Document を返す"""
+        f = tmp_path / "sample.png"
+        f.write_bytes(b"\x89PNG stub")
+        parser = ImageParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert isinstance(docs[0], Document)
+        # スタブ実装は「画像」または「VLM」を含む文字列を返す
+        assert "画像" in docs[0].text or "VLM" in docs[0].text
+
+    def test_metadata_contains_type_image(self, tmp_path: Path) -> None:
+        """metadata に type: image が含まれる"""
+        f = tmp_path / "photo.jpg"
+        f.write_bytes(b"JFIF stub")
+        parser = ImageParser()
+        docs = parser.parse(f)
+        assert docs[0].metadata.get("type") == "image"
+
+
+# ─────────────────────── ParserDispatcher ───────────────────────
+
+class TestParserDispatcher:
+    def test_dispatch_txt_file(self, tmp_path: Path) -> None:
+        """.txtファイルをTextParserでパースする（Document.text が空でない）"""
+        f = tmp_path / "hello.txt"
+        f.write_text("テキストデータ", encoding="utf-8")
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse(f)
+        assert len(docs) >= 1
+        assert docs[0].text != ""
+        assert "テキストデータ" in docs[0].text
+
+    def test_unsupported_extension_returns_stub(self, tmp_path: Path) -> None:
+        """未対応拡張子のファイルを渡すと '[未対応形式' を含むDocumentを返す"""
+        f = tmp_path / "weird.xyz"
+        f.write_bytes(b"some data")
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse(f)
+        assert len(docs) == 1
+        assert "[未対応形式" in docs[0].text
+
+    def test_parse_directory_recursive(self, tmp_path: Path) -> None:
+        """parse_directory() でディレクトリ内の複数ファイルを再帰的に処理できる"""
+        (tmp_path / "a.txt").write_text("ファイルA", encoding="utf-8")
+        (tmp_path / "b.md").write_text("ファイルB", encoding="utf-8")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "c.txt").write_text("ファイルC", encoding="utf-8")
+
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+        texts = [d.text for d in docs]
+        assert any("ファイルA" in t for t in texts)
+        assert any("ファイルB" in t for t in texts)
+        assert any("ファイルC" in t for t in texts)

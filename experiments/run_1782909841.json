@@ -1,0 +1,111 @@
+{
+  "summary": {
+    "mean_score": 0.0,
+    "total": 10,
+    "label_counts": {
+      "Missing": 10
+    }
+  },
+  "results": [
+    {
+      "question_id": "q001",
+      "question": "宿泊費の精算上限はいくらですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q002",
+      "question": "接待交際費の申請に誰の承認が必要ですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q003",
+      "question": "Model X Proのバッテリー駆動時間を教えてください",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q004",
+      "question": "Q2の新規顧客獲得目標は何社ですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q005",
+      "question": "3月のModel Aの売上はいくらですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q006",
+      "question": "パスワードを忘れた場合のIT部門の内線番号は？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q007",
+      "question": "リモートワークの申請締め切りはいつですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q008",
+      "question": "APIv2の公開予定はいつですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q009",
+      "question": "社内WifiのパスワードはABCですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    },
+    {
+      "question_id": "q010",
+      "question": "Model X Proの価格はいくらですか？",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "LLM未接続のためスタブ判定"
+    }
+  ]
+}

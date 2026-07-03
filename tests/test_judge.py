@@ -1,0 +1,251 @@
+"""Judge コンポーネントの TDD テスト。
+
+テスト対象:
+- src/models.py の CRAGLabel, JudgeResult
+- src/evaluator/judge.py の LocalJudge._parse, LocalJudge.score
+- src/evaluator/metrics.py の summarize, EvalSummary.report
+"""
+from __future__ import annotations
+
+import pytest
+
+from src.models import CRAGLabel, JudgeResult
+from src.evaluator.judge import LocalJudge
+from src.evaluator.metrics import EvalSummary, summarize
+
+
+# ---------------------------------------------------------------------------
+# CRAGLabel のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestCRAGLabelScore:
+    def test_perfect_score_is_1(self) -> None:
+        assert CRAGLabel.PERFECT.score == 1.0
+
+    def test_acceptable_score_is_0_5(self) -> None:
+        assert CRAGLabel.ACCEPTABLE.score == 0.5
+
+    def test_missing_score_is_0(self) -> None:
+        assert CRAGLabel.MISSING.score == 0.0
+
+    def test_incorrect_score_is_minus_1(self) -> None:
+        assert CRAGLabel.INCORRECT.score == -1.0
+
+    def test_label_can_be_constructed_from_string(self) -> None:
+        assert CRAGLabel("Perfect") == CRAGLabel.PERFECT
+
+    def test_acceptable_can_be_constructed_from_string(self) -> None:
+        assert CRAGLabel("Acceptable") == CRAGLabel.ACCEPTABLE
+
+    def test_missing_can_be_constructed_from_string(self) -> None:
+        assert CRAGLabel("Missing") == CRAGLabel.MISSING
+
+    def test_incorrect_can_be_constructed_from_string(self) -> None:
+        assert CRAGLabel("Incorrect") == CRAGLabel.INCORRECT
+
+
+# ---------------------------------------------------------------------------
+# JudgeResult のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestJudgeResult:
+    def test_label_and_reason_are_set_correctly(self) -> None:
+        result = JudgeResult(label=CRAGLabel.PERFECT, reason="正確な回答")
+        assert result.label == CRAGLabel.PERFECT
+        assert result.reason == "正確な回答"
+
+    def test_score_matches_label_score_for_perfect(self) -> None:
+        result = JudgeResult(label=CRAGLabel.PERFECT, reason="ok")
+        assert result.score == CRAGLabel.PERFECT.score
+
+    def test_score_matches_label_score_for_acceptable(self) -> None:
+        result = JudgeResult(label=CRAGLabel.ACCEPTABLE, reason="ok")
+        assert result.score == CRAGLabel.ACCEPTABLE.score
+
+    def test_score_matches_label_score_for_missing(self) -> None:
+        result = JudgeResult(label=CRAGLabel.MISSING, reason="no answer")
+        assert result.score == CRAGLabel.MISSING.score
+
+    def test_score_matches_label_score_for_incorrect(self) -> None:
+        result = JudgeResult(label=CRAGLabel.INCORRECT, reason="wrong")
+        assert result.score == CRAGLabel.INCORRECT.score
+
+    def test_score_is_set_automatically_via_post_init(self) -> None:
+        """score は __post_init__ で自動設定されるため init では指定しない。"""
+        result = JudgeResult(label=CRAGLabel.INCORRECT, reason="誤り")
+        assert result.score == -1.0
+
+
+# ---------------------------------------------------------------------------
+# LocalJudge._parse のテスト（内部メソッド）
+# ---------------------------------------------------------------------------
+
+
+class TestLocalJudgeParse:
+    def setup_method(self) -> None:
+        self.judge = LocalJudge()
+
+    def test_parse_perfect_label(self) -> None:
+        raw = '{"label": "Perfect", "reason": "正確"}'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.PERFECT
+        assert result.reason == "正確"
+
+    def test_parse_acceptable_label(self) -> None:
+        raw = '{"label": "Acceptable", "reason": "概ね正確"}'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.ACCEPTABLE
+        assert result.reason == "概ね正確"
+
+    def test_parse_missing_label(self) -> None:
+        raw = '{"label": "Missing", "reason": "回答なし"}'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.MISSING
+        assert result.reason == "回答なし"
+
+    def test_parse_incorrect_label(self) -> None:
+        raw = '{"label": "Incorrect", "reason": "誤り"}'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.INCORRECT
+        assert result.reason == "誤り"
+
+    def test_invalid_json_falls_back_to_missing(self) -> None:
+        raw = "これは不正なJSONです"
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.MISSING
+
+    def test_invalid_json_does_not_raise_exception(self) -> None:
+        raw = "not json at all {broken"
+        # 例外を投げずに Missing を返すことを確認
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.MISSING
+
+    def test_parse_json_surrounded_by_text(self) -> None:
+        """JSON の前後にテキストがあっても正しくパースできる。"""
+        raw = 'この回答を評価します。\n{"label": "Perfect", "reason": "正確"}\n以上です。'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.PERFECT
+
+    def test_parse_json_with_markdown_fences(self) -> None:
+        """LLM が markdown コードブロックで返す場合でもパースできる。"""
+        raw = '```json\n{"label": "Acceptable", "reason": "おおよそ正確"}\n```'
+        result = self.judge._parse(raw)
+        assert result.label == CRAGLabel.ACCEPTABLE
+
+
+# ---------------------------------------------------------------------------
+# LocalJudge.score のテスト（FakeJudge による振る舞いテスト）
+# ---------------------------------------------------------------------------
+
+
+class FakeJudge(LocalJudge):
+    """_call_llm をオーバーライドして任意の応答を返すテスト用サブクラス。"""
+
+    def __init__(self, fake_response: str) -> None:
+        self.fake_response = fake_response
+
+    def _call_llm(self, prompt: str) -> str:
+        return self.fake_response
+
+
+class TestLocalJudgeScore:
+    def test_score_returns_perfect_when_llm_says_perfect(self) -> None:
+        judge = FakeJudge('{"label": "Perfect", "reason": "非常に正確"}')
+        result = judge.score(
+            question="宿泊費の上限は？",
+            generated_answer="15,000円です。",
+            reference_or_context="宿泊費の上限は15,000円です。",
+        )
+        assert result.label == CRAGLabel.PERFECT
+
+    def test_score_returns_incorrect_when_llm_says_incorrect(self) -> None:
+        judge = FakeJudge('{"label": "Incorrect", "reason": "金額が間違い"}')
+        result = judge.score(
+            question="宿泊費の上限は？",
+            generated_answer="100万円です。",
+            reference_or_context="宿泊費の上限は15,000円です。",
+        )
+        assert result.label == CRAGLabel.INCORRECT
+
+    def test_score_falls_back_to_missing_on_invalid_response(self) -> None:
+        judge = FakeJudge("これは無効な応答です。JSON ではありません。")
+        result = judge.score(
+            question="何かの質問",
+            generated_answer="何かの回答",
+            reference_or_context="文脈",
+        )
+        assert result.label == CRAGLabel.MISSING
+
+    def test_score_returns_judge_result_type(self) -> None:
+        judge = FakeJudge('{"label": "Acceptable", "reason": "概ね正確"}')
+        result = judge.score("質問", "回答", "文脈")
+        assert isinstance(result, JudgeResult)
+
+    def test_score_sets_correct_score_value(self) -> None:
+        judge = FakeJudge('{"label": "Perfect", "reason": "正確"}')
+        result = judge.score("質問", "回答", "文脈")
+        assert result.score == 1.0
+
+
+# ---------------------------------------------------------------------------
+# metrics.summarize のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestSummarize:
+    def _make_results(self) -> list[JudgeResult]:
+        return [
+            JudgeResult(label=CRAGLabel.PERFECT, reason="ok"),
+            JudgeResult(label=CRAGLabel.PERFECT, reason="ok"),
+            JudgeResult(label=CRAGLabel.MISSING, reason="no answer"),
+            JudgeResult(label=CRAGLabel.INCORRECT, reason="wrong"),
+        ]
+
+    def test_mean_score_is_correct(self) -> None:
+        results = self._make_results()
+        summary = summarize(results)
+        expected = (1.0 + 1.0 + 0.0 + (-1.0)) / 4  # == 0.25
+        assert abs(summary.mean_score - expected) < 1e-9
+
+    def test_label_counts_perfect_is_2(self) -> None:
+        summary = summarize(self._make_results())
+        assert summary.label_counts.get("Perfect") == 2
+
+    def test_label_counts_missing_is_1(self) -> None:
+        summary = summarize(self._make_results())
+        assert summary.label_counts.get("Missing") == 1
+
+    def test_label_counts_incorrect_is_1(self) -> None:
+        summary = summarize(self._make_results())
+        assert summary.label_counts.get("Incorrect") == 1
+
+    def test_total_is_correct(self) -> None:
+        summary = summarize(self._make_results())
+        assert summary.total == 4
+
+    def test_report_returns_non_empty_string(self) -> None:
+        summary = summarize(self._make_results())
+        report = summary.report()
+        assert isinstance(report, str)
+        assert len(report) > 0
+
+    def test_report_contains_total(self) -> None:
+        summary = summarize(self._make_results())
+        assert "Total: 4" in summary.report()
+
+    def test_report_contains_mean_score(self) -> None:
+        summary = summarize(self._make_results())
+        assert "Mean score" in summary.report()
+
+    def test_summarize_empty_list_returns_zero_mean(self) -> None:
+        summary = summarize([])
+        assert summary.mean_score == 0.0
+        assert summary.total == 0
+
+    def test_summarize_single_result(self) -> None:
+        results = [JudgeResult(label=CRAGLabel.ACCEPTABLE, reason="ok")]
+        summary = summarize(results)
+        assert summary.total == 1
+        assert summary.mean_score == 0.5
