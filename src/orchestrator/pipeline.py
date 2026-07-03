@@ -12,7 +12,7 @@ from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
 from src.models import Answer, JudgeResult
 from src.parsers.dispatcher import ParserDispatcher
-from src.retriever.hybrid_retriever import HybridRetriever
+from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
 
@@ -50,7 +50,7 @@ class Pipeline:
         self.logger = setup_logging()
 
         self.dispatcher = ParserDispatcher()
-        self.retriever = HybridRetriever()
+        self.retriever = ProjectScopedRetriever()
         self.generator = AnswerGenerator(threshold=confidence_threshold)
         self.judge = LocalJudge()
 

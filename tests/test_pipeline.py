@@ -65,6 +65,15 @@ def test_metrics_summarize() -> None:
     assert summary.label_counts["Perfect"] == 2
 
 
+def test_pipeline_uses_project_scoped_retriever(tmp_path: Path) -> None:
+    """PipelineはHybridRetrieverではなくProjectScopedRetrieverを使う（ベースライン方針）。"""
+    from src.orchestrator.pipeline import Pipeline
+    from src.retriever.project_scoped_retriever import ProjectScopedRetriever
+
+    pipeline = Pipeline(data_dir=tmp_path)
+    assert isinstance(pipeline.retriever, ProjectScopedRetriever)
+
+
 def test_e2e_stub(tmp_path: Path, sample_docs: list[Document]) -> None:
     """スタブ実装でパイプライン全体が通ることを確認する。"""
     from src.generator.answer_generator import AnswerGenerator

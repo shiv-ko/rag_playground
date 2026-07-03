@@ -6,7 +6,7 @@ description: パイプライン構成・コンポーネントの役割・本番�
 ## パイプライン
 
 ```
-ParserDispatcher → HybridRetriever(Vector+Keyword) → AnswerGenerator → ConfidenceGate
+ParserDispatcher → ProjectScopedRetriever(BM25) → AnswerGenerator → ConfidenceGate
                                                                             ↓
                                                                      LocalJudge (CRAG)
 ```
@@ -18,7 +18,7 @@ ParserDispatcher → HybridRetriever(Vector+Keyword) → AnswerGenerator → Con
 | Parser | `src/parsers/dispatcher.py` | 拡張子で振り分け |
 | Indexer | `src/indexer/keyword_store.py` | BM25/TF-IDF（CJKバイグラム対応） |
 | Indexer | `src/indexer/vector_store.py` | コサイン類似度（疑似埋め込み） |
-| Retriever | `src/retriever/hybrid_retriever.py` | 重み付きfusion + 正規化 |
+| Retriever | `src/retriever/project_scoped_retriever.py` | 質問文から案件名検出→案件フォルダ絞り込み＋BM25（未検出時は全体BM25にフォールバック） |
 | Generator | `src/generator/answer_generator.py` | スタブ → Claude API に差し替え |
 | Gate | `src/generator/confidence_gate.py` | confidence < 0.4 → Missing |
 | Judge | `src/evaluator/judge.py` | スタブ → Claude API に差し替え |
