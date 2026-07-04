@@ -11,6 +11,15 @@ from src.retriever.project_scoped_retriever import (
 )
 
 
+class CapturingStore:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def search(self, query: str, top_k: int = 5) -> list:
+        self.queries.append(query)
+        return []
+
+
 def _doc(text: str, project: str | None = None, is_internal: bool = False, path: str = "x.txt") -> Document:
     return Document(
         text=text,
@@ -142,3 +151,74 @@ class TestProjectScopedRetriever:
         retriever.add(docs)
 
         assert retriever.detect_project("青潮モビリティサービスについて") == "株式会社青潮モビリティサービス"
+
+    def test_scoped_search_removes_project_alias_tokens_from_query(self) -> None:
+        retriever = ProjectScopedRetriever(
+            project_aliases={"株式会社青潮モビリティサービス": ["AOSHIO", "青潮"]}
+        )
+        retriever.add([_doc("Recall が評価指標です。", project="株式会社青潮モビリティサービス")])
+        store = CapturingStore()
+        retriever._project_stores["株式会社青潮モビリティサービス"] = store  # type: ignore[assignment]
+
+        retriever.search("AOSHIOの評価指標", top_k=5)
+
+        assert store.queries == ["の評価指標"]
+
+    def test_scoped_search_keeps_original_query_when_alias_removal_makes_empty(self) -> None:
+        retriever = ProjectScopedRetriever(project_aliases={"株式会社青潮モビリティサービス": ["AOSHIO"]})
+        retriever.add([_doc("AOSHIO", project="株式会社青潮モビリティサービス")])
+        store = CapturingStore()
+        retriever._project_stores["株式会社青潮モビリティサービス"] = store  # type: ignore[assignment]
+
+        retriever.search("AOSHIO", top_k=5)
+
+        assert store.queries == ["AOSHIO"]
+
+    def test_unscoped_search_does_not_rewrite_query(self) -> None:
+        retriever = ProjectScopedRetriever(project_aliases={"株式会社青潮モビリティサービス": ["AOSHIO"]})
+        retriever.add([_doc("AOSHIO", project="株式会社青潮モビリティサービス")])
+        store = CapturingStore()
+        retriever._global_store = store  # type: ignore[assignment]
+
+        retriever.search("未知案件の評価指標", top_k=5)
+
+        assert store.queries == ["未知案件の評価指標"]
+
+    def test_explicit_file_name_hint_injects_matching_file_when_absent_from_top_k(self) -> None:
+        retriever = ProjectScopedRetriever()
+        docs = [
+            _doc("需要予測の概要です。", project="A社", path="x/foo.ipynb"),
+            _doc("需要予測の詳細です。", project="A社", path="x/bar.ipynb"),
+        ]
+        retriever.add(docs)
+
+        results = retriever.search("foo.ipynbの出力は？ 需要予測", top_k=1)
+
+        assert results
+        assert results[0].document.source_path.name == "foo.ipynb"
+
+    def test_file_name_hint_missing_from_index_keeps_results_unchanged(self) -> None:
+        retriever = ProjectScopedRetriever()
+        docs = [
+            _doc("需要予測の詳細です。", project="A社", path="x/bar.ipynb"),
+        ]
+        retriever.add(docs)
+
+        hinted = retriever.search("foo.ipynbの出力は？ 需要予測", top_k=1)
+        plain = retriever.search("需要予測", top_k=1)
+
+        assert [r.document.source_path for r in hinted] == [r.document.source_path for r in plain]
+
+    def test_file_name_hint_matches_case_and_unicode_normalized_suffix(self) -> None:
+        retriever = ProjectScopedRetriever()
+        nfd_path = unicodedata.normalize("NFD", "x/データ.IPYNB")
+        docs = [
+            _doc("分析出力です。", project="A社", path=nfd_path),
+            _doc("分析出力です。", project="A社", path="x/other.ipynb"),
+        ]
+        retriever.add(docs)
+
+        results = retriever.search("データ.ipynbの分析出力", top_k=1)
+
+        assert results
+        assert unicodedata.normalize("NFC", results[0].document.source_path.name).lower() == "データ.ipynb"

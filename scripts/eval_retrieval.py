@@ -20,6 +20,7 @@ from src.evaluator.retrieval_eval import (
     records_to_payload,
     summarize_records,
 )
+from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.utils.parse_cache import load_or_parse
 
@@ -32,9 +33,15 @@ def main() -> None:
     parser.add_argument("--split", default="valid")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--out-dir", type=Path, default=ROOT / "experiments")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="パースキャッシュを使わず、現在のparser/chunkerで再パースする")
     args = parser.parse_args()
 
-    docs = load_or_parse(args.data_dir, ROOT / ".cache")
+    docs = (
+        ParserDispatcher().parse_directory(args.data_dir)
+        if args.no_cache
+        else load_or_parse(args.data_dir, ROOT / ".cache")
+    )
 
     project_registry = json.loads(
         (ROOT / "artifacts" / "project_registry.json").read_text(encoding="utf-8")
