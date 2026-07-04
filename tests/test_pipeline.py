@@ -239,6 +239,65 @@ def test_pipeline_answers_single_office_style_match_without_llm_refusal(tmp_path
     assert result.answer == "1. データ理解・EDA"
 
 
+def test_style_extraction_intent_detection() -> None:
+    """装飾文字列そのものを求める質問だけが抽出意図と判定される。"""
+    from src.orchestrator.pipeline import is_style_extraction_request
+
+    assert is_style_extraction_request("マーカーされている単語をすべて抜き出してください。")
+    assert is_style_extraction_request("赤で強調されている箇所の文字列を抜き出してください。")
+    assert is_style_extraction_request("太字で記載されている部分を抽出してください。")
+    assert is_style_extraction_request("黄色でハイライトされている部分を全て抜き出してください。")
+    # 「抽出条件」は名詞複合語であり抽出意図ではない（説明要求型）
+    assert not is_style_extraction_request(
+        "黄色ハイライトされている数値に対応するデータの抽出条件と集計内容を答えてください。"
+    )
+    assert not is_style_extraction_request("太字で強調されている項目は何を表していますか。")
+
+
+def test_pipeline_office_style_explanation_request_not_answered_with_raw_strings(tmp_path: Path) -> None:
+    """装飾文字列そのものを求めない質問（条件・集計内容の説明要求）はoffice_style直返ししない。"""
+    from src.models import Answer
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "office_marks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/基礎分析.pptx",
+            "project_name": "テスト社",
+            "file_name": "基礎分析.pptx",
+            "slide_number": 3,
+            "text": "4,675,000",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+            "font_color": None,
+            "fill_color": None,
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+
+    generate_calls: list[str] = []
+
+    def _fake_generate(question, contexts):
+        generate_calls.append(question)
+        return Answer(text="LLM経由の回答", confidence=0.9)
+
+    pipeline.generator.generate = _fake_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="7",
+        question="テスト社の基礎分析.pptxで太字で強調されている数値に対応するデータの抽出条件と集計内容を答えてください。",
+    ))
+
+    assert generate_calls, "説明要求型は装飾文字列を直返しせずLLM生成へ渡す"
+    assert result.answer == "LLM経由の回答"
+
+
 def test_pipeline_routes_spreadsheet_calc_question_to_calc_answerer(tmp_path: Path) -> None:
     """spreadsheet_calcタグの質問はSpreadsheetCalcAnswererへ渡る。"""
     from src.orchestrator.pipeline import Pipeline, QAPair

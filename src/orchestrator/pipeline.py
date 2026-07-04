@@ -31,6 +31,15 @@ from src.utils.paths import to_repo_relative
 from src.utils.question_classifier import classify_question
 
 
+# 「〜を（すべて）抜き出す/抽出する」の動詞用法のみ抽出意図とみなす。
+# 「抽出条件」のような名詞複合語（装飾内容の説明を求める質問）は含めない。
+_STYLE_EXTRACTION_INTENT = re.compile(r"を(?:すべて|全て)?\s*(?:抜き出|抽出)")
+
+
+def is_style_extraction_request(question: str) -> bool:
+    return bool(_STYLE_EXTRACTION_INTENT.search(unicodedata.normalize("NFC", question)))
+
+
 @dataclass
 class QAPair:
     question_id: str
@@ -175,7 +184,7 @@ class Pipeline:
         pool_size = self._structured_pool_size(used_tag, project_name)
         if not is_enumeration_complete(len(contexts), pool_size, "structured_attribute_filter"):
             return None
-        if used_tag == "office_style":
+        if used_tag == "office_style" and is_style_extraction_request(qa.question):
             direct = self._direct_office_style_answer(contexts)
             if direct is not None:
                 return direct
