@@ -160,7 +160,9 @@ class AnswerGenerator:
         try:
             m = re.search(r"\{.*\}", raw, re.DOTALL)
             if m:
-                data = json.loads(m.group())
+                # strict=False: citation等の文字列内に生改行（制御文字）があっても
+                # パース失敗→conf 0.0扱いにしない（実測valid Q18の過剰ゲート原因）
+                data = json.loads(m.group(), strict=False)
                 return (
                     str(data.get("answer", "")),
                     float(data.get("confidence", 0.0)),

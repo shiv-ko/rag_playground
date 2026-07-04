@@ -108,6 +108,14 @@ class TestParseResponse:
         assert confidence == pytest.approx(0.8)
         assert citation == "bar"
 
+    def test_parse_response_allows_raw_newline_in_strings(self) -> None:
+        """citation内の生改行（制御文字）でパース失敗しない（実測valid Q18の真因）。"""
+        raw = '{"answer": "第3章に記載", "confidence": 0.55, "citation": "3. 業務範囲\n乙が本契約に基づき"}'
+        answer, confidence, citation = self.gen._parse_response(raw)
+        assert answer == "第3章に記載"
+        assert confidence == pytest.approx(0.55)
+        assert "業務範囲" in citation
+
     def test_parses_json_surrounded_by_text(self) -> None:
         """JSON が前後テキストに囲まれていてもパースできる。"""
         raw = 'Here is the result: {"answer": "bar", "confidence": 0.7, "citation": "baz", "reasoning": "r"} done.'
