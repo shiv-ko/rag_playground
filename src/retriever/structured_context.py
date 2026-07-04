@@ -297,6 +297,22 @@ def _pivot_argmax_docs(question: str, cells: list[dict]) -> list[Document]:
         ]
         if not data_rows:
             continue
+        # 階層を1列に畳み込んだcompactレイアウトのpivot対策: 行の同一性（抽出条件）を
+        # 表す列 = 集計列以外の全列。集計列は「複数列で共有される集計関数トークン
+        # （平均・合計等）を見出しに含む列」＋判定列として一般則で検出する。
+        # 同一性タプルがデータ行間で重複する場合、行単独では親階層込みの完全な
+        # 抽出条件を復元できない。部分条件の回答はofficial規則「部分一致はIncorrect」で
+        # -1になるため出さない（実測valid Q21: 「Human Resources」が親階層違いで重複）。
+        aggregate_cols = {
+            c for c in numeric_cols
+            if any(token_col_count.get(t, 0) >= 2 for t in header_tokens[c])
+        } | {col}
+        identity_cols = [c for c in sorted(headers) if c not in aggregate_cols]
+        identity_tuples = [
+            tuple(grid[r].get(c) for c in identity_cols) for r in data_rows
+        ]
+        if len(set(identity_tuples)) < len(identity_tuples):
+            continue
         pick = (max if want_max else min)(data_rows, key=lambda r: float(grid[r][col]))
         lines = [
             f"シート: {sheet_name}（Pivot集計表・xlsxセル値から機械抽出）",

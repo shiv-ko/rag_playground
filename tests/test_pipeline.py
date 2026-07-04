@@ -338,6 +338,58 @@ def test_pipeline_prefers_spreadsheet_state_for_xlsx_questions_over_office_marks
     assert "無関係な黄色ハイライトのスライド文言" not in captured_contexts[0]
 
 
+def test_pipeline_falls_through_to_state_when_calc_has_no_train_csv(tmp_path: Path) -> None:
+    """spreadsheet_calcとspreadsheet_stateの両タグが付く質問（例: Pivotの「平均が最も高い」）で、
+    train.csvが無い場合はcalc分岐で離脱せずspreadsheet_stateビルダーへ委ねる（実測valid Q6/Q21の死にパス）。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    cells = [
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "A3", "row": 3, "value": "層"},
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "B3", "row": 3, "value": "平均 / bmi"},
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "A4", "row": 4, "value": "20代"},
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "B4", "row": 4, "value": "10.5"},
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "A5", "row": 5, "value": "30代"},
+        {"source_path": "data/raw/x/train.xlsx", "project_name": "テスト社",
+         "file_name": "train.xlsx", "sheet_name": "Pivot", "cell": "B5", "row": 5, "value": "99.9"},
+    ]
+    (artifacts_dir / "train_xlsx_small_sheet_cells.jsonl").write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cells), encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    captured_contexts: list[str] = []
+
+    def _fake_llm(question: str, context: str) -> str:
+        captured_contexts.append(context)
+        return json.dumps({
+            "answer": "30代",
+            "confidence": 0.9,
+            "citation": "30代",
+            "reasoning": "r",
+        }, ensure_ascii=False)
+
+    pipeline.generator._call_llm = _fake_llm
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxのPivotシートで、bmiの平均が最も高い層の抽出条件を教えてください。",
+    ))
+
+    # train.csvが無くてもstateビルダーのargmax行docが生成器に渡ること
+    assert captured_contexts and "30代" in captured_contexts[0] and "99.9" in captured_contexts[0]
+    assert result.answer == "30代"
+
+
 def test_pipeline_falls_back_to_search_when_calc_answer_is_gated(tmp_path: Path) -> None:
     """spreadsheet_calcパスがspecを解釈できずゲートした場合、Missing固定にせず
     通常のBM25検索パスへフォールバックする。"""

@@ -137,11 +137,13 @@ class Pipeline:
 
         if "spreadsheet_calc" in tags:
             df = self._load_train_csv(project_name)
-            if df is None:
-                return None
-            calc_answer = self.spreadsheet_calc_answerer.answer(qa.question, df)
-            # 集計仕様に落とせなかった質問はMissing固定にせず通常の検索パスへ委ねる
-            return None if calc_answer.was_gated else calc_answer
+            if df is not None:
+                calc_answer = self.spreadsheet_calc_answerer.answer(qa.question, df)
+                if not calc_answer.was_gated:
+                    return calc_answer
+            # train.csvが無い・集計仕様に落とせなかった場合はMissing固定にせず
+            # 後続の構造化ビルダー（state/office）→通常の検索パスへ委ねる
+            # （calc早期returnがQ6/Q21型のPivot質問を殺していた実測に基づく）
 
         if self.structured_store is None:
             return None
@@ -184,6 +186,10 @@ class Pipeline:
                 len(self.structured_store.train_xlsx_highlight_blocks_for(project_name))
                 + len(self.structured_store.spreadsheet_sheets_for(project_name))
                 + len(self.structured_store.schedule_tasks_for(project_name))
+                # Task 3で追加した供給源（autoFilter条件・Pivot小型シートセル）も
+                # 候補プールに数える — 漏れると該当案件で完全性ゲートがpool=0棄却する
+                + len(self.structured_store.train_xlsx_sheets_for(project_name))
+                + len(self.structured_store.small_sheet_cells_for(project_name))
             )
         return 0
 

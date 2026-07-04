@@ -360,14 +360,14 @@ def test_pivot_argmax_forward_fills_merged_label_columns():
 def test_pivot_argmax_does_not_fill_sparse_numeric_aggregate_column():
     """欠損セルを含む数値の集計列はラベル列と誤判定せず、forward-fillで
     実データに存在しない数値を捏造しない（回帰テスト）。
-    argmax行はラベル列（マージセル）も集計列Bも空欄 — ラベルはfillされるが
-    集計値はfillされてはならない。"""
+    argmax行はラベル列（マージセル）も集計列Cも空欄 — ラベルはfillされるが
+    集計値はfillされてはならない。層列で行の同一性は一意（compact階層ガード非発火）。"""
     cells = []
-    header = {"A3": "性別", "B3": "平均 / ALP", "C3": "平均 / bmi"}
+    header = {"A3": "性別", "B3": "層", "C3": "平均 / ALP", "D3": "平均 / bmi"}
     data = {
-        4: {"A": "Male", "B": "10.5", "C": "1.0"},
-        5: {"C": "99.9"},  # A列はマージセルで空、B列（集計列）は欠損
-        6: {"A": "Female", "B": "50.0", "C": "3.0"},
+        4: {"A": "Male", "B": "20代", "C": "10.5", "D": "1.0"},
+        5: {"B": "30代", "D": "99.9"},  # A列はマージセルで空、C列（集計列）は欠損
+        6: {"A": "Female", "B": "40代", "C": "50.0", "D": "3.0"},
     }
     for cell, v in header.items():
         cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
@@ -383,6 +383,32 @@ def test_pivot_argmax_does_not_fill_sparse_numeric_aggregate_column():
     text = docs[0].document.text
     assert "性別=Male" in text and "99.9" in text  # ラベルのfillは維持される
     assert "平均 / ALP=10.5" not in text           # 直前行の集計値を捏造fillしていない
+
+
+def test_pivot_argmax_abstains_on_compact_hierarchical_pivot():
+    """階層を1列に畳み込んだcompactレイアウトのpivot（ラベルタプルがデータ行間で重複）では
+    行単独で完全な抽出条件を復元できないため、docを出さない（部分条件の回答は
+    official規則「部分一致はIncorrect」で-1になる — 実測valid Q21）。"""
+    cells = []
+    header = {"A3": "行ラベル", "B3": "平均 / MonthlyIncome"}
+    # 「Human Resources」が別ブロック（親階層違い）で重複出現するcompact pivot
+    data = {
+        4: {"A": "Female", "B": "7216.2"},
+        5: {"A": "Human Resources", "B": "9140"},
+        6: {"A": "Male", "B": "6835.7"},
+        7: {"A": "Human Resources", "B": "17328"},
+    }
+    for cell, v in header.items():
+        cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                      "source_path": "data/raw/x/train.xlsx", "cell": cell, "row": 3, "value": v})
+    for row, cols in data.items():
+        for col, v in cols.items():
+            cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                          "source_path": "data/raw/x/train.xlsx", "cell": f"{col}{row}", "row": row, "value": v})
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "PivotシートでMonthlyIncomeの平均が最も高い層の抽出条件は？", "テスト案件", store)
+    assert docs == []
 
 
 def test_pivot_argmax_no_matching_column_returns_nothing():
