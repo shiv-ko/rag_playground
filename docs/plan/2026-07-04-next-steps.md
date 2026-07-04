@@ -78,6 +78,10 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
 - [x] **spreadsheet_calc（test 9問）**: CalcSpecに `group_by` + `select`（argmax/argmin）と
   `list` / `closest_to_mean_list` を追加（2026-07-04完了: `725acfd` / `37e62f1`）。
   Q7はlocal/official Perfect、Q26は単発official Perfect。ゲート（0行・列不在・51件以上→Missing）は維持。
+- [x] **HEAD最終構成の後追い検証（2026-07-04完了: `eaf6f77`）**: `exp_phase2rem_head_valid` N=3＋
+  official較正で採用確定。**official mean 0.3667**（B2b 0.2333→calcgroupby 0.2667→0.3667）、
+  Q25/Q26/Q27 official Perfect、Q23 Acceptable安定化、official IncorrectはQ17のみ（Q6解消で2→1）。
+  local多数決0.3000への見かけ低下はjudge誤判定（Q25: GT完全一致をIncorrect判定。plan_0703 §2.3学び4）
 
 → **office_style＋spreadsheet_calc（Q0/Q7/Q26/Q25）のCodex向け実装指示書策定済み（2026-07-04）**:
 `2026-07-04-phase2-remainder-for-codex.md`（`b2c0f0a`）。Codexはサブエージェント不可のため
