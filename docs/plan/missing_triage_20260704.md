@@ -1,0 +1,48 @@
+# valid 失敗切り分け表（2026-07-04）
+
+run: `phase0_valid_1783125252.json` / retrieval: `retrieval_valid_1783123484.json` / raw判定judge: openai
+
+## 集計
+
+| 分類 | 件数 |
+|---|---|
+| 生成失敗 | 12 |
+| 検索失敗 | 10 |
+| OK | 6 |
+| 計測不能(手動確認) | 1 |
+| 較正失敗(過剰ゲート) | 1 |
+
+## 質問別
+
+| # | type | 最終label | 検索hit | gated | 生回答判定 | 分類 | 質問 |
+|---|---|---|---|---|---|---|---|
+| 0 | office_style | Missing | × | ○ | - | 検索失敗 | 青潮モビリティサービスの最終報告における、モビリティ需要の要因分析のページで、マ |
+| 1 | image_graph | Missing | ○ | ○ | - | 生成失敗 | KSSのfigure_06.pngにおいて、dayによる件数推移とあわせて表示さ |
+| 2 | single_text | Missing | ○ | ○ | Missing | 生成失敗 | 恒一会 かえで総合病院の提案書内で、重視するとされている評価指標を答えてください |
+| 3 | cross_project | Missing | × | ○ | - | 計測不能(手動確認) | 全案件で支払った税込金額をもとに、消費税額の総額を計算してください。 |
+| 4 | code_static | Missing | × | ○ | - | 検索失敗 | 青嶺不動産アセットマネジメントの modeling.py において、前処理器の  |
+| 5 | single_text | Perfect | ○ | - | - | OK | 白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI |
+| 6 | spreadsheet_state | Missing | × | ○ | - | 検索失敗 | 恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計さ |
+| 7 | spreadsheet_calc | Missing | × | ○ | - | 検索失敗 | 恒一会 かえで総合病院のプロジェクトデータ（train.csv）において、dis |
+| 8 | contract_rule | Perfect | ○ | - | - | OK | 蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だっ |
+| 9 | version_diff | Missing | ○ | ○ | Missing | 生成失敗 | 青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォ |
+| 10 | list_extraction | Missing | × | ○ | - | 検索失敗 | 蒼樹会 みなみ野女性医療センターの最終報告書にて、影響度が最も高いとされている残 |
+| 11 | spreadsheet_state | Missing | × | ○ | - | 検索失敗 | 東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィル |
+| 12 | contract_rule | Missing | ○ | ○ | Missing | 生成失敗 | 京橋信用ソリューションズの契約金額（税込）はいくらですか。 |
+| 13 | spreadsheet_calc | Perfect | ○ | - | - | OK | 青葉与信マネジメントの分析対象データにおいて、term=3 years、grad |
+| 14 | single_text | Acceptable | ○ | ○ | - | OK | 青葉バイオメディカル機器案件において、鈴木 美咲さんはどの役割としてアサインされ |
+| 15 | internal_terms | Missing | ○ | ○ | - | 生成失敗 | 中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称で |
+| 16 | internal_terms | Missing | × | ○ | - | 検索失敗 | MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日か |
+| 17 | single_text | Missing | ○ | - | - | 生成失敗 | 京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表 |
+| 18 | internal_terms | Missing | ○ | ○ | Perfect | 較正失敗(過剰ゲート) | 東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載さ |
+| 19 | list_extraction | Missing | ○ | ○ | Missing | 生成失敗 | 青嶺不動産アセットマネジメント案件で分析設計を担当する人の名前をフルネームで抽出 |
+| 20 | internal_terms | Perfect | ○ | - | - | OK | AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙 |
+| 21 | spreadsheet_state | Missing | × | ○ | - | 検索失敗 | 青葉バイオメディカル機器のtrain.xlsxのPivotシートにおいて、平均月 |
+| 22 | notebook_output | Missing | ○ | ○ | Missing | 生成失敗 | AOSHIOの NB01_eda.ipynbにおいて、観察結果サマリで出力されて |
+| 23 | office_style | Missing | ○ | ○ | Missing | 生成失敗 | AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をす |
+| 24 | notebook_output | Missing | ○ | ○ | - | 生成失敗 | 白峰信用リスク評価の 01_eda.ipynb にある特徴量相関ヒートマップの図 |
+| 25 | office_style | Missing | ○ | ○ | Missing | 生成失敗 | 東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜 |
+| 26 | spreadsheet_calc | Missing | × | ○ | - | 検索失敗 | 青葉バイオメディカル機器のtrain.csvにおいて、EducationFiel |
+| 27 | analysis_metrics | Missing | ○ | - | - | 生成失敗 | 蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1ス |
+| 28 | code_static | Incorrect | × | - | - | 検索失敗 | 蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように |
+| 29 | contract_rule | Perfect | ○ | - | - | OK | 蒼樹会 みなみ野女性医療センターの契約書第8条において、本契約終了後に秘密保持義 |

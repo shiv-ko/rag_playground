@@ -21,12 +21,17 @@
 - [x] worktree `.claude/worktrees/phase0-measurement-infra` の完了済みTask 1（パースキャッシュ）・Task 2（診断情報）を
       現mainへ統合する（2026-07-04完了: `ac612e9` / `9c86d8e`。raw_textを現行の全ゲート経路に適応。
       詳細は`docs/daily作業ログ/20260704_005800.md`）
-- [ ] Task 3: 検索単体評価（retrieval recall）スクリプト
-- [ ] Task 4: flip分析の標準化（`scripts/run_eval.py`にrun間差分出力）＋ **「同一コードでN=3 run→多数決ラベル」を標準手順化**（ゆらぎ対策）
-- [ ] Task 5: OpenAI CRAGジャッジとの較正（キーがあれば）。judgeゆらぎ（同一回答でラベル反転）の定量化もここで
-- [ ] Task 6-7: Missing切り分け表の生成と`plan_0703.md`更新
+- [x] Task 3: 検索単体評価（retrieval recall）スクリプト（2026-07-04完了 `68fc097`。valid recall 66%=19/29。
+      NFC/NFD突合バグをrecall 0の実測で検出し修正）
+- [x] Task 4: flip分析の標準化（`scripts/run_eval.py`にrun間差分出力、2026-07-04完了 `31bff62`）。
+      N=3 run多数決の手順化は今後の実験運用で適用
+- [x] Task 5: OpenAI CRAGジャッジとの較正（2026-07-04完了 `3f58499`。official 0.1333 vs local 0.15、一致率90%。
+      judgeゆらぎの定量化（同一回答N回判定）は未実施・必要になったら）
+- [x] Task 6-7: Missing切り分け表の生成と`plan_0703.md`更新（2026-07-04完了 `5b4d3d7`＋E2E実行。
+      `docs/plan/missing_triage_20260704.md`: 検索失敗10/生成失敗12/過剰ゲート1/計測不能1。`plan_0703.md` §2.1参照）
 
-**完了条件**: 「変更→30問評価→flip確認」が数分で回り、安定Missing 21問が「検索失敗/生成失敗/較正失敗」に分類されている。
+**完了条件**: ✅達成（2026-07-04）。「変更→30問評価→flip確認」= 2分3秒＋flip数秒で回る。Missing+Incorrectは
+検索失敗10/生成失敗12/較正失敗1/計測不能1に分類済み。
 
 ## 2. フリップ層の安定化（安価・+0.10〜0.15）
 
@@ -65,6 +70,10 @@ Q5/Q14/Q18/Q27は正解を出せることが実証済みで、落ちる原因は
 
 low-riskの安定Missing（Q2/Q4/Q17/Q22）と唯一のIncorrect（Q28）はretrieval/chunking起因の疑い。
 **Phase 0 Task 3のrecall実測で規模を確定してから**着手（Phase 1計画で意図的に先送りした項目。感覚で直さない）。
+
+→ **2026-07-04 実測で規模確定**（`missing_triage_20260704.md`）: 検索失敗は10問でspreadsheet系に集中
+（spreadsheet_state 0/3・code_static 0/2・spreadsheet_calc 1/3が全/半滅）。当初疑いのうち**Q4・Q28は検索失敗と確定**、
+Q2/Q17/Q22は検索hitしており**生成失敗側**だった（チャンク内容の質の問題の可能性はある — raw_answer読みで切り分け）。
 
 - [ ] Q28型の対策: notebook/コードのチャンク分割で条件式が泣き別れないよう、セル単位・関数単位の境界を優先
 
