@@ -69,6 +69,8 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
     **可視行と非表示行の列ごとの値差分**を計算してコンテキスト化（Q11）
   - Pivot質問: `train_xlsx_highlight_blocks/context` をspreadsheet_stateパスに接続強化（Q6/Q21。
     かえで総合病院はファイル破損で`failures=1`のため、`scan_train_xlsx_xml.py`側の到達可否も確認）
+    - 2026-07-05: compact Pivot向けに `pivotTableDefinition + pivotCache` から再集計する構造化パスを実装。
+      `artifacts/train_xlsx_pivot_aggregates.jsonl` は24行、PoC比較 mismatch 0。コミットは本変更。
 - [x] **office_style（test 9問）**: Q0/Q25系のoffice_styleルート改善（2026-07-04完了:
   `8b07c3a` / `ef22058`）。Q25は単発スモークで `1. データ理解・EDA` 回収。
   Q0はcapability gateを脱出したが、文脈不足で未回収。残る「M02資料」→`報告資料_2025-08-06.docx`対応付けは次ブロックへ継続。

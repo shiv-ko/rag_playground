@@ -14,6 +14,7 @@ _ARTIFACT_FILES = {
     "train_xlsx_sheets": "train_xlsx_sheets.jsonl",
     "spreadsheet_sheets": "spreadsheet_sheets.jsonl",
     "train_xlsx_small_sheet_cells": "train_xlsx_small_sheet_cells.jsonl",
+    "train_xlsx_pivot_aggregates": "train_xlsx_pivot_aggregates.jsonl",
 }
 
 
@@ -78,3 +79,6 @@ class StructuredArtifactStore:
 
     def small_sheet_cells_for(self, project_name: str) -> list[dict]:
         return self._get("train_xlsx_small_sheet_cells", project_name)
+
+    def pivot_aggregates_for(self, project_name: str) -> list[dict]:
+        return self._get("train_xlsx_pivot_aggregates", project_name)

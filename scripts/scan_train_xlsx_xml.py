@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from src.parsers.pivot_cache import extract_pivot_aggregates
 
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト"
@@ -326,10 +328,12 @@ def scan_sheet(
 
 
 def target_workbooks() -> list[Path]:
+    data_dir = unicodedata.normalize("NFC", "03.データ")
     return sorted(
         p
         for p in PROJECT_ROOT.rglob("train.xlsx")
-        if "03.データ" in p.parts and not p.name.startswith("~$")
+        if any(unicodedata.normalize("NFC", part) == data_dir for part in p.parts)
+        and not p.name.startswith("~$")
     )
 
 
@@ -338,6 +342,7 @@ def main() -> None:
     formula_cells_out: list[dict[str, Any]] = []
     highlights_out: list[dict[str, Any]] = []
     small_cells_out: list[dict[str, Any]] = []
+    pivot_aggregates_out: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
 
     for path in target_workbooks():
@@ -355,6 +360,15 @@ def main() -> None:
                     formula_cells_out.extend(formula_cells)
                     highlights_out.extend(highlights)
                     small_cells_out.extend(small_cells)
+                source_path = str(path.relative_to(ROOT))
+                for aggregate in extract_pivot_aggregates(path):
+                    row = {
+                        "project_name": project_name(path),
+                        "source_path": source_path,
+                        "file_name": path.name,
+                    }
+                    row.update(aggregate.to_dict())
+                    pivot_aggregates_out.append(row)
         except Exception as exc:  # noqa: BLE001 - audit failures.
             failures.append({"source_path": str(path.relative_to(ROOT)), "error": repr(exc)})
 
@@ -362,6 +376,7 @@ def main() -> None:
     write_jsonl(ARTIFACTS / "train_xlsx_formula_cells.jsonl", formula_cells_out)
     write_jsonl(ARTIFACTS / "train_xlsx_highlights.jsonl", highlights_out)
     write_jsonl(ARTIFACTS / "train_xlsx_small_sheet_cells.jsonl", small_cells_out)
+    write_jsonl(ARTIFACTS / "train_xlsx_pivot_aggregates.jsonl", pivot_aggregates_out)
     write_jsonl(ARTIFACTS / "train_xlsx_failures.jsonl", failures)
 
     print(f"workbooks={len(target_workbooks())}")
@@ -369,6 +384,7 @@ def main() -> None:
     print(f"formula_cells={len(formula_cells_out)}")
     print(f"highlights={len(highlights_out)}")
     print(f"small_sheet_cells={len(small_cells_out)}")
+    print(f"pivot_aggregates={len(pivot_aggregates_out)}")
     print(f"failures={len(failures)}")
 
 

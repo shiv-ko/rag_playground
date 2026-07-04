@@ -224,6 +224,7 @@ class Pipeline:
                 # 候補プールに数える — 漏れると該当案件で完全性ゲートがpool=0棄却する
                 + len(self.structured_store.train_xlsx_sheets_for(project_name))
                 + len(self.structured_store.small_sheet_cells_for(project_name))
+                + len(self.structured_store.pivot_aggregates_for(project_name))
             )
         return 0
 

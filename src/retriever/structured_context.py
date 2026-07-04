@@ -328,6 +328,54 @@ def _pivot_argmax_docs(question: str, cells: list[dict]) -> list[Document]:
     return docs
 
 
+def _pivot_cache_aggregate_docs(question: str, aggregates: list[dict]) -> list[Document]:
+    question_nfc = unicodedata.normalize("NFC", question)
+    if not ("Pivot" in question_nfc or "ピボット" in question_nfc):
+        return []
+    if not (
+        any(term in question_nfc for term in _SUPERLATIVE_MAX)
+        or any(term in question_nfc for term in _SUPERLATIVE_MIN)
+    ):
+        return []
+
+    def matches_data_field(row: dict) -> bool:
+        expanded_question = question_nfc
+        for value in (row.get("data_field_source"), row.get("data_field_name")):
+            token = unicodedata.normalize("NFC", str(value or ""))
+            if token and token in expanded_question:
+                return True
+        return False
+
+    matched = [row for row in aggregates if matches_data_field(row)]
+    if not matched and len(aggregates) == 1:
+        matched = aggregates
+    if not matched:
+        return []
+
+    docs: list[Document] = []
+    for row in matched:
+        source_path = row.get("source_path") or "train.xlsx"
+        file_name = row.get("file_name") or Path(str(source_path)).name or "train.xlsx"
+        max_labels = _render_label_pairs(row.get("argmax_labels") or {})
+        min_labels = _render_label_pairs(row.get("argmin_labels") or {})
+        text = "\n".join([
+            f"{file_name} の {row.get('sheet_name')}（ピボットテーブル: {row.get('pivot_table_name')}）",
+            f"集計: {row.get('data_field_name')}（{row.get('subtotal')}）",
+            f"最大のグループ: {max_labels}（値: {row.get('argmax_value')}）",
+            f"最小のグループ: {min_labels}（値: {row.get('argmin_value')}）",
+        ])
+        docs.append(Document(
+            text=text,
+            source_path=Path(str(source_path)),
+            location=f"sheet_{row.get('sheet_name')}_pivot_{row.get('pivot_table_name')}",
+        ))
+    return docs
+
+
+def _render_label_pairs(labels: dict) -> str:
+    return "、".join(f"{key} = {value}" for key, value in labels.items())
+
+
 def _pivot_label_columns(
     grid: dict[int, dict[str, Any]], headers: dict[str, Any], data_rows: list[int]
 ) -> list[str]:
@@ -407,7 +455,10 @@ def build_spreadsheet_state_context(
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
     if question_mentions_spreadsheet(question):
-        for doc in _pivot_argmax_docs(question, store.small_sheet_cells_for(project_name)):
+        pivot_docs = _pivot_cache_aggregate_docs(question, store.pivot_aggregates_for(project_name))
+        if not pivot_docs:
+            pivot_docs = _pivot_argmax_docs(question, store.small_sheet_cells_for(project_name))
+        for doc in pivot_docs:
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
     if _requests_filter_condition(question):

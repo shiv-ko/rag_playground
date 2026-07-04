@@ -16,6 +16,7 @@ def _full_store(**kinds) -> StructuredArtifactStore:
         "train_xlsx_highlight_blocks": {},
         "train_xlsx_sheets": {},
         "spreadsheet_sheets": {},
+        "train_xlsx_pivot_aggregates": {},
     }
     base.update(kinds)
     return StructuredArtifactStore(base)
@@ -417,4 +418,63 @@ def test_pivot_argmax_no_matching_column_returns_nothing():
          "cell": "A1", "row": 1, "value": "層"},
     ]})
     docs = build_spreadsheet_state_context("XYZの平均が最も高いのは？", "テスト案件", store)
+    assert docs == []
+
+
+def test_pivot_cache_aggregate_context_for_single_candidate() -> None:
+    store = _store({"train_xlsx_pivot_aggregates": [{
+        "source_path": "data/raw/x/train.xlsx",
+        "file_name": "train.xlsx",
+        "sheet_name": "Pivot",
+        "pivot_table_name": "PivotTable1",
+        "data_field_name": "平均 / Sales",
+        "data_field_source": "Sales",
+        "subtotal": "average",
+        "argmax_labels": {"Region": "東", "Category": "A"},
+        "argmax_value": 123.0,
+        "argmin_labels": {"Region": "西", "Category": "B"},
+        "argmin_value": 45.0,
+    }]})
+    docs = build_spreadsheet_state_context(
+        "Pivotシートで平均売上が最も高い層の抽出条件は？", "テスト案件", store)
+    assert len(docs) == 1
+    text = docs[0].document.text
+    assert "Region = 東、Category = A" in text
+    assert "値: 123.0" in text
+    assert "最小のグループ" in text
+
+
+def test_pivot_cache_aggregate_requires_superlative() -> None:
+    store = _store({"train_xlsx_pivot_aggregates": [{
+        "source_path": "data/raw/x/train.xlsx",
+        "sheet_name": "Pivot",
+        "pivot_table_name": "PivotTable1",
+        "data_field_name": "平均 / Sales",
+        "data_field_source": "Sales",
+        "subtotal": "average",
+        "argmax_labels": {"Region": "東"},
+        "argmax_value": 123.0,
+        "argmin_labels": {"Region": "西"},
+        "argmin_value": 45.0,
+    }]})
+    docs = build_spreadsheet_state_context("PivotシートでSalesの平均は？", "テスト案件", store)
+    assert docs == []
+
+
+def test_pivot_cache_aggregate_abstains_when_multiple_data_fields_do_not_match() -> None:
+    base = {
+        "source_path": "data/raw/x/train.xlsx",
+        "sheet_name": "Pivot",
+        "pivot_table_name": "PivotTable1",
+        "subtotal": "average",
+        "argmax_labels": {"Region": "東"},
+        "argmax_value": 123.0,
+        "argmin_labels": {"Region": "西"},
+        "argmin_value": 45.0,
+    }
+    store = _store({"train_xlsx_pivot_aggregates": [
+        {**base, "data_field_name": "平均 / Sales", "data_field_source": "Sales"},
+        {**base, "data_field_name": "平均 / Profit", "data_field_source": "Profit"},
+    ]})
+    docs = build_spreadsheet_state_context("Pivotシートで平均売上が最も高い層は？", "テスト案件", store)
     assert docs == []

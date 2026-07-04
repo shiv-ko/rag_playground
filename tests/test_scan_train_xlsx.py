@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -106,3 +107,14 @@ def test_small_sheet_cells_dumped_for_non_train_only(tmp_path):
     assert all(c["sheet_name"] == "Pivot" for c in pivot_small)
     assert [c for c in pivot_small if c["cell"] == "A1"][0]["value"] == "層"
     assert [c for c in pivot_small if c["cell"] == "A1"][0]["row"] == 1
+
+
+def test_target_workbooks_matches_nfd_data_dir(tmp_path, monkeypatch):
+    project_root = tmp_path / "プロジェクト"
+    data_dir = project_root / "テスト案件" / unicodedata.normalize("NFD", "03.データ")
+    data_dir.mkdir(parents=True)
+    workbook = data_dir / "train.xlsx"
+    workbook.write_bytes(b"")
+    monkeypatch.setattr(scanner, "PROJECT_ROOT", project_root)
+
+    assert scanner.target_workbooks() == [workbook]
