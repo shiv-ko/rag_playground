@@ -69,12 +69,15 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
     **可視行と非表示行の列ごとの値差分**を計算してコンテキスト化（Q11）
   - Pivot質問: `train_xlsx_highlight_blocks/context` をspreadsheet_stateパスに接続強化（Q6/Q21。
     かえで総合病院はファイル破損で`failures=1`のため、`scan_train_xlsx_xml.py`側の到達可否も確認）
-- [ ] **office_style（test 9問）**: 「M02資料」→`報告資料_2025-08-06.docx`の対応付け。
+- [x] **office_style（test 9問）**: Q0/Q25系のoffice_styleルート改善（2026-07-04完了:
+  `8b07c3a` / `ef22058`）。Q25は単発スモークで `1. データ理解・EDA` 回収。
+  Q0はcapability gateを脱出したが、文脈不足で未回収。残る「M02資料」→`報告資料_2025-08-06.docx`対応付けは次ブロックへ継続。
   スケジュールxlsxのマイルストーン表（MS ID→日付）が実行時に取れるので、**「M0N資料」= MS0Nの日付近傍の
   報告系ファイル**として汎用導出する（ファイル名ハードコード禁止の規約に適合）。対応付け後もLLMが確信を
   持てない場合はコンテキストに対応根拠を明記（Q0/Q23/Q25）
-- [ ] **spreadsheet_calc（test 9問）**: CalcSpecに `group_by` + `select`（argmax/argmin）を追加し、
-  現在意図的にMissingへ倒しているgroupby系（Q7/Q26）を決定的pandasで処理。ゲート（0行・列不在→Missing）は維持
+- [x] **spreadsheet_calc（test 9問）**: CalcSpecに `group_by` + `select`（argmax/argmin）と
+  `list` / `closest_to_mean_list` を追加（2026-07-04完了: `725acfd` / `37e62f1`）。
+  Q7はlocal/official Perfect、Q26は単発official Perfect。ゲート（0行・列不在・51件以上→Missing）は維持。
 
 → **office_style＋spreadsheet_calc（Q0/Q7/Q26/Q25）のCodex向け実装指示書策定済み（2026-07-04）**:
 `2026-07-04-phase2-remainder-for-codex.md`（`b2c0f0a`）。Codexはサブエージェント不可のため
