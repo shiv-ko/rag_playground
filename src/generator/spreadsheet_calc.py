@@ -28,6 +28,7 @@ _AGGS = {
     "max": lambda s: s.max(),
     "min": lambda s: s.min(),
 }
+_LIST_LIMIT = 50
 
 SYSTEM_PROMPT = """\
 あなたはExcel/CSVデータに対する集計質問を、フィルタ条件と集計方法のJSON仕様に変換するアシスタントです。
@@ -37,13 +38,18 @@ SYSTEM_PROMPT = """\
 {
   "filters": [{"column": "列名", "op": "==|!=|>|<|>=|<=", "value": "値"}],
   "target_column": "集計対象の列名",
-  "aggregation": "mean|sum|count|max|min",
+  "aggregation": "mean|sum|count|max|min|list|closest_to_mean_list",
   "round_to": 0,
   "group_by": "グループ化する列名",
-  "select": "argmax|argmin"
+  "select": "argmax|argmin",
+  "compare_column": "平均との近さを判定する数値列名"
 }
 
 "round_to"は四捨五入する小数桁数（整数なら0）。指定が無ければnullにすること。
+"aggregation"が"list"の場合は、フィルタ後に該当するtarget_columnの値をすべて挙げる質問を表す。
+"aggregation"が"closest_to_mean_list"の場合は、フィルタ後にcompare_columnの平均値を計算し、
+その平均値に最も近いcompare_column値を持つ行のtarget_columnをすべて挙げる質問を表す。
+"平均値に最も近い年齢のidをすべて"のような質問では、target_columnをid、compare_columnを年齢列にする。
 "group_by"と"select"は、グループ別に集計して「最も大きい/小さいグループ」を答える場合だけ指定し、
 指定が無ければnullにすること。返す値はグループ値そのもの。
 質問がこの形式で表現できない場合（複数列の組み合わせ等）や、与えられた列名では答えられない場合は
@@ -71,6 +77,7 @@ class CalcSpec:
     round_to: int | None = None
     group_by: str | None = None
     select: str | None = None
+    compare_column: str | None = None
 
 
 def parse_calc_spec(raw_json: str) -> CalcSpec | None:
@@ -81,7 +88,10 @@ def parse_calc_spec(raw_json: str) -> CalcSpec | None:
         data = json.loads(m.group())
         target_column = data.get("target_column")
         aggregation = data.get("aggregation")
-        if not target_column or aggregation not in _AGGS:
+        if not target_column or aggregation not in (*_AGGS, "list", "closest_to_mean_list"):
+            return None
+        compare_column = data.get("compare_column")
+        if aggregation == "closest_to_mean_list" and not compare_column:
             return None
         group_by = data.get("group_by")
         select = data.get("select")
@@ -101,6 +111,7 @@ def parse_calc_spec(raw_json: str) -> CalcSpec | None:
             round_to=data.get("round_to"),
             group_by=group_by,
             select=select,
+            compare_column=compare_column,
         )
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
@@ -108,6 +119,8 @@ def parse_calc_spec(raw_json: str) -> CalcSpec | None:
 
 def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | str | None:
     if spec.target_column not in df.columns:
+        return None
+    if spec.compare_column and spec.compare_column not in df.columns:
         return None
     if spec.group_by and spec.group_by not in df.columns:
         return None
@@ -124,11 +137,10 @@ def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | str | N
             return None
     if len(filtered) == 0:
         return None
-    agg_fn = _AGGS.get(spec.aggregation)
-    if agg_fn is None:
-        return None
-
     if spec.group_by:
+        agg_fn = _AGGS.get(spec.aggregation)
+        if agg_fn is None:
+            return None
         if spec.select not in ("argmax", "argmin"):
             return None
         grouped = filtered.groupby(spec.group_by, dropna=False)[spec.target_column].agg(spec.aggregation)
@@ -139,6 +151,35 @@ def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | str | N
             return None
         return selected
 
+    if spec.aggregation == "list":
+        if len(filtered) > _LIST_LIMIT:
+            return None
+        values = [str(value) for value in filtered[spec.target_column].tolist() if not pd.isna(value)]
+        if not values:
+            return None
+        return "、".join(values)
+
+    if spec.aggregation == "closest_to_mean_list":
+        if not spec.compare_column:
+            return None
+        mean_value = filtered[spec.compare_column].mean()
+        if pd.isna(mean_value):
+            return None
+        distances = (filtered[spec.compare_column] - mean_value).abs()
+        min_distance = distances.min()
+        if pd.isna(min_distance):
+            return None
+        selected = filtered[distances == min_distance]
+        if len(selected) == 0 or len(selected) > _LIST_LIMIT:
+            return None
+        values = [str(value) for value in selected[spec.target_column].tolist() if not pd.isna(value)]
+        if not values:
+            return None
+        return "、".join(values)
+
+    agg_fn = _AGGS.get(spec.aggregation)
+    if agg_fn is None:
+        return None
     result = agg_fn(filtered[spec.target_column])
     if pd.isna(result):
         return None

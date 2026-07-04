@@ -46,6 +46,23 @@ def test_parse_calc_spec_group_by_select() -> None:
     assert spec.select == "argmax"
 
 
+def test_parse_calc_spec_list_aggregation() -> None:
+    raw = '{"filters": [{"column": "grade", "op": "==", "value": "B1"}], "target_column": "id", "aggregation": "list", "round_to": null}'
+    spec = parse_calc_spec(raw)
+    assert spec is not None
+    assert spec.target_column == "id"
+    assert spec.aggregation == "list"
+
+
+def test_parse_calc_spec_closest_to_mean_list() -> None:
+    raw = '{"filters": [{"column": "EducationField", "op": "==", "value": "Marketing"}], "target_column": "id", "aggregation": "closest_to_mean_list", "compare_column": "Age", "round_to": null}'
+    spec = parse_calc_spec(raw)
+    assert spec is not None
+    assert spec.target_column == "id"
+    assert spec.aggregation == "closest_to_mean_list"
+    assert spec.compare_column == "Age"
+
+
 def test_parse_calc_spec_invalid_select_returns_none() -> None:
     raw = '{"filters": [], "target_column": "ALT_GPT", "aggregation": "mean", "group_by": "age", "select": "top"}'
     assert parse_calc_spec(raw) is None
@@ -56,6 +73,7 @@ def _sample_df() -> pd.DataFrame:
         "term": ["3 years", "3 years", "5 years"],
         "grade": ["B1", "B1", "B1"],
         "loan_amnt": [1000.0, 2000.0, 5000.0],
+        "id": ["train_0001", "train_0002", "train_0003"],
     })
 
 
@@ -127,6 +145,46 @@ def test_execute_group_by_after_zero_row_filter_returns_none() -> None:
     assert execute_calc_spec(spec, _sample_df()) is None
 
 
+def test_execute_list_aggregation_preserves_input_order() -> None:
+    spec = CalcSpec([FilterCondition("term", "==", "3 years")], "id", "list", None)
+    assert execute_calc_spec(spec, _sample_df()) == "train_0001、train_0002"
+
+
+def test_execute_list_aggregation_zero_rows_returns_none() -> None:
+    spec = CalcSpec([FilterCondition("term", "==", "99 years")], "id", "list", None)
+    assert execute_calc_spec(spec, _sample_df()) is None
+
+
+def test_execute_list_aggregation_over_limit_returns_none() -> None:
+    df = pd.DataFrame({
+        "flag": [1] * 51,
+        "id": [f"train_{i:04d}" for i in range(51)],
+    })
+    spec = CalcSpec([FilterCondition("flag", "==", 1)], "id", "list", None)
+    assert execute_calc_spec(spec, df) is None
+
+
+def test_execute_closest_to_mean_list_returns_all_ties_in_input_order() -> None:
+    df = pd.DataFrame({
+        "field": ["Marketing", "Marketing", "Marketing", "Marketing", "Sales"],
+        "income": [11000, 12000, 13000, 14000, 15000],
+        "Age": [30, 32, 34, 36, 34],
+        "id": ["train_0001", "train_0002", "train_0003", "train_0004", "train_0005"],
+    })
+    spec = CalcSpec(
+        filters=[FilterCondition("field", "==", "Marketing"), FilterCondition("income", ">", 10000)],
+        target_column="id",
+        aggregation="closest_to_mean_list",
+        compare_column="Age",
+    )
+    assert execute_calc_spec(spec, df) == "train_0002、train_0003"
+
+
+def test_execute_closest_to_mean_list_missing_compare_column_returns_none() -> None:
+    spec = CalcSpec([], "id", "closest_to_mean_list", None, compare_column="Age")
+    assert execute_calc_spec(spec, _sample_df()) is None
+
+
 class FakeAnswerer(SpreadsheetCalcAnswerer):
     def __init__(self, fake_response: str) -> None:
         super().__init__()
@@ -165,6 +223,14 @@ def test_answerer_answers_groupby_argmax_question() -> None:
     )
     assert answer.was_gated is False
     assert answer.text == "B1"
+
+
+def test_answerer_returns_list_aggregation_text() -> None:
+    fake = '{"filters": [{"column": "term", "op": "==", "value": "3 years"}], "target_column": "id", "aggregation": "list", "round_to": 0}'
+    answerer = FakeAnswerer(fake)
+    answer = answerer.answer("term=3 yearsに該当するidをすべて挙げてください。", _sample_df())
+    assert answer.was_gated is False
+    assert answer.text == "train_0001、train_0002"
 
 
 def test_answerer_still_gates_group_listing_question_without_calling_llm() -> None:
