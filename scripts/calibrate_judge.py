@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import sys
 import time
@@ -20,14 +19,9 @@ sys.path.insert(0, str(ROOT))
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
+from src.evaluator.ground_truth import load_ground_truth
 from src.evaluator.openai_judge import OpenAICragJudge
 from src.models import CRAGLabel
-
-
-def load_ground_truth(path: Path) -> dict[str, str]:
-    """valid_txt.csv（ヘッダなし index,answer）を読む。"""
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        return {row[0]: row[1] for row in csv.reader(f) if row}
 
 
 def main() -> None:
