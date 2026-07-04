@@ -265,3 +265,130 @@ class TestOfficeStyleContextSelfDescription:
         ])
         docs = build_office_style_context("契約書で太字の箇所を抽出してください。", "A社", store)
         assert "太字" in docs[0].document.text
+
+
+def _store(kind_data: dict[str, list[dict]]) -> StructuredArtifactStore:
+    by_kind = {kind: {"テスト案件": rows} for kind, rows in kind_data.items()}
+    return StructuredArtifactStore(by_kind_and_project=by_kind)
+
+
+def test_filter_condition_from_train_xlsx_filter_columns():
+    store = _store({
+        "train_xlsx_sheets": [{
+            "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+            "sheet_name": "train", "auto_filter_ref": "A1:J100", "hidden_row_count": 90,
+            "filter_columns": [
+                {"col_id": 1, "header": "gender", "values": ["Male"], "custom": []},
+                {"col_id": 3, "header": "country", "values": ["India"], "custom": []},
+            ],
+        }],
+    })
+    docs = build_spreadsheet_state_context(
+        "train.xlsxのtrainシートでフィルターで抽出されている条件を教えてください。", "テスト案件", store)
+    assert len(docs) == 1
+    text = docs[0].document.text
+    assert "gender" in text and "Male" in text
+    assert "country" in text and "India" in text
+    assert "90" in text  # 非表示行数
+
+
+def test_filter_condition_renders_custom_filters():
+    store = _store({
+        "train_xlsx_sheets": [{
+            "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+            "sheet_name": "train", "auto_filter_ref": "A1:B10", "hidden_row_count": 5,
+            "filter_columns": [
+                {"col_id": 0, "header": "age", "values": [],
+                 "custom": [{"operator": "greaterThan", "val": "30"}]},
+            ],
+        }],
+    })
+    docs = build_spreadsheet_state_context("フィルタの条件は？", "テスト案件", store)
+    assert "age" in docs[0].document.text
+    assert "greaterThan" in docs[0].document.text and "30" in docs[0].document.text
+
+
+def test_pivot_argmax_row_selected():
+    """「最も高い」質問で、質問に現れる列見出しのargmax行がdoc化される。"""
+    cells = []
+    header = {"A3": "層", "B3": "平均 / ALP", "C3": "平均 / bmi"}
+    rows = {4: ("20代", "10.5", "1.0"), 5: ("30代", "99.9", "2.0"), 6: ("40代", "50.0", "3.0")}
+    for cell, v in header.items():
+        cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                      "source_path": "data/raw/x/train.xlsx", "cell": cell, "row": 3, "value": v})
+    for row, (label, alp, bmi) in rows.items():
+        for col, v in zip("ABC", (label, alp, bmi)):
+            cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                          "source_path": "data/raw/x/train.xlsx", "cell": f"{col}{row}", "row": row, "value": v})
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "PivotシートでALPの平均が最も高いものの抽出条件は？", "テスト案件", store)
+    assert len(docs) >= 1
+    text = docs[0].document.text
+    assert "30代" in text          # argmax行のラベル
+    assert "99.9" in text
+    assert "平均 / ALP" in text    # どの列で判定したか
+
+
+def test_pivot_argmax_forward_fills_merged_label_columns():
+    """マージセル由来で疎なラベル列は直前の非空値を引き継いでargmax行docに含める。
+    数値の集計列は空欄でもfillしない（値の捏造になるため）。"""
+    cells = []
+    header = {"A3": "性別", "B3": "層", "C3": "平均 / ALP", "D3": "平均 / bmi"}
+    data = {
+        4: {"A": "Male", "B": "20代", "C": "10.5", "D": "1.0"},
+        5: {"B": "30代", "C": "99.9"},  # A列はマージセルで空、D列は欠損
+        6: {"A": "Female", "B": "40代", "C": "50.0", "D": "3.0"},
+    }
+    for cell, v in header.items():
+        cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                      "source_path": "data/raw/x/train.xlsx", "cell": cell, "row": 3, "value": v})
+    for row, cols in data.items():
+        for col, v in cols.items():
+            cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                          "source_path": "data/raw/x/train.xlsx", "cell": f"{col}{row}", "row": row, "value": v})
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "PivotシートでALPの平均が最も高いものの抽出条件は？", "テスト案件", store)
+    assert len(docs) >= 1
+    text = docs[0].document.text
+    assert "性別=Male" in text        # マージセルのラベルがforward-fillされている
+    assert "30代" in text and "99.9" in text
+    assert "平均 / bmi=1.0" not in text  # 数値集計列は捏造fillしない
+
+
+def test_pivot_argmax_does_not_fill_sparse_numeric_aggregate_column():
+    """欠損セルを含む数値の集計列はラベル列と誤判定せず、forward-fillで
+    実データに存在しない数値を捏造しない（回帰テスト）。
+    argmax行はラベル列（マージセル）も集計列Bも空欄 — ラベルはfillされるが
+    集計値はfillされてはならない。"""
+    cells = []
+    header = {"A3": "性別", "B3": "平均 / ALP", "C3": "平均 / bmi"}
+    data = {
+        4: {"A": "Male", "B": "10.5", "C": "1.0"},
+        5: {"C": "99.9"},  # A列はマージセルで空、B列（集計列）は欠損
+        6: {"A": "Female", "B": "50.0", "C": "3.0"},
+    }
+    for cell, v in header.items():
+        cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                      "source_path": "data/raw/x/train.xlsx", "cell": cell, "row": 3, "value": v})
+    for row, cols in data.items():
+        for col, v in cols.items():
+            cells.append({"sheet_name": "Pivot", "file_name": "train.xlsx",
+                          "source_path": "data/raw/x/train.xlsx", "cell": f"{col}{row}", "row": row, "value": v})
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "Pivotシートでbmiの平均が最も高いものの抽出条件は？", "テスト案件", store)
+    assert len(docs) >= 1
+    text = docs[0].document.text
+    assert "性別=Male" in text and "99.9" in text  # ラベルのfillは維持される
+    assert "平均 / ALP=10.5" not in text           # 直前行の集計値を捏造fillしていない
+
+
+def test_pivot_argmax_no_matching_column_returns_nothing():
+    store = _store({"train_xlsx_small_sheet_cells": [
+        {"sheet_name": "Pivot", "file_name": "train.xlsx", "source_path": "x",
+         "cell": "A1", "row": 1, "value": "層"},
+    ]})
+    docs = build_spreadsheet_state_context("XYZの平均が最も高いのは？", "テスト案件", store)
+    assert docs == []

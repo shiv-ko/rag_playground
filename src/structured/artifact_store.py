@@ -13,6 +13,7 @@ _ARTIFACT_FILES = {
     "train_xlsx_highlight_blocks": "train_xlsx_highlight_blocks.jsonl",
     "train_xlsx_sheets": "train_xlsx_sheets.jsonl",
     "spreadsheet_sheets": "spreadsheet_sheets.jsonl",
+    "train_xlsx_small_sheet_cells": "train_xlsx_small_sheet_cells.jsonl",
 }
 
 
@@ -74,3 +75,6 @@ class StructuredArtifactStore:
 
     def spreadsheet_sheets_for(self, project_name: str) -> list[dict]:
         return self._get("spreadsheet_sheets", project_name)
+
+    def small_sheet_cells_for(self, project_name: str) -> list[dict]:
+        return self._get("train_xlsx_small_sheet_cells", project_name)

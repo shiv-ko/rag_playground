@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import Path
+from typing import Any
 
 from src.generator.color_names import nearest_basic_color_name
 from src.models import Document, ScoredDocument
@@ -206,6 +208,159 @@ def _requests_highlight_condition(question: str) -> bool:
     return any(k in question for k in ("ハイライト", "highlight"))
 
 
+def _render_filter_conditions(sheet: dict) -> str:
+    lines = [
+        f"シート: {sheet.get('sheet_name')}（{sheet.get('file_name')}）",
+        f"フィルタ範囲: {sheet.get('auto_filter_ref')}（非表示行 {sheet.get('hidden_row_count', 0)}行）",
+        "フィルタで抽出されている条件（xlsxのautoFilter定義から機械抽出）:",
+    ]
+    for fc in sheet.get("filter_columns") or []:
+        name = fc.get("header") or f"列{fc.get('col_id')}"
+        if fc.get("values"):
+            lines.append(f"  - {name} = {' / '.join(str(v) for v in fc['values'])}")
+        for cf in fc.get("custom") or []:
+            lines.append(f"  - {name} {cf.get('operator')} {cf.get('val')}")
+    return "\n".join(lines)
+
+
+_SUPERLATIVE_MAX = ("最も高い", "最も多い", "最大")
+_SUPERLATIVE_MIN = ("最も低い", "最も少ない", "最小")
+
+
+def _pivot_argmax_docs(question: str, cells: list[dict]) -> list[Document]:
+    """小型シート（Pivot等）をグリッド化し、質問中の列見出しトークンで対象列を特定して
+    argmax/argmin行を返す。列を特定できない・最上級表現が無い場合は何も返さない（保守側）。"""
+    want_max = any(k in question for k in _SUPERLATIVE_MAX)
+    want_min = any(k in question for k in _SUPERLATIVE_MIN)
+    if not (want_max or want_min):
+        return []
+
+    by_sheet: dict[tuple[str, str], list[dict]] = {}
+    for c in cells:
+        by_sheet.setdefault((str(c.get("source_path")), str(c.get("sheet_name"))), []).append(c)
+
+    docs: list[Document] = []
+    question_nfc = unicodedata.normalize("NFC", question)
+    for (source, sheet_name), sheet_cells in by_sheet.items():
+        grid: dict[int, dict[str, Any]] = {}
+        for c in sheet_cells:
+            grid.setdefault(int(c["row"]), {})[re.sub(r"\d+", "", c["cell"])] = c.get("value")
+        rows = sorted(grid)
+        if len(rows) < 2:
+            continue
+        # ヘッダ行 = 非数値の値を2つ以上含む最初の行
+        header_row = None
+        for r in rows:
+            texts = [v for v in grid[r].values() if v is not None and not _is_number(v)]
+            if len(texts) >= 2:
+                header_row = r
+                break
+        if header_row is None:
+            continue
+        headers = grid[header_row]
+        data_rows_all = [r for r in rows if r > header_row]
+        # 行ラベル列 = 最左から連続する「存在する値の数値が過半でない」列。
+        # 最初の「存在する値の数値が過半」の列（=集計値領域の開始）で打ち切る。
+        label_cols = _pivot_label_columns(grid, headers, data_rows_all)
+        # マージセル由来で空欄になった行ラベルをforward-fillで補完（階層構造を尊重:
+        # より左のラベル列に新しい値が現れた行では、それより右の列の引き継ぎを打ち切る）。
+        # 集計値の列はfill対象にしない — 値の捏造になるため。
+        _forward_fill_label_columns(grid, label_cols, data_rows_all)
+        # 質問に現れるトークンを含む列（行ラベル列は除く）
+        numeric_cols = [c for c in headers if c not in label_cols]
+        # ヘッダをトークン化（例: 「平均 / ALP」→ ["平均","ALP"]）。
+        # Pivotの列見出しは「集計関数名 / 変数名」の形が多く、集計関数名（平均・合計・個数等）は
+        # 全ての数値列に共通して現れるため判定に使えない。複数列で共有されるトークンは
+        # 一般則として除外し、その列だけに現れるトークン（変数名側）でのみ判定する。
+        header_tokens = {
+            c: [t for t in re.split(r"[\s/／・]+", unicodedata.normalize("NFC", str(headers[c]))) if t]
+            for c in numeric_cols
+        }
+        token_col_count: dict[str, int] = {}
+        for toks in header_tokens.values():
+            for t in set(toks):
+                token_col_count[t] = token_col_count.get(t, 0) + 1
+        target_cols = [
+            c for c in numeric_cols
+            if any(
+                len(tok) >= 2 and token_col_count.get(tok, 0) == 1 and tok in question_nfc
+                for tok in header_tokens[c]
+            )
+        ]
+        if not target_cols and len(numeric_cols) == 1:
+            target_cols = numeric_cols  # 数値列が1つしかなければそれ
+        if len(target_cols) != 1:
+            continue  # 曖昧なら出さない（誤答よりMissing）
+        col = target_cols[0]
+        data_rows = [
+            r for r in rows if r > header_row and _is_number(grid[r].get(col))
+        ]
+        if not data_rows:
+            continue
+        pick = (max if want_max else min)(data_rows, key=lambda r: float(grid[r][col]))
+        lines = [
+            f"シート: {sheet_name}（Pivot集計表・xlsxセル値から機械抽出）",
+            f"判定列: {headers[col]}",
+            f"ヘッダ行: " + ", ".join(f"{c}={v}" for c, v in sorted(headers.items())),
+            f"{'最大' if want_max else '最小'}の行: "
+            + ", ".join(f"{headers.get(c, c)}={grid[pick].get(c)}" for c in sorted(grid[pick])),
+        ]
+        docs.append(Document(
+            text="\n".join(lines), source_path=Path(source),
+            location=f"sheet_{sheet_name}_row_{pick}",
+        ))
+    return docs
+
+
+def _pivot_label_columns(
+    grid: dict[int, dict[str, Any]], headers: dict[str, Any], data_rows: list[int]
+) -> list[str]:
+    """Pivot表の行ラベル列（グループキー）を一般則で判定する。
+    行ラベルは表の最左から連続して並び、存在する値（非欠損）は非数値または
+    カテゴリ的（例: 「0」「0 集計」のようにグループ名＋小計行ラベルが混在）。
+    集計値の列は存在する値のほぼ全てが数値になるため、最初の「存在する値の
+    数値が過半」の列でラベル領域は終わる。欠損の有無（密度）は分類に使わない —
+    欠損セルを含む集計列をラベル列と誤判定してforward-fillで数値を捏造しないため。"""
+    label_cols: list[str] = []
+    for col in sorted(headers):
+        present = [
+            grid[r][col] for r in data_rows if grid[r].get(col) not in (None, "")
+        ]
+        numeric = [v for v in present if _is_number(v)]
+        if present and len(numeric) * 2 > len(present):
+            break  # 存在する値の数値が過半 = 集計値領域の開始
+        label_cols.append(col)
+    if not label_cols and headers:
+        label_cols = [min(headers)]  # 最低でも最左列はラベルとみなす（従来挙動）
+    return label_cols
+
+
+def _forward_fill_label_columns(
+    grid: dict[int, dict[str, Any]], label_cols: list[str], data_rows: list[int]
+) -> None:
+    """マージセル由来で空欄になった行ラベルを、直前の非空値で補完する（in-place）。
+    階層構造を尊重: より左のラベル列に新しい値が現れた行では、それより右の列の
+    引き継ぎ値を破棄する（左の親グループが変わったら右の子ラベルは持ち越さない）。"""
+    carries: dict[str, Any] = {}
+    for r in data_rows:
+        for i, col in enumerate(label_cols):
+            v = grid[r].get(col)
+            if v not in (None, ""):
+                carries[col] = v
+                for right in label_cols[i + 1:]:
+                    carries.pop(right, None)
+            elif col in carries:
+                grid[r][col] = carries[col]
+
+
+def _is_number(v: Any) -> bool:
+    try:
+        float(str(v))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
 def build_spreadsheet_state_context(
     question: str, project_name: str, store: StructuredArtifactStore
 ) -> list[ScoredDocument]:
@@ -221,6 +376,22 @@ def build_spreadsheet_state_context(
                 source_path=Path(source),
                 location=f"sheet_{block.get('sheet_name')}",
             )
+            docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
+
+    if _requests_filter_condition(question):
+        # train.xlsx（XML直読み系）のフィルタ条件 — 条件そのものが取れるので最優先
+        for sheet in store.train_xlsx_sheets_for(project_name):
+            if not sheet.get("filter_columns"):
+                continue
+            doc = Document(
+                text=_render_filter_conditions(sheet),
+                source_path=Path(sheet["source_path"]),
+                location=f"sheet_{sheet.get('sheet_name')}_filter",
+            )
+            docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
+
+    if question_mentions_spreadsheet(question):
+        for doc in _pivot_argmax_docs(question, store.small_sheet_cells_for(project_name)):
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
     if _requests_filter_condition(question):
