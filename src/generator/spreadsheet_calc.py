@@ -38,17 +38,22 @@ SYSTEM_PROMPT = """\
   "filters": [{"column": "列名", "op": "==|!=|>|<|>=|<=", "value": "値"}],
   "target_column": "集計対象の列名",
   "aggregation": "mean|sum|count|max|min",
-  "round_to": 0
+  "round_to": 0,
+  "group_by": "グループ化する列名",
+  "select": "argmax|argmin"
 }
 
 "round_to"は四捨五入する小数桁数（整数なら0）。指定が無ければnullにすること。
-質問がこの形式で表現できない場合（グループ別の集計、複数列の組み合わせ等）や、
-与えられた列名では答えられない場合は {"not_applicable": true} のみを返すこと。
+"group_by"と"select"は、グループ別に集計して「最も大きい/小さいグループ」を答える場合だけ指定し、
+指定が無ければnullにすること。返す値はグループ値そのもの。
+質問がこの形式で表現できない場合（複数列の組み合わせ等）や、与えられた列名では答えられない場合は
+{"not_applicable": true} のみを返すこと。
 """
 
 # CalcSpec（単一フィルタ＋単一集計）で表現できない質問のヒント。
 # もっともらしいspecで誤った数値を返す（Incorrect=-1）よりゲートしてフォールバックさせる。
-_UNSUPPORTED_QUESTION_HINTS = ("最も", "ごとの", "ごとに", "毎に", "それぞれ")
+_UNSUPPORTED_QUESTION_HINTS = ("ごとの", "ごとに", "毎に", "それぞれ")
+_SPREADSHEET_STATE_HINTS = (".xlsx", "train.xlsx", "Pivot", "pivot", "ピボット", "シート")
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,8 @@ class CalcSpec:
     target_column: str = ""
     aggregation: str = ""
     round_to: int | None = None
+    group_by: str | None = None
+    select: str | None = None
 
 
 def parse_calc_spec(raw_json: str) -> CalcSpec | None:
@@ -76,6 +83,12 @@ def parse_calc_spec(raw_json: str) -> CalcSpec | None:
         aggregation = data.get("aggregation")
         if not target_column or aggregation not in _AGGS:
             return None
+        group_by = data.get("group_by")
+        select = data.get("select")
+        if select is not None and select not in ("argmax", "argmin"):
+            return None
+        if bool(group_by) != bool(select):
+            return None
         filters = [
             FilterCondition(column=f["column"], op=f["op"], value=f["value"])
             for f in data.get("filters", [])
@@ -86,13 +99,17 @@ def parse_calc_spec(raw_json: str) -> CalcSpec | None:
             target_column=target_column,
             aggregation=aggregation,
             round_to=data.get("round_to"),
+            group_by=group_by,
+            select=select,
         )
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
 
 
-def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | None:
+def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | str | None:
     if spec.target_column not in df.columns:
+        return None
+    if spec.group_by and spec.group_by not in df.columns:
         return None
     filtered = df
     for cond in spec.filters:
@@ -110,6 +127,18 @@ def execute_calc_spec(spec: CalcSpec, df: pd.DataFrame) -> float | int | None:
     agg_fn = _AGGS.get(spec.aggregation)
     if agg_fn is None:
         return None
+
+    if spec.group_by:
+        if spec.select not in ("argmax", "argmin"):
+            return None
+        grouped = filtered.groupby(spec.group_by, dropna=False)[spec.target_column].agg(spec.aggregation)
+        if len(grouped) == 0:
+            return None
+        selected = grouped.idxmax() if spec.select == "argmax" else grouped.idxmin()
+        if pd.isna(selected):
+            return None
+        return selected
+
     result = agg_fn(filtered[spec.target_column])
     if pd.isna(result):
         return None
@@ -127,6 +156,8 @@ class SpreadsheetCalcAnswerer:
 
     def answer(self, question: str, df: pd.DataFrame) -> Answer:
         if any(hint in question for hint in _UNSUPPORTED_QUESTION_HINTS):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True)
+        if any(hint in question for hint in _SPREADSHEET_STATE_HINTS):
             return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True)
 
         columns_preview = ", ".join(df.columns)

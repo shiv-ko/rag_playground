@@ -38,6 +38,19 @@ def test_parse_calc_spec_multiple_filters() -> None:
     assert len(spec.filters) == 2
 
 
+def test_parse_calc_spec_group_by_select() -> None:
+    raw = '{"filters": [{"column": "disease", "op": "==", "value": 1}], "target_column": "ALT_GPT", "aggregation": "mean", "round_to": null, "group_by": "age", "select": "argmax"}'
+    spec = parse_calc_spec(raw)
+    assert spec is not None
+    assert spec.group_by == "age"
+    assert spec.select == "argmax"
+
+
+def test_parse_calc_spec_invalid_select_returns_none() -> None:
+    raw = '{"filters": [], "target_column": "ALT_GPT", "aggregation": "mean", "group_by": "age", "select": "top"}'
+    assert parse_calc_spec(raw) is None
+
+
 def _sample_df() -> pd.DataFrame:
     return pd.DataFrame({
         "term": ["3 years", "3 years", "5 years"],
@@ -79,6 +92,41 @@ def test_execute_numeric_comparison_filter() -> None:
     assert execute_calc_spec(spec, _sample_df()) == 7000
 
 
+def test_execute_group_by_mean_argmax() -> None:
+    df = pd.DataFrame({
+        "sex": ["F", "F", "F", "M"],
+        "disease": [1, 1, 1, 1],
+        "age": [31, 32, 32, 33],
+        "ALT_GPT": [10.0, 30.0, 50.0, 100.0],
+    })
+    spec = CalcSpec(
+        filters=[FilterCondition("sex", "==", "F"), FilterCondition("disease", "==", 1)],
+        target_column="ALT_GPT",
+        aggregation="mean",
+        round_to=None,
+        group_by="age",
+        select="argmax",
+    )
+    assert execute_calc_spec(spec, df) == 32
+
+
+def test_execute_group_by_missing_column_returns_none() -> None:
+    spec = CalcSpec([], "loan_amnt", "mean", None, group_by="age", select="argmax")
+    assert execute_calc_spec(spec, _sample_df()) is None
+
+
+def test_execute_group_by_after_zero_row_filter_returns_none() -> None:
+    spec = CalcSpec(
+        [FilterCondition("term", "==", "99 years")],
+        "loan_amnt",
+        "mean",
+        None,
+        group_by="grade",
+        select="argmax",
+    )
+    assert execute_calc_spec(spec, _sample_df()) is None
+
+
 class FakeAnswerer(SpreadsheetCalcAnswerer):
     def __init__(self, fake_response: str) -> None:
         super().__init__()
@@ -109,17 +157,37 @@ def test_answerer_gates_when_filter_matches_nothing() -> None:
     assert answer.was_gated is True
 
 
-def test_answerer_gates_groupby_style_question_without_calling_llm():
-    """CalcSpecで表現できないグループ別・argmax系の質問（「最も高い」「〜ごと」）は、
-    もっともらしいspecで誤った数値を返すリスクがあるためLLMを呼ばずにゲートする。"""
+def test_answerer_answers_groupby_argmax_question() -> None:
+    fake = '{"filters": [{"column": "term", "op": "==", "value": "3 years"}], "target_column": "loan_amnt", "aggregation": "mean", "round_to": null, "group_by": "grade", "select": "argmax"}'
+    answerer = FakeAnswerer(fake)
+    answer = answerer.answer(
+        "term=3 yearsの中で、loan_amntの平均値が最も高いgradeは何ですか。", _sample_df()
+    )
+    assert answer.was_gated is False
+    assert answer.text == "B1"
 
+
+def test_answerer_still_gates_group_listing_question_without_calling_llm() -> None:
     class BoomAnswerer(SpreadsheetCalcAnswerer):
         def _call_llm(self, question: str, columns_preview: str) -> str:
             raise AssertionError("表現できない質問ではLLMを呼ばない")
 
     answerer = BoomAnswerer()
     answer = answerer.answer(
-        "disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。", _sample_df()
+        "gradeごとのloan_amntの平均をそれぞれ教えてください。", _sample_df()
+    )
+    assert answer.was_gated is True
+
+
+def test_answerer_gates_xlsx_pivot_question_without_calling_llm() -> None:
+    class BoomAnswerer(SpreadsheetCalcAnswerer):
+        def _call_llm(self, question: str, columns_preview: str) -> str:
+            raise AssertionError("xlsx/Pivot系はspreadsheet_stateへフォールバックする")
+
+    answerer = BoomAnswerer()
+    answer = answerer.answer(
+        "train.xlsxのPivotシートにおいて、平均月収が最も高い層の抽出条件を教えてください。",
+        _sample_df(),
     )
     assert answer.was_gated is True
 
