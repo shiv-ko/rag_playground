@@ -56,6 +56,12 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
 
 完了条件「該当タイプでPerfect過半」は未達（9問中1）。診断済みの残ギャップを潰す。優先はtest問数の多い順。
 
+→ **実装計画策定済み（2026-07-04）**: `docs/superpowers/plans/2026-07-04-value-only-and-spreadsheet-state.md`。
+計画時の実地調査による更新: (a) 東都train.xlsxの**autoFilter XMLにフィルタ条件そのものが保存されている**
+（gender=Male等・非表示行11,413）→値差分の推計は不要で決定的に抽出可能。(b) **かえで「ファイル破損failures=1」は
+古い情報**で実際はPivotシート1,907セルが読める — 欠落はPivotセル値のartifact未出力のみ。
+(c) §2残課題の短答「値のみ」実験も同計画のTask 1として先行実施。
+
 - [ ] **spreadsheet_state（test 21問・最大）**:
   - フィルタ条件質問: ヘッダ＋非表示行番号だけでは条件を導けない。`spreadsheet_cells.jsonl`（全セル保持）から
     **可視行と非表示行の列ごとの値差分**を計算してコンテキスト化（Q11）
