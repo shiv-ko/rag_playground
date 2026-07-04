@@ -109,9 +109,10 @@ class TestParseResponse:
         assert citation == "bar"
 
     def test_system_prompt_requires_direct_answer_with_document_wording(self) -> None:
-        """短答系設問への直答ルール（文書表記を言い換えない）がプロンプトから消えていない
-        （flip安定化5の退行ガード）。"""
+        """短答系設問への直答ルール（文書表記を言い換えない・説明はreasoningへ）が
+        プロンプトから消えていない（flip安定化5・実験Aの退行ガード）。"""
         assert "言い換えない" in SYSTEM_PROMPT
+        assert "reasoning" in SYSTEM_PROMPT.split("【重要ルール】")[1].split("【出力形式】")[0]
 
     def test_parse_response_allows_raw_newline_in_strings(self) -> None:
         """citation内の生改行（制御文字）でパース失敗しない（実測valid Q18の真因）。"""
