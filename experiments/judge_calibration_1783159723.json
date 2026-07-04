@@ -1,0 +1,279 @@
+{
+  "run": "expB2b_calcfall_valid_1783159486.json",
+  "model": "gpt-5.2-2025-12-11",
+  "official_mean": 0.23333333333333334,
+  "local_mean": 0.3,
+  "agreement": 0.8333333333333334,
+  "rows": [
+    {
+      "question_id": "0",
+      "question": "青潮モビリティサービスの最終報告における、モビリティ需要の要因分析のページで、マーカーされている単語をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "hr、weekday、weathersit、temp",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "1",
+      "question": "KSSのfigure_06.pngにおいて、dayによる件数推移とあわせて表示されているTG平均が最も低い日は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "20日",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "2",
+      "question": "恒一会 かえで総合病院の提案書内で、重視するとされている評価指標を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Recall",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "3",
+      "question": "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "4,394,250円",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "4",
+      "question": "青嶺不動産アセットマネジメントの modeling.py において、前処理器の sparse_output が False になる model_type は何ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "hist_gradient_boosting",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "5",
+      "question": "白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI化はどの分類に記載されていますか。",
+      "answer": "対象外（契約明記）",
+      "ground_truth": "対象外（契約明記）",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件を教えてください。",
+      "answer": "Gender=Male, disease=1, Age=68",
+      "ground_truth": "Gender=Male、disease=1、Age=68で抽出されたデータに対する平均 / ALP",
+      "local_label": "Perfect",
+      "official_label": "Incorrect",
+      "official_score": -1.0
+    },
+    {
+      "question_id": "7",
+      "question": "恒一会 かえで総合病院のプロジェクトデータ（train.csv）において、disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "32歳",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "1,168,750円",
+      "ground_truth": "1,168,750円",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "QAレビューア：池田 直哉 → 小林 直樹",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "10",
+      "question": "蒼樹会 みなみ野女性医療センターの最終報告書にて、影響度が最も高いとされている残余リスクを抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "0値の疑似欠損",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "11",
+      "question": "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。",
+      "answer": "Gender = Male, Country = India, target = 2",
+      "ground_truth": "Gender=Male、Country=India、target=2",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "12",
+      "question": "京橋信用ソリューションズの契約金額（税込）はいくらですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "5,775,000円",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "13",
+      "question": "青葉与信マネジメントの分析対象データにおいて、term=3 years、grade=B1、purpose=credit_cardに該当するloan_amntの平均を算出してください。四捨五入して整数値で出してください。",
+      "answer": "1526",
+      "ground_truth": "1526",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "14",
+      "question": "青葉バイオメディカル機器案件において、鈴木 美咲さんはどの役割としてアサインされていますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "アサインされていない",
+      "local_label": "Acceptable",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "15",
+      "question": "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "MINAMINO、SHR、AYM",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "16",
+      "question": "MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "43日",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "前回未接触",
+      "ground_truth": "未連絡",
+      "local_label": "Missing",
+      "official_label": "Incorrect",
+      "official_score": -1.0
+    },
+    {
+      "question_id": "18",
+      "question": "東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載されている章番号を数字で答えてください。",
+      "answer": "3",
+      "ground_truth": "3",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "19",
+      "question": "青嶺不動産アセットマネジメント案件で分析設計を担当する人の名前をフルネームで抽出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "渡辺 遥",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "20",
+      "question": "AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。",
+      "answer": "T09, T10, T11, T12",
+      "ground_truth": "T09、T10、T11、T12",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "21",
+      "question": "青葉バイオメディカル機器のtrain.xlsxのPivotシートにおいて、平均月収が最も高い層の抽出条件を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Attrition = No、Gender = Female、MaritalStatus = Single、EducationField = Human Resources",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "22",
+      "question": "AOSHIOの NB01_eda.ipynbにおいて、観察結果サマリで出力されている「TGとの相関 上位5」の中で、相関係数が最も小さいカラム名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "season",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "見込金額（税込）,:, 4,675,000 JPY",
+      "ground_truth": "見込金額（税込）: 4,675,000 JPY",
+      "local_label": "Acceptable",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "24",
+      "question": "白峰信用リスク評価の 01_eda.ipynb にある特徴量相関ヒートマップの図で可視化されている特徴量のうち、classとの相関係数の絶対値が最も小さい特徴量名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Attr7",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "25",
+      "question": "東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "1. データ理解・EDA",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "26",
+      "question": "青葉バイオメディカル機器のtrain.csvにおいて、EducationFieldがMarketingかつMonthlyIncomeが10000より大きいデータを抽出し、Ageの平均値を計算してください。その平均値に最も近い年齢のidをすべて答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "train_0077、train_0216、train_0242、train_0722",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "0.010301",
+      "ground_truth": "0.010301",
+      "local_label": "Missing",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    },
+    {
+      "question_id": "28",
+      "question": "蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように判定していますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "object、string、categoricaldtype の列を候補とし、欠損を除いたユニーク数が50未満ならカテゴリ特徴量として採用している。",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_score": 0.0
+    },
+    {
+      "question_id": "29",
+      "question": "蒼樹会 みなみ野女性医療センターの契約書第8条において、本契約終了後に秘密保持義務が存続する期間は何年間ですか。",
+      "answer": "3年間",
+      "ground_truth": "3年間",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_score": 1.0
+    }
+  ]
+}

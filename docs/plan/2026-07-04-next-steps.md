@@ -48,9 +48,11 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
       Incorrect素通りを生み多数決mean 0.15→0.10。**引用ゲートの誤答遮断価値が偽陰性コストを上回る**（`f417aec`）
 - [x] （追加実験）短答系の直答形式（2026-07-04・採用 `641e858`）: 不安定問6→3・local Incorrectゼロ化
 - [ ] しきい値調整はPhase 5のグリッドサーチまで温存（単発でいじらない）
-- [ ] **残課題（新規判明、plan_0703 §2.2）**: ①Q18型=数値・章番号系は「値のみ」超短答の実験
-      （説明付き回答がofficial Incorrect化する実弾-1リスク）②Q17型=言い換え未解決 ③実験判定はmean単独禁止
-      （local judgeの正答→Missing誤判定を確認済み。多数決＋raw読み＋official較正で判断）
+- [x] **①「値のみ」超短答の実験**（2026-07-04実施・採用 `bc22924` = plan_0703 §2.3 実験A。
+      official 0.1167→0.1667。Q8/Q27回収）
+- [ ] **残課題（plan_0703 §2.2-2.3）**: ①Q17言い換え・Q18章番号誤りのゲート通過中-1リスク
+      ②実験判定はmean単独禁止の運用継続 ③Q6のofficial表現問題（規約適合の範囲での一般的回答形改善のみ可 —
+      正解文の型の模倣は**規約違反としてB3をrevert済み**。plan_0703 §2.3 学び1参照）
 
 ## 3. Phase 2 残課題（test 39問に直結、期待値最大）
 
@@ -73,6 +75,10 @@ gate_reason記録とN=3多数決ツールを先に整備してから、パース
   持てない場合はコンテキストに対応根拠を明記（Q0/Q23/Q25）
 - [ ] **spreadsheet_calc（test 9問）**: CalcSpecに `group_by` + `select`（argmax/argmin）を追加し、
   現在意図的にMissingへ倒しているgroupby系（Q7/Q26）を決定的pandasで処理。ゲート（0行・列不在→Missing）は維持
+
+→ **office_style＋spreadsheet_calc（Q0/Q7/Q26/Q25）のCodex向け実装指示書策定済み（2026-07-04）**:
+`2026-07-04-phase2-remainder-for-codex.md`（`b2c0f0a`）。Codexはサブエージェント不可のため
+step-reviewはコミット前セルフレビュー1周で代替する（`.claude/skills/step-review`の代替手順）。
 
 ## 4. Phase 3 着手（test 30問、Phase 2と並行可）
 
