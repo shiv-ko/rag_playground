@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import datetime
+
 import argparse
 import json
 import re
@@ -193,14 +195,191 @@ def _office_questions(rows: list[dict], aliases: dict[str, list[str]], per_type:
     return questions
 
 
+def _version_diff_questions(rows: list[dict], aliases: dict[str, list[str]], per_type: int) -> list[GeneratedQuestion]:
+    questions: list[GeneratedQuestion] = []
+    for pair in rows:
+        changed_count = pair.get("changed_count", 0)
+        if changed_count < 1 or changed_count > 5:
+            continue
+        project = pair.get("project_name") or ""
+        old_file_name = pair.get("old_file_name") or ""
+        new_file_name = pair.get("new_file_name") or ""
+        changed_samples = pair.get("changed_samples") or []
+        if not project or not old_file_name or not new_file_name or not changed_samples:
+            continue
+        name = _short_project_name(project, aliases)
+        q = f"{name}案件の{old_file_name}から{new_file_name}への変更内容のうち、変更された箇所を挙げてください。"
+        if changed_count == 1 and len(changed_samples) == 1:
+            s = changed_samples[0]
+            answer = f"変更前: {s.get('before', '')} → 変更後: {s.get('after', '')}"
+        else:
+            parts: list[str] = []
+            for s in changed_samples:
+                parts.append(f"変更前: {s.get('before', '')} → 変更後: {s.get('after', '')}")
+            answer = "\n".join(parts)
+        if len(answer) > 800:
+            continue
+        questions.append(GeneratedQuestion(
+            id=f"gen_vdiff_{len(questions):04d}",
+            question=q,
+            answer=answer,
+            type="version_diff",
+            source_path=pair.get("old_path") or "",
+        ))
+        if len(questions) >= per_type:
+            break
+    return questions
+
+
+def _term_resolution_questions(terms: list[dict], per_type: int) -> list[GeneratedQuestion]:
+    questions: list[GeneratedQuestion] = []
+    for entry in terms:
+        term = str(entry.get("term") or "").strip()
+        expansion = str(entry.get("expansion") or "").strip()
+        if len(term) < 2 or expansion == term or not expansion:
+            continue
+        questions.append(GeneratedQuestion(
+            id=f"gen_term_{len(questions):04d}",
+            question=f"データアステル社の社内用語で「{term}」は何を指しますか。",
+            answer=expansion,
+            type="term_resolution",
+            source_path="artifacts/term_registry.json",
+        ))
+        if len(questions) >= per_type:
+            break
+    return questions
+
+
+def _parse_date(value: str) -> datetime.date | None:
+    """開始日/終了日の文字列を date に変換する。"""
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _schedule_date_range_questions(
+    rows: list[dict], aliases: dict[str, list[str]], per_type: int,
+) -> list[GeneratedQuestion]:
+    by_project: dict[str, list[dict]] = defaultdict(list)
+    for row in rows:
+        project = row.get("project_name") or ""
+        values = row.get("values") or {}
+        start_date = _parse_date(str(values.get("開始日") or ""))
+        task_id = values.get("タスクID")
+        if project and start_date and task_id:
+            by_project[project].append({"task_id": str(task_id), "start_date": start_date})
+
+    questions: list[GeneratedQuestion] = []
+    for project, tasks in sorted(by_project.items()):
+        tasks.sort(key=lambda t: t["start_date"])
+        if len(tasks) < 3:
+            continue
+        name = _short_project_name(project, aliases)
+        generated_for_project = 0
+        # 先頭から走査して 3〜8 件のウィンドウを探す
+        for i in range(len(tasks)):
+            for j in range(i + 3, min(i + 9, len(tasks) + 1)):
+                window = tasks[i:j]
+                if not (3 <= len(window) <= 8):
+                    continue
+                date1 = window[0]["start_date"]
+                date2 = window[-1]["start_date"]
+                if date1 == date2:
+                    continue
+                # この日付範囲に該当するタスクを厳密に再抽出
+                matched_ids = sorted(
+                    {t["task_id"] for t in tasks if date1 <= t["start_date"] <= date2}
+                )
+                if not (3 <= len(matched_ids) <= 8):
+                    continue
+                d1_str = date1.strftime("%Y-%m-%d")
+                d2_str = date2.strftime("%Y-%m-%d")
+                q = (
+                    f"{name}案件のスケジュールにおいて、"
+                    f"{d1_str}から{d2_str}の間に開始日が設定されている"
+                    f"タスクIDをすべて挙げてください。"
+                )
+                questions.append(GeneratedQuestion(
+                    id=f"gen_sched_date_{len(questions):04d}",
+                    question=q,
+                    answer="、".join(matched_ids),
+                    type="schedule_date_range",
+                    source_path=str(tasks[0].get("source_path", "")),
+                ))
+                generated_for_project += 1
+                if generated_for_project >= 2:
+                    break
+            if generated_for_project >= 2:
+                break
+        if len(questions) >= per_type:
+            break
+    return questions
+
+
+def _negative_case_questions(
+    schedule_rows: list[dict],
+    aliases: dict[str, list[str]],
+    per_type: int,
+) -> list[GeneratedQuestion]:
+    # プロジェクト別の担当者集合を構築
+    persons_by_project: dict[str, set[str]] = defaultdict(set)
+    for row in schedule_rows:
+        project = row.get("project_name") or ""
+        values = row.get("values") or {}
+        for person in re.split(r"[/、,]", str(values.get("担当者") or "")):
+            person = person.strip()
+            if (
+                len(person) >= 3
+                and " " in person
+                and not re.match(r"^[\s\d\.．]+$", person)
+                and not re.match(r"^[■▼▲●◆※#＃]", person)
+                and re.search(r"[一-龥ぁ-んァ-ヶ]", person)
+            ):
+                persons_by_project[project].add(person)
+
+    project_list = sorted(persons_by_project.keys())
+    questions: list[GeneratedQuestion] = []
+    max_negative = min(per_type, 5)
+    for i, project_a in enumerate(project_list):
+        for project_b in project_list[i + 1:]:
+            # project_a の人で project_b にいない人を探す
+            only_in_a = persons_by_project[project_a] - persons_by_project[project_b]
+            for person in sorted(only_in_a):
+                name_b = _short_project_name(project_b, aliases)
+                questions.append(GeneratedQuestion(
+                    id=f"gen_neg_{len(questions):04d}",
+                    question=f"{name_b}案件で、{person}さんが担当しているタスクIDをすべて挙げてください。",
+                    answer="該当なし",
+                    type="negative_case",
+                    source_path="",
+                ))
+                if len(questions) >= max_negative:
+                    break
+            if len(questions) >= max_negative:
+                break
+        if len(questions) >= max_negative:
+            break
+    return questions
+
+
 def build_questions(artifacts_dir: Path, per_type: int = 20) -> list[GeneratedQuestion]:
     projects = _load_json(artifacts_dir / "project_registry.json")
     aliases = {p.get("project_name", ""): p.get("aliases", []) for p in projects}
     questions: list[GeneratedQuestion] = []
-    questions += _schedule_questions(_load_jsonl(artifacts_dir / "schedule_tasks.jsonl"), aliases, per_type)
+    schedule_rows = _load_jsonl(artifacts_dir / "schedule_tasks.jsonl")
+    questions += _schedule_questions(schedule_rows, aliases, per_type)
     questions += _filter_questions(_load_jsonl(artifacts_dir / "train_xlsx_sheets.jsonl"), aliases, per_type)
     questions += _highlight_questions(_load_jsonl(artifacts_dir / "train_xlsx_highlight_blocks.jsonl"), aliases, per_type)
     questions += _office_questions(_load_jsonl(artifacts_dir / "office_marks.jsonl"), aliases, per_type)
+    questions += _version_diff_questions(_load_jsonl(artifacts_dir / "version_diff_poc.jsonl"), aliases, per_type)
+    questions += _term_resolution_questions(_load_json(artifacts_dir / "term_registry.json"), per_type)
+    questions += _schedule_date_range_questions(schedule_rows, aliases, per_type)
+    questions += _negative_case_questions(schedule_rows, aliases, per_type)
     return questions
 
 
