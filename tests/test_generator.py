@@ -108,6 +108,11 @@ class TestParseResponse:
         assert confidence == pytest.approx(0.8)
         assert citation == "bar"
 
+    def test_system_prompt_requires_direct_answer_with_document_wording(self) -> None:
+        """短答系設問への直答ルール（文書表記を言い換えない）がプロンプトから消えていない
+        （flip安定化5の退行ガード）。"""
+        assert "言い換えない" in SYSTEM_PROMPT
+
     def test_parse_response_allows_raw_newline_in_strings(self) -> None:
         """citation内の生改行（制御文字）でパース失敗しない（実測valid Q18の真因）。"""
         raw = '{"answer": "第3章に記載", "confidence": 0.55, "citation": "3. 業務範囲\n乙が本契約に基づき"}'

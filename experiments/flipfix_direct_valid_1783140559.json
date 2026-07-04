@@ -1,0 +1,578 @@
+{
+  "summary": {
+    "mean_score": 0.16666666666666666,
+    "total": 30,
+    "label_counts": {
+      "Missing": 25,
+      "Perfect": 5
+    },
+    "elapsed_seconds": 53.3,
+    "generator_tokens": {
+      "input": 72694,
+      "output": 9660
+    },
+    "judge_tokens": {
+      "input": 10540,
+      "output": 4089
+    },
+    "models": {
+      "generator": "claude-sonnet-5",
+      "judge": "claude-sonnet-5"
+    }
+  },
+  "results": [
+    {
+      "question_id": "0",
+      "question": "青潮モビリティサービスの最終報告における、モビリティ需要の要因分析のページで、マーカーされている単語をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「hr、weekday、weathersit、temp」という具体的なマーカーされた単語が示されているにもかかわらず、生成された回答は「見つけることができませんでした」として具体的な回答を回避している。実際には回答可能な情報が存在するため、Missing判定となる。",
+      "raw_answer": "",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx::slide_16",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/会議録/会議録_2025-08-26.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx::slide_10"
+      ],
+      "gate_reason": "capability"
+    },
+    {
+      "question_id": "1",
+      "question": "KSSのfigure_06.pngにおいて、dayによる件数推移とあわせて表示されているTG平均が最も低い日は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には正解「20日」が明示されているにもかかわらず、生成された回答は具体的な回答を提示せず「見つけられなかった」としているため、具体的回答がないMissingに該当する。",
+      "raw_answer": "",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_18_code_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/05.会議/報告資料/報告資料_2025-10-01.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_18_code_chunk5",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/05.会議/報告資料/報告資料_2025-10-01.docx::full_chunk5"
+      ],
+      "gate_reason": "capability"
+    },
+    {
+      "question_id": "2",
+      "question": "恒一会 かえで総合病院の提案書内で、重視するとされている評価指標を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.05,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には評価指標として「Recall」が明記されているにもかかわらず、生成された回答は「回答を見つけることができませんでした」としており、具体的な回答を提供していない。情報が文書内に存在するため本来は回答可能であり、Missing(回答なし・拒否)に該当する。",
+      "raw_answer": "わかりません。提供された参考文書には「提案書.pptx」の内容としてタイトルスライド（slide_1）の情報しかなく、重視する評価指標についての記載は含まれていません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk8",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk4",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-02.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/06.報告書/医療法人社団 恒一会 かえで総合病院_最終報告.pptx::slide_1"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "3",
+      "question": "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.55,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書に税込金額(4,394,250円)が示されており、これをもとに消費税額を計算できるはずだが、生成された回答は「見つけることができませんでした」として具体的な回答を放棄している。実際には税込金額から消費税率(10%または8%)を仮定して計算(例:10%の場合399,477円)することが可能であり、情報不足を理由に回答拒否している点でMissingに該当する。",
+      "raw_answer": "全案件の消費税額の合計は1,465,000円です。内訳は、案件A(固定価格契約 税込¥3,960,000)の消費税額¥360,000、案件B(Time & Materials 見込金額 税込¥4,675,000)の消費税額¥425,000、案件C(固定価格契約 税込¥7,480,000)の消費税額¥680,000であり、360,000+425,000+680,000=1,465,000円となります。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/00.提案/提案書.pptx::slide_12",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx::slide_11",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書.pptx::slide_15",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書old.pptx::slide_15",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx::slide_12"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "4",
+      "question": "青嶺不動産アセットマネジメントの modeling.py において、前処理器の sparse_output が False になる model_type は何ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「hist_gradient_boosting」という具体的な回答が存在するにもかかわらず、生成された回答は「回答を見つけることができませんでした」としており、具体的な情報を提供していない。質問に対する明確な回答が欠如しているため、Missingと判定される。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_8",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx::slide_8",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_15"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "5",
+      "question": "白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI化はどの分類に記載されていますか。",
+      "answer": "「対象外（契約明記）」に記載されています。",
+      "confidence": 0.95,
+      "was_gated": false,
+      "judge_label": "Perfect",
+      "judge_score": 1.0,
+      "judge_reason": "参考文書に記載された内容と生成された回答が完全に一致しており、質問に対して正確に答えている。虚偽の情報も含まれていない。",
+      "raw_answer": "「対象外（契約明記）」に記載されています。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/06.報告書/白峰信用リスク評価株式会社_最終報告.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書old.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/06.報告書/白峰信用リスク評価株式会社_最終報告.pptx::slide_4",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/06.報告書/白峰信用リスク評価株式会社_最終報告.pptx::slide_2"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件を教えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書にはGender=Male、disease=1、Age=68という具体的な抽出条件が明記されているにもかかわらず、生成された回答は「見つけることができませんでした」として具体的な回答を提供しておらず、回答拒否に該当する。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk8",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx::slide_3",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk4"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "7",
+      "question": "恒一会 かえで総合病院のプロジェクトデータ（train.csv）において、disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には正解として「32歳」という具体的な回答が存在するにもかかわらず、生成された回答は「見つけることができませんでした」として具体的な回答を提示しておらず、回答拒否に該当するため。",
+      "raw_answer": "わかりません。参考文書にはプロジェクトの提案書・会議録・報告書の概要のみが含まれており、train.csvの実データ（年齢別・性別別のALT_GPT数値等）は記載されていないため、disease=1の女性でALT_GPTの平均値が最も高い年齢を特定することができません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/06.報告書/医療法人社団 恒一会 かえで総合病院_最終報告.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/06.報告書/医療法人社団 恒一会 かえで総合病院_最終報告_old.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/会議録/会議録_2025-09-02.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx::slide_3"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "最終請求金額（税込）は見込金額（税込）より1,168,750円少なくなります。\n\n計算根拠：見込工数170時間の4分の3は127.5時間（30分単位のため端数切り上げ不要）。実績工数127.5時間×時間単価25,000円＝税抜3,187,500円、消費税10%＝318,750円、税込3,506,250円となります。見込金額（税込）4,675,000円との差額は4,675,000円－3,506,250円＝1,168,750円です。",
+      "confidence": 0.85,
+      "was_gated": false,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "判定解析エラー",
+      "raw_answer": "最終請求金額（税込）は見込金額（税込）より1,168,750円少なくなります。\n\n計算根拠：見込工数170時間の4分の3は127.5時間（30分単位のため端数切り上げ不要）。実績工数127.5時間×時間単価25,000円＝税抜3,187,500円、消費税10%＝318,750円、税込3,506,250円となります。見込金額（税込）4,675,000円との差額は4,675,000円－3,506,250円＝1,168,750円です。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/00.提案/提案書.pptx::slide_12",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/01.契約/契約書.docx::full_chunk4",
+        "data/raw/share/共有ドライブ/社内管理/データアステル社内管理_決裁基準.md::full_chunk2",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/06.報告書/医療法人社団 蒼泉会 ひがし丘総合病院_最終報告.pdf::page_17",
+        "data/raw/share/共有ドライブ/社内管理/データアステル社内管理_決裁基準.md::full_chunk1"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書にはQAレビューアが池田直哉から小林直樹に変更された旨の情報が含まれているにもかかわらず、生成された回答はこれを一切反映せず「回答を見つけることができませんでした」としており、具体的な回答を提供していない。質問である旧版と最新版の変更箇所（変更前・変更後）についての具体的な比較結果を示すべきところ、それを放棄しているためMissingと判定した。",
+      "raw_answer": "わかりません。提供された参考文書には、oldフォルダ内の旧版の提案書の内容が含まれておらず、提案フォルダ直下の最新版の提案書（slide_1のタイトル部分のみ）と比較できる材料がありません。そのため、旧版と最新版の変更箇所を特定することができません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/ニューヨーク不動産市場の最新動向調査.pdf::page_5",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/01.契約/契約書.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/ニューヨーク不動産市場の最新動向調査.pdf::page_7_chunk1"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "10",
+      "question": "蒼樹会 みなみ野女性医療センターの最終報告書にて、影響度が最も高いとされている残余リスクを抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「0値の疑似欠損」という断片的な情報しか提供されておらず、質問に対する具体的な残余リスクの内容を判断できる情報が不足している。生成された回答は「見つけられなかった」と述べており、具体的な回答を提供していないが、これは参考文書の情報が不十分であることに起因する適切な対応であり、虚偽の情報を含んでいないためMissingに分類される。",
+      "raw_answer": "わかりません。提供された参考文書（提案書.pptx、契約書.docx、糖尿病統計情報.docx）には「最終報告書」に該当する文書、および残余リスクやその影響度に関する記載が含まれていません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/糖尿病統計情報.docx::full_chunk4",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx::slide_3",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/糖尿病統計情報.docx::full_chunk7"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "11",
+      "question": "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書にはGender=Male、Country=India、target=2というフィルター条件が明記されているにもかかわらず、生成された回答は「回答を見つけることができませんでした」としており、具体的な回答を提供していない。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/02.計画/スケジュール.xlsx::sheet_スケジュール"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "12",
+      "question": "京橋信用ソリューションズの契約金額（税込）はいくらですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.1,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には契約金額(税込)5,775,000円という具体的な情報が明記されているにもかかわらず、生成された回答は「回答を見つけることができませんでした」としており、具体的な回答を提供していないため。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/06.報告書/京橋信用ソリューションズ株式会社_最終報告.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx::full_chunk8"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "13",
+      "question": "青葉与信マネジメントの分析対象データにおいて、term=3 years、grade=B1、purpose=credit_cardに該当するloan_amntの平均を算出してください。四捨五入して整数値で出してください。",
+      "answer": "1526",
+      "confidence": 0.9,
+      "was_gated": false,
+      "judge_label": "Perfect",
+      "judge_score": 1.0,
+      "judge_reason": "参考文書(根拠)に示された値1526と生成された回答が完全に一致しており、質問で求められた条件(term=3 years、grade=B1、purpose=credit_card)におけるloan_amntの平均値を整数値で正確に回答している。虚偽情報や不完全さは見られない。",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "14",
+      "question": "青葉バイオメディカル機器案件において、鈴木 美咲さんはどの役割としてアサインされていますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書は鈴木美咲さんが当該案件にアサインされていないことを示しているが、生成された回答は「見つけることができなかった」としており、具体的な回答（アサインされていない旨）を提示できていないため、Missingと判定される。",
+      "raw_answer": "わかりません。参考文書には「鈴木 美咲」という人物についての記載が見当たりません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/会議録/会議録_2025-07-11.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/会議録/会議録_2025-07-25.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書_draft.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/06.報告書/株式会社青葉バイオメディカル機器_最終報告.pptx::slide_21"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "15",
+      "question": "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書にはMINAMINO、SHR、AYMという主略称が挙げられており、これらが質問に対する回答として存在するにもかかわらず、生成された回答は「見つけることができませんでした」として具体的な回答を提供していない。本来であればこれらの案件名を回答すべきであり、情報が参考文書に存在するにも関わらず回答を拒否している状態はMissingに該当する。",
+      "raw_answer": "{\n  \"answer\": \"参考文書から確認できる範囲では、2025年7月1日以前に中間報告会・中間レビューが実施された案件は見当たりません。3件の報告書のうち、2025-09-16文書は会議日2025-09-16のM02（中間レビュー）、2025-07-11文書は報告時点2025-07-11のM02",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk8",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-29.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-29.docx::full_chunk8",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/報告資料/報告資料_2025-07-11.docx::full_chunk1"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "16",
+      "question": "MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「43日」という具体的な答えが存在するにもかかわらず、生成された回答は情報を見つけられなかったとして具体的な回答を提供していない。これは回答拒否に該当し、Missingと判定される。",
+      "raw_answer": "わかりません。参考文書内には「MINAMINO」「M01」「FR」といった名称やIDに関する記載が見当たらず、該当する情報を確認できませんでした。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx::slide_14",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/02.計画/スケジュール.xlsx::sheet_スケジュール管理表_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/03.データ/カラム説明.md::full",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/04.分析/analysis_project/data/カラム説明.md::full"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "pdays=-1は「前回未接触」を示す特別値です。乙はこれを前回未接触を表すフラグとして扱い、数値とフラグの両面から有効性を検証しています。",
+      "confidence": 0.85,
+      "was_gated": false,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "判定解析エラー",
+      "raw_answer": "pdays=-1は「前回未接触」を示す特別値です。乙はこれを前回未接触を表すフラグとして扱い、数値とフラグの両面から有効性を検証しています。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx::slide_2",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx::slide_2",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx::slide_7",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx::slide_7"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "18",
+      "question": "東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載されている章番号を数字で答えてください。",
+      "answer": "3章です。「3. 業務範囲」の中で本業務の内容を列挙した後、続けて「本業務の対象データ、前提および制約は以下のとおりとする。」と記載されており、これは第3章「業務範囲」に含まれる内容です。",
+      "confidence": 0.45,
+      "was_gated": false,
+      "judge_label": "Perfect",
+      "judge_score": 1.0,
+      "judge_reason": "参考文書に示された正解である章番号「3」を正確に回答しており、その根拠となる文脈(3章「業務範囲」内に「本業務の対象データ、前提および制約は以下のとおりとする」という記載があること)も適切に説明されている。虚偽情報は含まれていない。",
+      "raw_answer": "3章です。「3. 業務範囲」の中で本業務の内容を列挙した後、続けて「本業務の対象データ、前提および制約は以下のとおりとする。」と記載されており、これは第3章「業務範囲」に含まれる内容です。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx::full_chunk14",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx::full_chunk5",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx::full_chunk19"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "19",
+      "question": "青嶺不動産アセットマネジメント案件で分析設計を担当する人の名前をフルネームで抽出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.1,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「渡辺 遥」という具体的な回答が存在するにもかかわらず、生成された回答は情報を見つけられなかったとして具体的な回答を提供していない。",
+      "raw_answer": "わかりません。参考文書には契約書の「1.3 実施体制」の項目名は記載されていますが、具体的な体制表（担当者名や役割）は本文中に含まれておらず、分析設計担当者の氏名を特定できる情報がありません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/06.報告書/株式会社青嶺不動産アセットマネジメント_最終報告.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx::slide_8"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "20",
+      "question": "AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。",
+      "answer": "T09、T10、T11、T12の4つです。",
+      "confidence": 0.95,
+      "was_gated": false,
+      "judge_label": "Perfect",
+      "judge_score": 1.0,
+      "judge_reason": "参考文書に記載されたT09、T10、T11、T12のすべてを過不足なく正確に列挙しており、虚偽の情報も含まれていないため。",
+      "raw_answer": "T09、T10、T11、T12の4つです。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/02.計画/スケジュール.xlsx::sheet_sheet1_row_11",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/02.計画/スケジュール.xlsx::sheet_sheet1_row_12",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/02.計画/スケジュール.xlsx::sheet_sheet1_row_13",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/02.計画/スケジュール.xlsx::sheet_sheet1_row_14"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "21",
+      "question": "青葉バイオメディカル機器のtrain.xlsxのPivotシートにおいて、平均月収が最も高い層の抽出条件を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には抽出条件（Attrition = No、Gender = Female、MaritalStatus = Single、EducationField = Human Resources）が明記されているにもかかわらず、生成された回答は「見つけることができませんでした」として具体的な回答を提供しておらず、回答拒否に該当するため。",
+      "raw_answer": "わかりません。参考文書にはtrain.xlsxのPivotシートに関する具体的なデータ(平均月収の集計結果や抽出条件)が含まれていないため、回答できません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/06.報告書/株式会社青葉バイオメディカル機器_最終報告.pptx::slide_1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書_draft.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/会議録/会議録_2025-07-25.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx::full_chunk7"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "22",
+      "question": "AOSHIOの NB01_eda.ipynbにおいて、観察結果サマリで出力されている「TGとの相関 上位5」の中で、相関係数が最も小さいカラム名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「season」という単語のみが示されており、TGとの相関上位5やその相関係数に関する具体的な情報が含まれていない。生成された回答は「わかりません」という趣旨の回答であり、具体的な回答を提供していないが、実際に根拠となる情報が不足しているため、これは適切な対応とも言える。ただし、参考文書に「season」が含まれていることから、本来は何らかの手がかりがあった可能性があり、完全に情報がないと断定するのではなく、部分的な情報(seasonというカラムが関係している可能性)に言及できなかった点で、Missing评価が妥当。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::full_chunk4",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_2_markdown",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/01.契約/契約書.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::full_chunk3"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.05,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "回答は具体的な情報を提示せず「見つけることができませんでした」としているのみで、参考文書に存在する見込金額（税込）4,675,000 JPYという情報を抽出できていない。ハイライト部分の抽出という質問に対して具体的な回答を拒否している状態であり、Missingに該当する。",
+      "raw_answer": "参考文書には「報告資料_2025-08-06.docx」というファイルの黄色ハイライト箇所のみが記載されており、AOSHIOのM02資料に関する情報は含まれていません。そのため、AOSHIOのM02資料における黄色ハイライト部分についてはお答えできません。\n\n※参考までに、参考文書に記載されている「報告資料_2025-08-06.docx」内の黄色ハイライト箇所は以下の通りです。\n・見込金額（税込）\n・:\n・ 4,675,000 JPY",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::paragraph_run",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::paragraph_run",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx::paragraph_run"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "24",
+      "question": "白峰信用リスク評価の 01_eda.ipynb にある特徴量相関ヒートマップの図で可視化されている特徴量のうち、classとの相関係数の絶対値が最も小さい特徴量名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には正解として「Attr7」が示されているにもかかわらず、生成された回答は具体的な特徴量名を答えず「回答を見つけることができませんでした」としており、実質的に回答拒否・不明の回答となっている。",
+      "raw_answer": "",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_18_code_chunk2",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda_old.ipynb::cell_18_code_chunk2",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_18_code_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda_old.ipynb::cell_18_code_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書.pptx::slide_16"
+      ],
+      "gate_reason": "capability"
+    },
+    {
+      "question_id": "25",
+      "question": "東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.1,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には「データ理解・EDA」という項目のみが提供されており、東都人材プラットフォームの提案書P7の内容や赤で強調された文字列に関する情報が含まれていない。回答は正直に「見つけられなかった」と述べており、虚偽の情報を提供していない点で適切だが、具体的な回答が得られていないためMissingに該当する。",
+      "raw_answer": "わかりません",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx::slide_7"
+      ],
+      "gate_reason": "missing_text"
+    },
+    {
+      "question_id": "26",
+      "question": "青葉バイオメディカル機器のtrain.csvにおいて、EducationFieldがMarketingかつMonthlyIncomeが10000より大きいデータを抽出し、Ageの平均値を計算してください。その平均値に最も近い年齢のidをすべて答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "回答が「資料から見つけられなかった」として具体的な回答を拒否しており、実際にはtrain_0077、train_0216、train_0242、train_0722という参考文書(根拠)が存在するにもかかわらず、データの抽出・平均値の計算・該当するidの提示が一切行われていない。質問に対する具体的な回答がないため、Missingと判定する。",
+      "raw_answer": "わかりません。提供された参考文書にはtrain.csvのデータ内容（EducationField、MonthlyIncome、Age、id等の実データ）が含まれておらず、契約書や最終報告の総括のみのため、該当する平均値やidを算出・回答できません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書_draft.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書_draft.docx::full_chunk7",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/06.報告書/株式会社青葉バイオメディカル機器_最終報告.pptx::slide_21"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "改善幅は約0.010301です（0.7422917255604067 − 0.7319904178115971 ＝ 0.0103013077488096）。",
+      "confidence": 0.85,
+      "was_gated": false,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "判定解析エラー",
+      "raw_answer": "改善幅は約0.010301です（0.7422917255604067 − 0.7319904178115971 ＝ 0.0103013077488096）。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/06.報告書/医療法人社団 蒼泉会 ひがし丘総合病院_最終報告.pdf::page_4",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx::full_chunk4",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/会議録/会議録_2025-08-05.docx::full_chunk2",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/会議録/会議録_2025-08-05.docx::full_chunk1"
+      ],
+      "gate_reason": ""
+    },
+    {
+      "question_id": "28",
+      "question": "蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように判定していますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.15,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "参考文書には回答の根拠となる情報が明確に存在するにもかかわらず、生成された回答はその内容を提示せず「見つけることができませんでした」と回答を拒否しているため、Missingと判定する。",
+      "raw_answer": "わかりません。参考文書には、EDAコードにおけるカテゴリ列（cat_cols）の判定基準として「df[c].dtype == 'object' または str(df[c].dtype) == 'category'」という条件は記載されていますが、CATの判定にユニーク数を条件として用いている記述は見当たりません。",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx::full_chunk5",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-08.docx::full_chunk2",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/04.分析/analysis_project/notebooks/01_eda.ipynb::cell_21_code_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/01.契約/契約書.docx::full_chunk8"
+      ],
+      "gate_reason": "confidence"
+    },
+    {
+      "question_id": "29",
+      "question": "蒼樹会 みなみ野女性医療センターの契約書第8条において、本契約終了後に秘密保持義務が存続する期間は何年間ですか。",
+      "answer": "3年間",
+      "confidence": 0.9,
+      "was_gated": false,
+      "judge_label": "Perfect",
+      "judge_score": 1.0,
+      "judge_reason": "参考文書に記載された「3年間」という回答が生成された回答と完全に一致しており、質問に対して正確に答えているため。",
+      "raw_answer": "3年間",
+      "retrieved_sources": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk3",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk6",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk5",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx::full_chunk1",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx::slide_1"
+      ],
+      "gate_reason": ""
+    }
+  ]
+}
