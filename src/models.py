@@ -54,6 +54,14 @@ class CRAGLabel(str, Enum):
         }[self]
 
 
+def label_score(label: str) -> float:
+    """ラベル文字列をCRAGスコアに変換。未知・空ラベル（judge無効run等）は0.0。"""
+    try:
+        return CRAGLabel(label).score
+    except ValueError:
+        return 0.0
+
+
 @dataclass
 class JudgeResult:
     label: CRAGLabel

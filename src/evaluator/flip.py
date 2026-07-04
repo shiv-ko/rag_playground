@@ -3,14 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from src.models import CRAGLabel
-
-
-def _score(label: str) -> float:
-    try:
-        return CRAGLabel(label).score
-    except ValueError:
-        return 0.0
+from src.models import label_score as _score
 
 
 @dataclass
