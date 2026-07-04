@@ -5,25 +5,6 @@ from src.models import Document
 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
-SNAP_LOOKBACK = 300
-
-
-def _snap_chunk_end(text: str, start: int, fixed_end: int, chunk_size: int) -> int:
-    end = min(fixed_end, len(text))
-    if end >= len(text):
-        return end
-
-    min_end = start + max(1, chunk_size - SNAP_LOOKBACK)
-    if min_end >= end:
-        return end
-
-    for marker in ("\n\n", "。", "\n"):
-        pos = text.rfind(marker, start, end)
-        if pos != -1:
-            snapped = pos + len(marker)
-            if snapped >= min_end and snapped > start:
-                return snapped
-    return end
 
 
 def chunk_documents(
@@ -42,8 +23,7 @@ def chunk_documents(
         start = 0
         chunk_index = 0
         while start < len(doc.text):
-            fixed_end = start + chunk_size
-            end = _snap_chunk_end(doc.text, start, fixed_end, chunk_size)
+            end = start + chunk_size
             chunk_index += 1
             result.append(Document(
                 text=doc.text[start:end],
@@ -53,5 +33,5 @@ def chunk_documents(
             ))
             if end >= len(doc.text):
                 break
-            start = max(end - overlap, start + 1)
+            start += step
     return result
