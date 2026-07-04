@@ -24,10 +24,32 @@ SPREADSHEET_CALC_KEYWORDS = (
 )
 
 
+def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    lower = text.lower()
+    for keyword in keywords:
+        needle = keyword.lower()
+        start = 0
+        while True:
+            index = lower.find(needle, start)
+            if index < 0:
+                break
+            spans.append((index, index + len(needle)))
+            start = index + len(needle)
+    return spans
+
+
+def _is_contained(span: tuple[int, int], containers: list[tuple[int, int]]) -> bool:
+    start, end = span
+    return any(container_start <= start and end <= container_end for container_start, container_end in containers)
+
+
 def classify_question(question: str) -> list[str]:
     tags: list[str] = []
     lower = question.lower()
-    if any(k.lower() in lower for k in IMAGE_KEYWORDS):
+    office_style_spans = _keyword_spans(question, OFFICE_STYLE_KEYWORDS)
+    image_spans = _keyword_spans(question, IMAGE_KEYWORDS)
+    if any(not _is_contained(span, office_style_spans) for span in image_spans):
         tags.append("image_or_graph")
     if any(k in question for k in VERSION_DIFF_KEYWORDS):
         tags.append("version_diff")

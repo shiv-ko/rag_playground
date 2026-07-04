@@ -57,6 +57,24 @@ def test_detects_office_style_question() -> None:
     )
 
 
+def test_office_marker_phrase_does_not_trigger_image_tag() -> None:
+    tags = classify_question(
+        "最終報告における、要因分析のページで、マーカーされている単語をすべて抜き出してください。"
+    )
+    assert "office_style" in tags
+    assert "image_or_graph" not in tags
+
+
+def test_true_marker_graph_context_keeps_image_tag() -> None:
+    tags = classify_question("折れ線グラフのマーカーの色は何ですか。")
+    assert "image_or_graph" in tags
+
+
+def test_pure_image_questions_keep_image_tag() -> None:
+    assert "image_or_graph" in classify_question("このグラフの色は何ですか。")
+    assert "image_or_graph" in classify_question("画像に写っているものは何ですか。")
+
+
 def test_detects_spreadsheet_calc_question() -> None:
     assert "spreadsheet_calc" in classify_question(
         "青葉与信マネジメントの分析対象データにおいて、term=3 years、grade=B1、purpose=credit_cardに該当するloan_amntの平均を算出してください。四捨五入して整数値で出してください。"
