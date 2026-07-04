@@ -75,6 +75,7 @@ class AnswerGenerator:
                 confidence=0.0,
                 source_docs=contexts,
                 was_gated=True,
+                gate_reason="capability",
             )
 
         if not contexts:
@@ -83,6 +84,7 @@ class AnswerGenerator:
                 confidence=0.0,
                 source_docs=[],
                 was_gated=True,
+                gate_reason="no_context",
             )
 
         context_text = _build_context(contexts)
@@ -96,6 +98,7 @@ class AnswerGenerator:
                 source_docs=contexts,
                 was_gated=True,
                 raw_text=answer_text,
+                gate_reason="missing_text",
             )
 
         if not self.gate.should_answer(confidence, tags=tags):
@@ -105,6 +108,7 @@ class AnswerGenerator:
                 source_docs=contexts,
                 was_gated=True,
                 raw_text=answer_text,
+                gate_reason="confidence",
             )
 
         if not citation_supported(citation, context_text):
@@ -114,6 +118,7 @@ class AnswerGenerator:
                 source_docs=contexts,
                 was_gated=True,
                 raw_text=answer_text,
+                gate_reason="citation",
             )
 
         # トークン制限チェック（暫定: 文字数で近似）

@@ -49,6 +49,7 @@ class PipelineResult:
     judge_reason: str
     raw_answer: str = ""
     retrieved_sources: list[str] = field(default_factory=list)
+    gate_reason: str = ""
 
 
 class Pipeline:
@@ -229,6 +230,7 @@ class Pipeline:
             judge_reason=judge_reason,
             raw_answer=answer.raw_text,
             retrieved_sources=retrieved_sources,
+            gate_reason=answer.gate_reason,
         )
 
     # ------------------------------------------------------------------ #

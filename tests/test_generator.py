@@ -355,3 +355,59 @@ def test_ungated_answer_raw_text_equals_text():
     ans = gen.generate("質問", [doc])
     assert ans.was_gated is False
     assert ans.raw_text == ans.text == "採用された回答"
+
+
+# ---------------------------------------------------------------------------
+# gate_reason（どのゲートで落ちたかをrun JSONに残す）
+# ---------------------------------------------------------------------------
+
+
+def _fake_gen(response: str, threshold: float = 0.4):
+    class FakeGen(AnswerGenerator):
+        def _call_llm(self, question, context):
+            return response
+    return FakeGen(threshold=threshold)
+
+
+def _doc():
+    return ScoredDocument(
+        document=Document(text="本文の根拠", source_path=Path("dummy.txt")), score=1.0
+    )
+
+
+def test_gate_reason_no_context():
+    gen = _fake_gen('{"answer": "x", "confidence": 0.9, "citation": "本文の根拠"}')
+    ans = gen.generate("質問", [])
+    assert ans.was_gated is True
+    assert ans.gate_reason == "no_context"
+
+
+def test_gate_reason_missing_text():
+    gen = _fake_gen('{"answer": "わかりません", "confidence": 0.1, "citation": ""}')
+    ans = gen.generate("質問", [_doc()])
+    assert ans.gate_reason == "missing_text"
+
+
+def test_gate_reason_confidence():
+    gen = _fake_gen('{"answer": "低確信の回答", "confidence": 0.1, "citation": "本文の根拠"}')
+    ans = gen.generate("質問", [_doc()])
+    assert ans.gate_reason == "confidence"
+
+
+def test_gate_reason_citation():
+    gen = _fake_gen('{"answer": "回答", "confidence": 0.9, "citation": "文書に存在しない一節"}')
+    ans = gen.generate("質問", [_doc()])
+    assert ans.gate_reason == "citation"
+
+
+def test_gate_reason_capability():
+    gen = _fake_gen('{"answer": "x", "confidence": 0.9, "citation": "本文の根拠"}')
+    ans = gen.generate("このグラフの色は何色ですか", [_doc()])  # image_or_graphタグ
+    assert ans.gate_reason == "capability"
+
+
+def test_gate_reason_empty_when_answered():
+    gen = _fake_gen('{"answer": "採用される回答", "confidence": 0.9, "citation": "本文の根拠"}')
+    ans = gen.generate("質問", [_doc()])
+    assert ans.was_gated is False
+    assert ans.gate_reason == ""

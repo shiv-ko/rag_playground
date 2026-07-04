@@ -406,6 +406,7 @@ def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
     result0 = payload["results"][0]
     assert "raw_answer" in result0
     assert "retrieved_sources" in result0
+    assert "gate_reason" in result0
     for source in result0["retrieved_sources"]:
         assert "::" in source
 
