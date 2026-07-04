@@ -39,7 +39,12 @@ def read_xml(zf: zipfile.ZipFile, name: str) -> ET.Element | None:
 
 
 def project_name(path: Path) -> str:
-    return path.relative_to(PROJECT_ROOT).parts[0]
+    try:
+        return path.relative_to(PROJECT_ROOT).parts[0]
+    except ValueError:
+        # リポジトリ外パス（テストのtmp_path等）向けフォールバック。
+        # 実データは常に <project>/03.データ/train.xlsx の構造を持つ。
+        return path.parent.parent.name
 
 
 def rel_target(base: str, target: str) -> str:
@@ -154,6 +159,25 @@ def sheet_map(zf: zipfile.ZipFile) -> list[dict[str, str]]:
     return sheets
 
 
+_REF_RE = re.compile(r"([A-Z]+)(\d+)")
+
+
+def col_letters_to_index(letters: str) -> int:
+    """'A'→0, 'B'→1, ... 'AA'→26"""
+    idx = 0
+    for ch in letters:
+        idx = idx * 26 + (ord(ch) - ord("A") + 1)
+    return idx - 1
+
+
+def split_ref(ref: str) -> tuple[int, int] | None:
+    """'B12' → (col_index=1, row=12)"""
+    m = _REF_RE.fullmatch(ref)
+    if not m:
+        return None
+    return col_letters_to_index(m.group(1)), int(m.group(2))
+
+
 def cell_value(cell: ET.Element, shared_strings: list[str]) -> Any:
     cell_type = cell.attrib.get("t")
     value_node = cell.find("main:v", NS)
@@ -178,10 +202,14 @@ def scan_sheet(
     shared_strings: list[str],
     fills: list[dict[str, Any]],
     style_fills: dict[int, int | None],
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     root = read_xml(zf, sheet["path"])
+    try:
+        source_path = str(workbook_path.relative_to(ROOT))
+    except ValueError:
+        source_path = str(workbook_path)
     meta = {
-        "source_path": str(workbook_path.relative_to(ROOT)),
+        "source_path": source_path,
         "project_name": project_name(workbook_path),
         "file_name": workbook_path.name,
         "sheet_name": sheet["name"],
@@ -194,9 +222,11 @@ def scan_sheet(
         "formula_count": 0,
         "styled_cell_count": 0,
         "colored_cell_count": 0,
+        "filter_columns": [],
+        "hidden_row_count": 0,
     }
     if root is None:
-        return meta, [], []
+        return meta, [], [], []
 
     dim = root.find("main:dimension", NS)
     meta["dimension"] = dim.attrib.get("ref") if dim is not None else None
@@ -204,6 +234,32 @@ def scan_sheet(
     meta["auto_filter_ref"] = auto_filter.attrib.get("ref") if auto_filter is not None else None
     meta["table_count"] = len(root.findall(".//main:tablePart", NS))
     meta["drawing_count"] = len(root.findall(".//main:drawing", NS))
+
+    filter_header_row = None
+    filter_start_col = 0
+    if auto_filter is not None:
+        ref = auto_filter.attrib.get("ref") or ""
+        m = re.match(r"([A-Z]+)(\d+):", ref)
+        if m:
+            filter_start_col = col_letters_to_index(m.group(1))  # A=0
+            filter_header_row = int(m.group(2))
+        for fc in auto_filter.findall("main:filterColumn", NS):
+            col_id = int(fc.attrib.get("colId", "0"))
+            values = [f.attrib.get("val") for f in fc.findall("main:filters/main:filter", NS)]
+            customs = [
+                {"operator": cf.attrib.get("operator", "equal"), "val": cf.attrib.get("val")}
+                for cf in fc.findall("main:customFilters/main:customFilter", NS)
+            ]
+            meta["filter_columns"].append(
+                {"col_id": col_id, "header": None, "values": values, "custom": customs}
+            )
+
+    header_values: dict[int, Any] = {}
+    small_cells: list[dict[str, Any]] = []
+    is_train_sheet = sheet["name"] == "train"
+    meta["hidden_row_count"] = sum(
+        1 for r in root.findall(".//main:row", NS) if r.attrib.get("hidden") == "1"
+    )
 
     formula_cells: list[dict[str, Any]] = []
     highlights: list[dict[str, Any]] = []
@@ -223,6 +279,21 @@ def scan_sheet(
         if value is None and formula is None and style_id is None:
             continue
         scanned_cell_count += 1
+        parsed = split_ref(ref)
+        if parsed is not None:
+            col_idx, row_num = parsed
+            if filter_header_row is not None and row_num == filter_header_row:
+                header_values[col_idx] = value
+            if not is_train_sheet and value is not None:
+                small_cells.append({
+                    "source_path": meta["source_path"],
+                    "project_name": meta["project_name"],
+                    "file_name": meta["file_name"],
+                    "sheet_name": meta["sheet_name"],
+                    "cell": ref,
+                    "row": row_num,
+                    "value": value,
+                })
         row = {
             "source_path": meta["source_path"],
             "project_name": meta["project_name"],
@@ -247,7 +318,11 @@ def scan_sheet(
             meta["colored_cell_count"] += 1
             highlights.append(row)
     meta["cell_count"] = scanned_cell_count
-    return meta, formula_cells, highlights
+    for fc in meta["filter_columns"]:
+        fc["header"] = header_values.get(filter_start_col + fc["col_id"])
+    if len(small_cells) > 5000:
+        small_cells = []  # 大きすぎるシートはダンプしない（コンテキスト用途外）
+    return meta, formula_cells, highlights, small_cells
 
 
 def target_workbooks() -> list[Path]:
@@ -262,6 +337,7 @@ def main() -> None:
     sheets_out: list[dict[str, Any]] = []
     formula_cells_out: list[dict[str, Any]] = []
     highlights_out: list[dict[str, Any]] = []
+    small_cells_out: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
 
     for path in target_workbooks():
@@ -272,22 +348,27 @@ def main() -> None:
                 fills = load_fills(zf)
                 style_fills = load_cell_style_fills(zf)
                 for sheet in sheet_map(zf):
-                    meta, formula_cells, highlights = scan_sheet(zf, path, sheet, shared_strings, fills, style_fills)
+                    meta, formula_cells, highlights, small_cells = scan_sheet(
+                        zf, path, sheet, shared_strings, fills, style_fills
+                    )
                     sheets_out.append(meta)
                     formula_cells_out.extend(formula_cells)
                     highlights_out.extend(highlights)
+                    small_cells_out.extend(small_cells)
         except Exception as exc:  # noqa: BLE001 - audit failures.
             failures.append({"source_path": str(path.relative_to(ROOT)), "error": repr(exc)})
 
     write_jsonl(ARTIFACTS / "train_xlsx_sheets.jsonl", sheets_out)
     write_jsonl(ARTIFACTS / "train_xlsx_formula_cells.jsonl", formula_cells_out)
     write_jsonl(ARTIFACTS / "train_xlsx_highlights.jsonl", highlights_out)
+    write_jsonl(ARTIFACTS / "train_xlsx_small_sheet_cells.jsonl", small_cells_out)
     write_jsonl(ARTIFACTS / "train_xlsx_failures.jsonl", failures)
 
     print(f"workbooks={len(target_workbooks())}")
     print(f"sheets={len(sheets_out)}")
     print(f"formula_cells={len(formula_cells_out)}")
     print(f"highlights={len(highlights_out)}")
+    print(f"small_sheet_cells={len(small_cells_out)}")
     print(f"failures={len(failures)}")
 
 
