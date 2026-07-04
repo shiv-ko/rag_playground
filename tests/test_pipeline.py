@@ -199,6 +199,46 @@ def test_pipeline_routes_office_style_question_through_structured_context(tmp_pa
     assert "太字の重要事項" in result.answer
 
 
+def test_pipeline_answers_single_office_style_match_without_llm_refusal(tmp_path: Path) -> None:
+    """office_styleはartifactで抽出済みの文字列を返せるため、LLM拒否でMissingにしない。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "office_marks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/提案書.pptx",
+            "project_name": "テスト社",
+            "file_name": "提案書.pptx",
+            "extension": ".pptx",
+            "slide_number": 7,
+            "text": "1. データ理解・EDA",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+            "font_color": "FFFFFF",
+            "fill_color": "A23B2C",
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+
+    def _boom(question, contexts):
+        raise AssertionError("office_styleの単一構造化抽出はLLMに委ねない")
+
+    pipeline.generator.generate = _boom
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="25",
+        question="テスト社の提案書P7において、赤で強調されている箇所の文字列を抜き出してください。",
+    ))
+
+    assert result.answer == "1. データ理解・EDA"
+
+
 def test_pipeline_routes_spreadsheet_calc_question_to_calc_answerer(tmp_path: Path) -> None:
     """spreadsheet_calcタグの質問はSpreadsheetCalcAnswererへ渡る。"""
     from src.orchestrator.pipeline import Pipeline, QAPair

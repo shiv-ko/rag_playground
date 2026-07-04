@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 import unicodedata
 from dataclasses import asdict, dataclass, field
@@ -174,7 +175,31 @@ class Pipeline:
         pool_size = self._structured_pool_size(used_tag, project_name)
         if not is_enumeration_complete(len(contexts), pool_size, "structured_attribute_filter"):
             return None
+        if used_tag == "office_style":
+            direct = self._direct_office_style_answer(contexts)
+            if direct is not None:
+                return direct
         return self.generator.generate(qa.question, contexts)
+
+    def _direct_office_style_answer(self, contexts: list[ScoredDocument]) -> Answer | None:
+        values = []
+        for context in contexts:
+            text = context.document.text
+            match = re.search(r"装飾箇所（[^）]+）:\s*(.+)$", text)
+            if not match:
+                return None
+            value = match.group(1).strip()
+            if value:
+                values.append(value)
+        if not values:
+            return None
+        return Answer(
+            text="、".join(values),
+            confidence=0.95,
+            source_docs=contexts,
+            was_gated=False,
+            raw_text="、".join(values),
+        )
 
     def _structured_pool_size(self, tag: str, project_name: str) -> int:
         if self.structured_store is None:
