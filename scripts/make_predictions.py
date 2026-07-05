@@ -5,6 +5,8 @@ import argparse
 import csv
 import json
 import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -13,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
+from src.orchestrator.answer_stabilizer import stabilize_answers
 from src.orchestrator.pipeline import Pipeline
 from src.utils.question_loader import load_questions_csv
 
@@ -25,9 +28,13 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--concurrent", type=int, default=5)
     parser.add_argument("--threshold", type=float, default=0.4)
+    parser.add_argument("--runs", type=int, default=1,
+                        help="提出用回答生成を複数回実行し、N>1なら正規化多数決で安定化する")
     parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
                         help="レジストリJSON・構造化artifactsのディレクトリ")
     args = parser.parse_args()
+    if args.runs < 1:
+        parser.error("--runs must be >= 1")
 
     qa_pairs = load_questions_csv(args.questions)
 
@@ -53,14 +60,51 @@ def main() -> None:
         artifacts_dir=args.artifacts_dir,
     )
     pipeline.build_index()
-    results = pipeline.run(qa_pairs)
+    if args.runs == 1:
+        results = pipeline.run(qa_pairs)
+
+        with args.out.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            for r in sorted(results, key=lambda r: int(r.question_id)):
+                writer.writerow([r.question_id, r.answer])
+
+        print(f"書き出し完了: {args.out} ({len(results)}件)")
+        return
+
+    sorted_runs = [
+        sorted(pipeline.run(qa_pairs), key=lambda r: int(r.question_id))
+        for _ in range(args.runs)
+    ]
+    question_ids = [r.question_id for r in sorted_runs[0]]
+    for run_results in sorted_runs[1:]:
+        run_question_ids = [r.question_id for r in run_results]
+        if run_question_ids != question_ids:
+            raise ValueError("question_id mismatch between runs")
+
+    decisions = stabilize_answers(
+        question_ids=question_ids,
+        per_run_answers=[[r.answer for r in run_results] for run_results in sorted_runs],
+    )
 
     with args.out.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        for r in sorted(results, key=lambda r: int(r.question_id)):
-            writer.writerow([r.question_id, r.answer])
+        for decision in decisions:
+            writer.writerow([decision.question_id, decision.chosen])
 
-    print(f"書き出し完了: {args.out} ({len(results)}件)")
+    experiments_dir = ROOT / "experiments"
+    experiments_dir.mkdir(exist_ok=True)
+    audit_path = experiments_dir / f"predictions_stability_{int(time.time())}.json"
+    audit_path.write_text(
+        json.dumps(
+            {"runs": args.runs, "decisions": [asdict(decision) for decision in decisions]},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    print(f"書き出し完了: {args.out} ({len(decisions)}件)")
+    print(f"安定化監査: {audit_path}")
 
 
 if __name__ == "__main__":
