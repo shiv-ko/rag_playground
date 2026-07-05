@@ -8,15 +8,30 @@ from __future__ import annotations
 import re
 import unicodedata
 from pathlib import Path
+from typing import Iterable
 
 # 空白・和文/欧文の区切り記号で切れる連続文字列＋既知拡張子。
 # 「::」はチャンクlocation区切りのため除外対象に含める。
-_FILE_BOUNDARY_CHARS = r"\s、。，「」『』（）()：:；;・？！?!*/\\のにでとはをがもや"
+# 助詞かな（の・に・で・と・は・を・が・も・や）は境界記号に含めない —
+# 「〜市場の未来予測.pdf」「見積もり一覧.xlsx」のようにファイル名内部に
+# これらの文字を含む実在ファイルが切り詰められ、既知basenameとの照合が
+# 常に失敗する問題を防ぐため。名指しファイルの主な照合は本モジュールの
+# find_named_files（既知basename集合との部分文字列照合）で行い、ゲートは
+# question_mentions_extension が担う。この正規表現ベースの抽出
+# （extract_file_names / matches_file_name）は現在src/から呼ばれていない
+# （境界推測ゆえ助詞かな直後のファイル名を取り逃すため、再利用しないこと）。
+_FILE_BOUNDARY_CHARS = r"\s、。，「」『』（）()：:；;・？！?!*/\\"
 _FILE_NAME_RE = re.compile(
     rf"[^{_FILE_BOUNDARY_CHARS}]+"
     r"\.(?:xlsx|xlsm|pptx|docx|pdf|csv|ipynb|txt|md)"
     rf"(?=$|[{_FILE_BOUNDARY_CHARS}])",
     re.IGNORECASE,
+)
+
+# 「質問文に既知拡張子のトークンが現れているか」を見るだけの軽量ゲート。
+# 境界文字に依存しないため、助詞かな直後でも拡張子トークンさえあれば検出できる。
+_EXTENSION_TOKEN_RE = re.compile(
+    r"\.(?:xlsx|xlsm|pptx|docx|pdf|csv|ipynb|txt|md)", re.IGNORECASE
 )
 
 
@@ -37,3 +52,59 @@ def matches_file_name(source: str | Path, file_names: list[str]) -> bool:
         return False
     basename = unicodedata.normalize("NFC", Path(str(source)).name)
     return basename in file_names
+
+
+def question_mentions_extension(question: str) -> bool:
+    """質問文に既知拡張子のトークン（.xlsx等）が含まれるかの軽量ゲート。
+    抽出精度は問わない（find_named_filesを呼ぶ価値があるかどうかの判定用）。"""
+    normalized = unicodedata.normalize("NFC", question)
+    return bool(_EXTENSION_TOKEN_RE.search(normalized))
+
+
+def find_named_files(question: str, known_names: Iterable[str | Path]) -> list[str]:
+    """質問文に部分文字列として出現する既知ファイル名(basename)を返す。
+
+    抽出ベースの matches_file_name/extract_file_names と異なり、境界文字に
+    依存しない: 既知のbasename集合を先に用意し、それぞれが質問文中に部分
+    文字列として現れるかどうかだけで判定するため、ファイル名内部に助詞かな
+    (の・に・で・と・は・を・が・も・や 等)を含んでいても切り詰められない。
+
+    複数の既知basenameが互いに部分文字列関係にある場合（例: 「一覧.xlsx」と
+    「見積もり一覧.xlsx」）は出現位置で判定する: 短い名前の出現がすべて
+    より長い一致名の出現区間の内側にあるなら内部一致とみなして除外し、
+    独立した出現が1つでもあれば残す。返り値はNFC正規化済みのbasenameで、
+    known_namesの出現順を保つ（重複basenameは最初の1件のみ）。
+    """
+    question_norm = unicodedata.normalize("NFC", question).casefold()
+
+    ordered_basenames: dict[str, str] = {}
+    for name in known_names:
+        basename_nfc = unicodedata.normalize("NFC", Path(str(name)).name)
+        key = basename_nfc.casefold()
+        if not key or key in ordered_basenames:
+            continue
+        ordered_basenames[key] = basename_nfc
+
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for key in ordered_basenames:
+        occurrences = [
+            (m.start(), m.end()) for m in re.finditer(re.escape(key), question_norm)
+        ]
+        if occurrences:
+            spans[key] = occurrences
+
+    kept_keys = []
+    for key, occurrences in spans.items():
+        longer_spans = [
+            span
+            for other, other_occurrences in spans.items()
+            if other != key and key in other
+            for span in other_occurrences
+        ]
+        has_independent_occurrence = any(
+            not any(o_start <= start and end <= o_end for o_start, o_end in longer_spans)
+            for start, end in occurrences
+        )
+        if has_independent_occurrence:
+            kept_keys.append(key)
+    return [ordered_basenames[key] for key in kept_keys]

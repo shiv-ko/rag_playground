@@ -8,7 +8,7 @@ from typing import Any
 
 from src.generator.color_names import nearest_basic_color_name
 from src.models import Document, ScoredDocument
-from src.retriever.question_file_scope import extract_file_names, matches_file_name
+from src.retriever.question_file_scope import find_named_files
 from src.structured.artifact_store import StructuredArtifactStore
 
 _STYLE_KEYWORD_MAP = {
@@ -224,12 +224,26 @@ def _render_filter_conditions(sheet: dict) -> str:
     return "\n".join(lines)
 
 
+# scripts/extract_spreadsheets.pyのnormalize_color()は彩度の高い標準色を、hexの
+# 代わりにこれらの名前文字列でdominant_row_fillへ格納することがある。
+_NAMED_COLOR_FAMILIES = {"yellow", "red", "blue", "orange", "green", "purple", "pink"}
+_NAMED_ACHROMATIC_COLORS = {"black", "white", "gray", "grey"}
+
+
 def _hex_color_family(hex_str: str) -> str:
-    """xlsxのfill色(RRGGBB/AARRGGBB)を色ファミリへ分類する。判定不能は空文字。
+    """xlsxのfill色(RRGGBB/AARRGGBB、または正規化済み色名)を色ファミリへ分類する。
+    判定不能は空文字。
 
     色相(hue)ベースの一般則のみ。特定の答えに合わせた個別色コードは書かない。
     """
-    token = str(hex_str or "").strip().lstrip("#")
+    token_raw = str(hex_str or "").strip()
+    token_lower = token_raw.lower()
+    if token_lower in _NAMED_COLOR_FAMILIES:
+        return token_lower
+    if token_lower in _NAMED_ACHROMATIC_COLORS:
+        return "achromatic"
+
+    token = token_raw.lstrip("#")
     if len(token) == 8:
         token = token[2:]
     if len(token) != 6:
@@ -252,7 +266,7 @@ def _hex_color_family(hex_str: str) -> str:
 
     if hue < 15 or hue >= 345:
         return "red"
-    if hue < 45:
+    if hue < 40:
         return "orange"
     if hue < 70:
         return "yellow"
@@ -268,31 +282,38 @@ def _hex_color_family(hex_str: str) -> str:
 def _schedule_highlight_docs(question: str, rows: list[dict]) -> list[ScoredDocument]:
     """schedule_tasks.jsonlの行データから、質問の色・ファイル名指定に合う
     ハイライト行のコンテキストを作る。"""
+    # 色キーワード照合・ファイル名照合の双方に一貫してNFCを渡す
+    # （NFD質問だと色キーワード照合が生の文字列比較のため無音で失敗するため）。
+    question = unicodedata.normalize("NFC", question)
     candidates = [r for r in rows if r.get("dominant_row_fill")]
     if not candidates:
         return []
 
-    file_names = extract_file_names(question)
-    if file_names:
+    known_names = [r.get("source_path") or r.get("file_name") or "" for r in candidates]
+    matched_basenames = set(find_named_files(question, known_names))
+    if matched_basenames:
         narrowed = [
             r for r in candidates
-            if matches_file_name(r.get("source_path") or r.get("file_name") or "", file_names)
+            if unicodedata.normalize(
+                "NFC", Path(str(r.get("source_path") or r.get("file_name") or "")).name
+            ) in matched_basenames
         ]
         if narrowed:
             candidates = narrowed
 
+    # (row, family) を1回だけ算出して以降で使い回す（フィルタ判定とラベル生成の
+    # 二重計算を避ける）。
+    rows_with_family = [
+        (r, _hex_color_family(str(r.get("dominant_row_fill")))) for r in candidates
+    ]
     color_names = _requested_color_names(question)
     if color_names:
-        candidates = [
-            r for r in candidates
-            if _hex_color_family(str(r.get("dominant_row_fill"))) in color_names
-        ]
+        rows_with_family = [(r, family) for r, family in rows_with_family if family in color_names]
 
     docs: list[ScoredDocument] = []
-    for r in candidates:
+    for r, family in rows_with_family:
         values = r.get("values") or {}
         value_desc = ", ".join(f"{k}={v}" for k, v in values.items() if v not in (None, ""))
-        family = _hex_color_family(str(r.get("dominant_row_fill")))
         color_label = _COLOR_LABELS.get(family, family or "不明")
         text = "\n".join([
             f"ファイル: {r.get('file_name')} / シート: {r.get('sheet_name')} / 行: {r.get('row_number')}",
@@ -591,7 +612,18 @@ def build_spreadsheet_state_context(
             )
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
-    return docs
+    # _schedule_highlight_docs（ハイライト経路）と上の値マッチ経路が同一スケジュール行を
+    # 同一locationで二重に出力しうるため、最初の出現を残してdedupする
+    # （ハイライト版が先に追加されるため、情報の濃い方が残る）。
+    seen_keys: set[tuple[str, str]] = set()
+    deduped: list[ScoredDocument] = []
+    for doc in docs:
+        key = (str(doc.document.source_path), doc.document.location)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(doc)
+    return deduped
 
 
 def _version_diff_tag_matches(tag: str | None, question_lower: str) -> bool:

@@ -600,6 +600,36 @@ def test_hex_color_family_classifies_hue_buckets() -> None:
     assert _hex_color_family("THEME:1") == ""
 
 
+def test_hex_color_family_orange_yellow_hue_boundary_at_40() -> None:
+    """Excel標準の薄い黄色FFF2CC(hue≈44.7°)は彩度が低くhueがorange側(旧閾値45°)に
+    寄るため、閾値を40°に下げてyellowへ正しく分類する（実測: 「黄色にハイライト」
+    質問がFFF2CC系の淡色セルで全滅していたバグの修正）。"""
+    from src.retriever.structured_context import _hex_color_family
+
+    assert _hex_color_family("FFF2CC") == "yellow"
+    assert _hex_color_family("FFD700") == "yellow"
+    # 濃い橙(hue≈39°)は引き続きorangeのまま
+    assert _hex_color_family("FFA500") == "orange"
+    assert _hex_color_family("F2E0D0") == "orange"
+
+
+def test_hex_color_family_accepts_normalized_color_names() -> None:
+    """scripts/extract_spreadsheets.pyのnormalize_color()は彩度の高い標準色を
+    "yellow"/"red"等の名前文字列に変換してdominant_row_fillへ格納することがある。
+    hexパースの前にこれらの名前を素通しし、achromatic系(black/white/gray/grey)は
+    "achromatic"へ正規化する。"""
+    from src.retriever.structured_context import _hex_color_family
+
+    assert _hex_color_family("yellow") == "yellow"
+    assert _hex_color_family("YELLOW") == "yellow"
+    assert _hex_color_family("red") == "red"
+    assert _hex_color_family("orange") == "orange"
+    assert _hex_color_family("white") == "achromatic"
+    assert _hex_color_family("black") == "achromatic"
+    assert _hex_color_family("gray") == "achromatic"
+    assert _hex_color_family("grey") == "achromatic"
+
+
 def _schedule_rows() -> list[dict]:
     def row(file_name: str, row_number: int, fill: str | None, task: str) -> dict:
         return {
@@ -654,6 +684,54 @@ def test_schedule_highlight_docs_keeps_rows_when_named_file_absent() -> None:
     assert len(docs) == 3
 
 
+def _schedule_rows_with_particle_kana_name() -> list[dict]:
+    def row(file_name: str, row_number: int, fill: str | None, task: str) -> dict:
+        return {
+            "source_path": f"data/x/02.見積/{file_name}",
+            "file_name": file_name,
+            "sheet_name": "工程",
+            "row_number": row_number,
+            "dominant_row_fill": fill,
+            "values": {"タスクID": f"T{row_number}", "タスク名": task, "担当者": "架空 太郎"},
+        }
+
+    return [
+        row("見積もり一覧.xlsx", 2, "F2E0D0", "要件整理"),
+        row("見積もり一覧.xlsx", 3, None, "設計"),
+        row("一覧.xlsx", 2, "F2E0D0", "旧版タスク"),
+    ]
+
+
+def test_schedule_highlight_docs_matches_file_name_containing_particle_kana() -> None:
+    """ファイル名内部に助詞かなを含む合成名（見積もり一覧.xlsx）でも
+    find_named_files経由の照合で名指し絞り込みが発火する回帰テスト。"""
+    from src.retriever.structured_context import _schedule_highlight_docs
+
+    docs = _schedule_highlight_docs(
+        "見積もり一覧.xlsxにおいて、オレンジにハイライトされている行のタスク名を教えてください。",
+        _schedule_rows_with_particle_kana_name(),
+    )
+    texts = [d.document.text for d in docs]
+    assert len(docs) == 1
+    assert any("要件整理" in t for t in texts)
+    assert not any("旧版タスク" in t for t in texts)
+
+
+def test_schedule_highlight_docs_nfd_question_matches_color_filter() -> None:
+    """_schedule_highlight_docs冒頭でquestionをNFC正規化してから色キーワード照合に
+    渡す（修正5）。NFD正規化された質問でも色フィルタが機能することを確認する。"""
+    import unicodedata
+
+    from src.retriever.structured_context import _schedule_highlight_docs
+
+    question_nfd = unicodedata.normalize("NFD", "工程_r2.xlsxにおいて、オレンジにハイライトされている行のタスク名は？")
+    docs = _schedule_highlight_docs(question_nfd, _schedule_rows())
+    texts = [d.document.text for d in docs]
+    assert len(docs) == 2
+    assert any("要件整理" in t for t in texts)
+    assert any("受入確認" in t for t in texts)
+
+
 def test_spreadsheet_state_context_includes_schedule_highlights() -> None:
     store = _full_store(schedule_tasks={"A社": [
         {
@@ -669,6 +747,29 @@ def test_spreadsheet_state_context_includes_schedule_highlights() -> None:
         "工程_r2.xlsxにおいて、オレンジにハイライトされている行のタスク名は？", "A社", store
     )
     assert any("要件整理" in d.document.text for d in docs)
+
+
+def test_spreadsheet_state_context_dedups_schedule_row_appearing_in_both_paths() -> None:
+    """_schedule_highlight_docs（ハイライト経路）と既存の値マッチ経路（担当者名一致等）が
+    同一スケジュール行を同一locationで二重に出力しうる問題の回帰テスト。
+    「ハイライト」語と担当者名の両方を含む質問で、同一行のdocは1件だけになる。"""
+    store = _full_store(schedule_tasks={"A社": [
+        {
+            "source_path": "data/x/02.計画/工程_r2.xlsx",
+            "file_name": "工程_r2.xlsx",
+            "sheet_name": "工程",
+            "row_number": 2,
+            "dominant_row_fill": "F2E0D0",
+            "values": {"タスク名": "要件整理", "担当者": "架空 太郎"},
+        },
+    ]})
+    docs = build_spreadsheet_state_context(
+        "架空 太郎さんが担当していて、ハイライトされている行のタスク名は？", "A社", store
+    )
+    keys = [(str(d.document.source_path), d.document.location) for d in docs]
+    assert len(keys) == len(set(keys))
+    assert len(docs) == 1
+    assert "要件整理" in docs[0].document.text
 
 
 def test_spreadsheet_state_context_train_xlsx_path_unchanged() -> None:

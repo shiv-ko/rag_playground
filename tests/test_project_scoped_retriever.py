@@ -42,3 +42,16 @@ def test_search_falls_back_when_named_file_has_no_chunks():
     ])
     results = retriever.search("A社の存在しない.xlsxのスケジュールは？", top_k=5)
     assert len(results) == 1
+
+
+def test_search_prioritizes_file_name_containing_particle_kana():
+    """ファイル名の内部に助詞かな（もり等）を含む合成ファイル名でも、
+    known basenameとの部分文字列照合（find_named_files経由）で名指し優先が発火する
+    ことを確認する回帰テスト（旧実装は助詞かなを境界文字として扱い切り詰めていた）。"""
+    retriever = ProjectScopedRetriever()
+    retriever.add([
+        _doc("スケジュール タスク 進捗 管理 一覧", "data/A社/02.見積/一覧.xlsx"),
+        _doc("スケジュール タスク 進捗 担当 記録", "data/A社/02.見積/見積もり一覧.xlsx"),
+    ])
+    results = retriever.search("A社の見積もり一覧.xlsxのスケジュールでタスクの進捗は？", top_k=1)
+    assert results[0].document.source_path.name == "見積もり一覧.xlsx"
