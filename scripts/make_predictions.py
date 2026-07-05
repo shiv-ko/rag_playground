@@ -15,9 +15,16 @@ sys.path.insert(0, str(ROOT))
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
-from src.orchestrator.answer_stabilizer import stabilize_answers
+from src.orchestrator.answer_stabilizer import align_run_answers, stabilize_answers
 from src.orchestrator.pipeline import Pipeline
 from src.utils.question_loader import load_questions_csv
+
+
+def write_predictions(path: Path, rows: list[tuple[str, str]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        for question_id, answer in rows:
+            writer.writerow([question_id, answer])
 
 
 def main() -> None:
@@ -63,48 +70,53 @@ def main() -> None:
     if args.runs == 1:
         results = pipeline.run(qa_pairs)
 
-        with args.out.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            for r in sorted(results, key=lambda r: int(r.question_id)):
-                writer.writerow([r.question_id, r.answer])
+        write_predictions(
+            args.out,
+            [(r.question_id, r.answer) for r in sorted(results, key=lambda r: int(r.question_id))],
+        )
 
         print(f"書き出し完了: {args.out} ({len(results)}件)")
         return
 
-    sorted_runs = [
-        sorted(pipeline.run(qa_pairs), key=lambda r: int(r.question_id))
+    # pipeline.runは例外を起こした質問を黙って落とすため、質問リスト由来のIDを正とし
+    # runごとの欠落はMissing票として補完する（1問の一時エラーで全runを捨てない）
+    question_ids = sorted((qa.question_id for qa in qa_pairs), key=int)
+    per_run_maps = [
+        {r.question_id: r.answer for r in pipeline.run(qa_pairs)}
         for _ in range(args.runs)
     ]
-    question_ids = [r.question_id for r in sorted_runs[0]]
-    for run_results in sorted_runs[1:]:
-        run_question_ids = [r.question_id for r in run_results]
-        if run_question_ids != question_ids:
-            raise ValueError("question_id mismatch between runs")
+    per_run_answers, dropped = align_run_answers(question_ids, per_run_maps)
+    for run_index, missing_ids in enumerate(dropped):
+        if missing_ids:
+            print(f"警告: run {run_index} で回答が得られなかった質問をMissing票として補完: {missing_ids}")
 
     decisions = stabilize_answers(
         question_ids=question_ids,
-        per_run_answers=[[r.answer for r in run_results] for run_results in sorted_runs],
+        per_run_answers=per_run_answers,
     )
 
-    with args.out.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        for decision in decisions:
-            writer.writerow([decision.question_id, decision.chosen])
-
-    experiments_dir = ROOT / "experiments"
-    experiments_dir.mkdir(exist_ok=True)
-    audit_path = experiments_dir / f"predictions_stability_{int(time.time())}.json"
-    audit_path.write_text(
-        json.dumps(
-            {"runs": args.runs, "decisions": [asdict(decision) for decision in decisions]},
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
+    write_predictions(args.out, [(d.question_id, d.chosen) for d in decisions])
     print(f"書き出し完了: {args.out} ({len(decisions)}件)")
-    print(f"安定化監査: {audit_path}")
+
+    # 監査ファイルは証跡であり提出物ではないので、書き込み失敗でCSV生成を失敗扱いにしない
+    audit_path = ROOT / "experiments" / f"predictions_stability_{int(time.time())}.json"
+    try:
+        audit_path.parent.mkdir(exist_ok=True)
+        audit_path.write_text(
+            json.dumps(
+                {
+                    "runs": args.runs,
+                    "dropped_question_ids_per_run": dropped,
+                    "decisions": [asdict(decision) for decision in decisions],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"安定化監査: {audit_path}")
+    except OSError as e:
+        print(f"警告: 監査ファイルの書き込みに失敗（predictions.csvは正常）: {e}")
 
 
 if __name__ == "__main__":
