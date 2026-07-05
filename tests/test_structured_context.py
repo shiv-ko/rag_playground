@@ -583,3 +583,72 @@ class TestVersionDiffContext:
             "テスト案件", store,
         )
         assert docs == []
+
+
+def test_hex_color_family_classifies_hue_buckets() -> None:
+    from src.retriever.structured_context import _hex_color_family
+
+    assert _hex_color_family("F2E0D0") == "orange"
+    assert _hex_color_family("B4C6E7") == "blue"
+    assert _hex_color_family("E2EFDA") == "green"
+    assert _hex_color_family("FFFF00") == "yellow"
+    assert _hex_color_family("FF0000") == "red"
+    assert _hex_color_family("FFFFFF") == "achromatic"
+    assert _hex_color_family("808080") == "achromatic"
+    assert _hex_color_family("00FFFF00") == "yellow"
+    assert _hex_color_family("") == ""
+    assert _hex_color_family("THEME:1") == ""
+
+
+def _schedule_rows() -> list[dict]:
+    def row(file_name: str, row_number: int, fill: str | None, task: str) -> dict:
+        return {
+            "source_path": f"data/x/02.計画/{file_name}",
+            "file_name": file_name,
+            "sheet_name": "工程",
+            "row_number": row_number,
+            "dominant_row_fill": fill,
+            "values": {"タスクID": f"T{row_number}", "タスク名": task, "担当者": "架空 太郎"},
+        }
+
+    return [
+        row("工程_r2.xlsx", 2, "F2E0D0", "要件整理"),
+        row("工程_r2.xlsx", 3, None, "設計"),
+        row("工程_r2.xlsx", 4, "F2E0D0", "受入確認"),
+        row("工程_r2.xlsx", 5, "B4C6E7", "移行リハーサル"),
+        row("工程.xlsx", 2, "F2E0D0", "旧版タスク"),
+    ]
+
+
+def test_schedule_highlight_docs_filters_by_named_file_and_color() -> None:
+    from src.retriever.structured_context import _schedule_highlight_docs
+
+    docs = _schedule_highlight_docs(
+        "工程_r2.xlsxにおいて、オレンジにハイライトされている行のタスク名をすべて答えてください。",
+        _schedule_rows(),
+    )
+    texts = [d.document.text for d in docs]
+    assert len(docs) == 2
+    assert any("要件整理" in t for t in texts)
+    assert any("受入確認" in t for t in texts)
+    assert not any("旧版タスク" in t for t in texts)
+    assert not any("移行リハーサル" in t for t in texts)
+    assert not any("設計" in t for t in texts)
+
+
+def test_schedule_highlight_docs_without_color_returns_all_filled_rows() -> None:
+    from src.retriever.structured_context import _schedule_highlight_docs
+
+    docs = _schedule_highlight_docs(
+        "工程_r2.xlsxでハイライトされている行は？", _schedule_rows()
+    )
+    assert len(docs) == 3
+
+
+def test_schedule_highlight_docs_keeps_rows_when_named_file_absent() -> None:
+    from src.retriever.structured_context import _schedule_highlight_docs
+
+    docs = _schedule_highlight_docs(
+        "不在.xlsxでオレンジにハイライトされている行は？", _schedule_rows()
+    )
+    assert len(docs) == 3

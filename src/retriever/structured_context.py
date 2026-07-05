@@ -8,6 +8,7 @@ from typing import Any
 
 from src.generator.color_names import nearest_basic_color_name
 from src.models import Document, ScoredDocument
+from src.retriever.question_file_scope import extract_file_names, matches_file_name
 from src.structured.artifact_store import StructuredArtifactStore
 
 _STYLE_KEYWORD_MAP = {
@@ -221,6 +222,95 @@ def _render_filter_conditions(sheet: dict) -> str:
         for cf in fc.get("custom") or []:
             lines.append(f"  - {name} {cf.get('operator')} {cf.get('val')}")
     return "\n".join(lines)
+
+
+def _hex_color_family(hex_str: str) -> str:
+    """xlsxのfill色(RRGGBB/AARRGGBB)を色ファミリへ分類する。判定不能は空文字。
+
+    色相(hue)ベースの一般則のみ。特定の答えに合わせた個別色コードは書かない。
+    """
+    token = str(hex_str or "").strip().lstrip("#")
+    if len(token) == 8:
+        token = token[2:]
+    if len(token) != 6:
+        return ""
+    try:
+        r, g, b = (int(token[i : i + 2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return ""
+
+    mx, mn = max(r, g, b), min(r, g, b)
+    if mx - mn < 12:
+        return "achromatic"
+    delta = mx - mn
+    if mx == r:
+        hue = (60 * ((g - b) / delta)) % 360
+    elif mx == g:
+        hue = 60 * ((b - r) / delta) + 120
+    else:
+        hue = 60 * ((r - g) / delta) + 240
+
+    if hue < 15 or hue >= 345:
+        return "red"
+    if hue < 45:
+        return "orange"
+    if hue < 70:
+        return "yellow"
+    if hue < 170:
+        return "green"
+    if hue < 255:
+        return "blue"
+    if hue < 290:
+        return "purple"
+    return "pink"
+
+
+def _schedule_highlight_docs(question: str, rows: list[dict]) -> list[ScoredDocument]:
+    """schedule_tasks.jsonlの行データから、質問の色・ファイル名指定に合う
+    ハイライト行のコンテキストを作る。"""
+    candidates = [r for r in rows if r.get("dominant_row_fill")]
+    if not candidates:
+        return []
+
+    file_names = extract_file_names(question)
+    if file_names:
+        narrowed = [
+            r for r in candidates
+            if matches_file_name(r.get("source_path") or r.get("file_name") or "", file_names)
+        ]
+        if narrowed:
+            candidates = narrowed
+
+    color_names = _requested_color_names(question)
+    if color_names:
+        candidates = [
+            r for r in candidates
+            if _hex_color_family(str(r.get("dominant_row_fill"))) in color_names
+        ]
+
+    docs: list[ScoredDocument] = []
+    for r in candidates:
+        values = r.get("values") or {}
+        value_desc = ", ".join(f"{k}={v}" for k, v in values.items() if v not in (None, ""))
+        family = _hex_color_family(str(r.get("dominant_row_fill")))
+        color_label = _COLOR_LABELS.get(family, family or "不明")
+        text = "\n".join([
+            f"ファイル: {r.get('file_name')} / シート: {r.get('sheet_name')} / 行: {r.get('row_number')}",
+            f"行のハイライト色: {color_label}（fill={r.get('dominant_row_fill')}）",
+            f"行の値: {value_desc}",
+        ])
+        docs.append(
+            ScoredDocument(
+                document=Document(
+                    text=text,
+                    source_path=Path(str(r.get("source_path") or r.get("file_name") or "")),
+                    location=f"sheet_{r.get('sheet_name')}_row_{r.get('row_number')}",
+                ),
+                score=1.0,
+                retrieval_method="structured_spreadsheet_state",
+            )
+        )
+    return docs
 
 
 _SUPERLATIVE_MAX = ("最も高い", "最も多い", "最大")
