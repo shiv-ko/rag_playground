@@ -652,3 +652,41 @@ def test_schedule_highlight_docs_keeps_rows_when_named_file_absent() -> None:
         "不在.xlsxでオレンジにハイライトされている行は？", _schedule_rows()
     )
     assert len(docs) == 3
+
+
+def test_spreadsheet_state_context_includes_schedule_highlights() -> None:
+    store = _full_store(schedule_tasks={"A社": [
+        {
+            "source_path": "data/x/02.計画/工程_r2.xlsx",
+            "file_name": "工程_r2.xlsx",
+            "sheet_name": "工程",
+            "row_number": 2,
+            "dominant_row_fill": "F2E0D0",
+            "values": {"タスク名": "要件整理"},
+        },
+    ]})
+    docs = build_spreadsheet_state_context(
+        "工程_r2.xlsxにおいて、オレンジにハイライトされている行のタスク名は？", "A社", store
+    )
+    assert any("要件整理" in d.document.text for d in docs)
+
+
+def test_spreadsheet_state_context_train_xlsx_path_unchanged() -> None:
+    store = _full_store(
+        train_xlsx_highlight_blocks={"A社": [
+            {
+                "source_path": "data/x/03.データ/train.xlsx",
+                "sheet_name": "Sheet1",
+                "range": "B2:B4",
+                "fill_color_name": "FFFF00",
+                "first_value": "42",
+                "column_header": {"value": "件数", "cell": "B1"},
+                "same_row_values": [],
+            },
+        ]},
+        schedule_tasks={"A社": []},
+    )
+    docs = build_spreadsheet_state_context(
+        "train.xlsxでハイライトされているセルの値は？", "A社", store
+    )
+    assert any("ハイライト範囲" in d.document.text for d in docs)

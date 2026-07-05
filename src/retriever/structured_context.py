@@ -531,6 +531,7 @@ def build_spreadsheet_state_context(
                 location=f"sheet_{block.get('sheet_name')}",
             )
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
+        docs.extend(_schedule_highlight_docs(question, store.schedule_tasks_for(project_name)))
 
     if _requests_filter_condition(question):
         # train.xlsx（XML直読み系）のフィルタ条件 — 条件そのものが取れるので最優先
