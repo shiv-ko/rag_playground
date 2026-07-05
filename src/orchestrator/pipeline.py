@@ -74,12 +74,15 @@ class Pipeline:
         term_registry: list[dict] | None = None,
         artifacts_dir: Path | None = None,
         cache_dir: Path | None = None,
+        exclude_dirs: list[Path] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.max_concurrent = max_concurrent
         self.top_k = top_k
         self.run_judge = run_judge
         self.cache_dir = cache_dir
+        # 評価用質問CSVのディレクトリ等、コーパスに含めてはいけない場所
+        self.exclude_dirs = exclude_dirs
         self.logger = setup_logging()
 
         self.dispatcher = ParserDispatcher()
@@ -100,9 +103,9 @@ class Pipeline:
         self.logger.info(f"インデックス構築開始: {self.data_dir}")
         if self.cache_dir is not None:
             from src.utils.parse_cache import load_or_parse
-            docs = load_or_parse(self.data_dir, self.cache_dir)
+            docs = load_or_parse(self.data_dir, self.cache_dir, exclude_dirs=self.exclude_dirs)
         else:
-            docs = self.dispatcher.parse_directory(self.data_dir)
+            docs = self.dispatcher.parse_directory(self.data_dir, exclude_dirs=self.exclude_dirs)
         self.logger.info(f"  {len(docs)} チャンク取得")
         self.retriever.add(docs)
         self.logger.info("インデックス構築完了")

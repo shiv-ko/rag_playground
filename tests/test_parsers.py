@@ -356,3 +356,40 @@ class TestDispatcherHandlesNotebook:
         dispatcher = ParserDispatcher()
         docs = dispatcher.parse(f)
         assert any("EDAメモ" in d.text for d in docs)
+
+
+def test_parse_directory_excludes_dirs(tmp_path):
+    from src.parsers.dispatcher import ParserDispatcher
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("コーパス文書", encoding="utf-8")
+    qa_dir = data_dir / "質問回答"
+    qa_dir.mkdir()
+    (qa_dir / "questions_valid.csv").write_text(
+        "index,question,answer\n0,テスト質問,テスト正解\n", encoding="utf-8"
+    )
+    docs = ParserDispatcher().parse_directory(data_dir, exclude_dirs=[qa_dir])
+    assert any("コーパス文書" in d.text for d in docs)
+    assert not any("questions_valid" in str(d.source_path) for d in docs)
+
+
+def test_parse_directory_excludes_nfd_dir_with_nfc_argument(tmp_path):
+    # macOS/zip展開由来のNFDディレクトリ名を、NFCで指定したexclude_dirsで除外できること
+    # （_extract_metadataと同じNFC事故パターンの回帰テスト）
+    import unicodedata
+    from src.parsers.dispatcher import ParserDispatcher
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("コーパス文書", encoding="utf-8")
+    nfd_name = unicodedata.normalize("NFD", "データ質問")
+    qa_dir = data_dir / nfd_name
+    qa_dir.mkdir()
+    (qa_dir / "questions_valid.csv").write_text(
+        "index,question,answer\n0,テスト質問,テスト正解\n", encoding="utf-8"
+    )
+    nfc_dir = data_dir / unicodedata.normalize("NFC", "データ質問")
+    docs = ParserDispatcher().parse_directory(data_dir, exclude_dirs=[nfc_dir])
+    assert any("コーパス文書" in d.text for d in docs)
+    assert not any("questions_valid" in str(d.source_path) for d in docs)

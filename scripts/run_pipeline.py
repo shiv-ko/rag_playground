@@ -76,6 +76,9 @@ def main() -> None:
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
         cache_dir=None if args.no_cache else ROOT / ".cache",
+        # 質問CSVの置き場（質問回答/）はコーパスから除外する — valid CSVは正解列を
+        # 含むため、取り込むと検索経由の正解リークになる（20260705の事故）
+        exclude_dirs=[args.questions.parent],
     )
 
     pipeline.build_index()

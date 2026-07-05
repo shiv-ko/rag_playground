@@ -65,6 +65,8 @@ def main() -> None:
         project_aliases=project_aliases,
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
+        # 質問CSVの置き場（質問回答/）はコーパスから除外する（run_pipeline.pyと同一規則）
+        exclude_dirs=[args.questions.parent],
     )
     pipeline.build_index()
     if args.runs == 1:
