@@ -685,3 +685,29 @@ def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
     assert "generator_tokens" in summary
     assert "judge_tokens" in summary
     assert "models" in summary
+
+def test_save_results_without_judge_does_not_crash(tmp_path: Path) -> None:
+    """run_judge=False（--no-judge診断run）でもsave_resultsが落ちず、診断フィールドは保存される。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=data_dir, run_judge=False)
+    pipeline.generator._call_llm = (
+        lambda q, c: '{"answer": "15,000円", "confidence": 0.9, "reasoning": "r"}'
+    )
+    pipeline.build_index()
+
+    results = pipeline.run([QAPair(question_id="0", question="宿泊費の上限は？")])
+
+    out_dir = tmp_path / "out"
+    pipeline.save_results(results, out_dir, run_name="nojudge")
+
+    payload = json.loads(next(out_dir.glob("nojudge_*.json")).read_text(encoding="utf-8"))
+    assert payload["summary"]["mean_score"] is None
+    assert payload["summary"]["total"] == 1
+    result0 = payload["results"][0]
+    assert "gate_reason" in result0
+    assert "retrieved_sources" in result0

@@ -333,18 +333,23 @@ class Pipeline:
         ts = int(time.time())
         out_path = out_dir / f"{run_name}_{ts}.json"
 
-        judge_results = []
         from src.models import CRAGLabel, JudgeResult
-        for r in results:
-            judge_results.append(JudgeResult(label=CRAGLabel(r.judge_label), reason=r.judge_reason))
-
-        summary: EvalSummary = summarize(judge_results)
+        # run_judge=False（診断run）ではjudge_labelが空なのでスコア集計をスキップする
+        judged = [r for r in results if r.judge_label]
+        if judged:
+            judge_results = [
+                JudgeResult(label=CRAGLabel(r.judge_label), reason=r.judge_reason)
+                for r in judged
+            ]
+            summary: EvalSummary | None = summarize(judge_results)
+        else:
+            summary = None
 
         payload = {
             "summary": {
-                "mean_score": summary.mean_score,
-                "total": summary.total,
-                "label_counts": summary.label_counts,
+                "mean_score": summary.mean_score if summary else None,
+                "total": summary.total if summary else len(results),
+                "label_counts": summary.label_counts if summary else {},
                 "elapsed_seconds": round(getattr(self, "last_elapsed", 0.0), 1),
                 "generator_tokens": {
                     "input": self.generator.input_tokens,
@@ -363,4 +368,5 @@ class Pipeline:
         }
         out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         self.logger.info(f"結果保存: {out_path}")
-        self.logger.info("\n" + summary.report())
+        if summary:
+            self.logger.info("\n" + summary.report())

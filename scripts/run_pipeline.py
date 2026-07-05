@@ -31,6 +31,8 @@ def main() -> None:
     parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
                         help="レジストリJSONのディレクトリ")
     parser.add_argument("--no-cache", action="store_true", help="パース結果キャッシュを使わない")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="judgeを実行しない（GTのないtest質問の診断run用。gate_reason等は保存される）")
     args = parser.parse_args()
 
     logger = setup_logging()
@@ -69,6 +71,7 @@ def main() -> None:
         max_concurrent=args.concurrent,
         top_k=args.top_k,
         confidence_threshold=args.threshold,
+        run_judge=not args.no_judge,
         project_aliases=project_aliases,
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
