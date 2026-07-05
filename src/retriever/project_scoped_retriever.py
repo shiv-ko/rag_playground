@@ -10,6 +10,7 @@ import unicodedata
 
 from src.indexer.keyword_store import KeywordStore
 from src.models import Document, ScoredDocument
+from src.retriever.question_file_scope import extract_file_names, matches_file_name
 
 _CORPORATE_AFFIXES = ("株式会社", "医療法人社団", "有限会社", "合同会社")
 
@@ -77,6 +78,16 @@ class ProjectScopedRetriever:
 
     def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
         project = self.detect_project(query)
-        if project is not None:
-            return self._project_stores[project].search(query, top_k)
-        return self._global_store.search(query, top_k)
+        store = self._project_stores[project] if project is not None else self._global_store
+        file_names = extract_file_names(query)
+        if not file_names:
+            return store.search(query, top_k)
+
+        # 名指しファイルのチャンクを優先する。候補を広めに取り、一致分を先頭に
+        # 安定ソート（一致ゼロなら従来結果と同一 — ハードフィルタにしない）
+        candidates = store.search(query, top_k * 4)
+        matched = [c for c in candidates if matches_file_name(c.document.source_path, file_names)]
+        if not matched:
+            return candidates[:top_k]
+        others = [c for c in candidates if not matches_file_name(c.document.source_path, file_names)]
+        return (matched + others)[:top_k]
