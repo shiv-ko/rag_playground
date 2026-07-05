@@ -9,8 +9,13 @@ from dataclasses import dataclass
 from src.generator.confidence_gate import MISSING_RESPONSE
 
 _MISSING_KEY = "\x00missing"
-_REMOVE_CHARS = "、。，,．.・:：;；()（）「」¥￥＄$"
+_REMOVE_CHARS = "、。，,．.・:：;；()（）「」"
 _REMOVE_TRANS = str.maketrans("", "", _REMOVE_CHARS)
+# 通貨表記は数字に隣接する場合のみ正規化する（「円グラフ」等の語中の単位語は保持）。
+# JPYは既定通貨として無印に寄せ、ドルは「<数字>ドル」の形へ寄せて通貨の区別を保つ。
+_YEN_PREFIX = re.compile(r"[¥￥](?=\d)")
+_YEN_SUFFIX = re.compile(r"(?<=\d)(円|jpy)")
+_DOLLAR_PREFIX = re.compile(r"[＄$](\d+)")
 
 
 @dataclass(frozen=True)
@@ -29,8 +34,9 @@ def normalize_answer(text: str) -> str:
     normalized = unicodedata.normalize("NFC", text).casefold()
     normalized = re.sub(r"\s+", "", normalized)
     normalized = normalized.translate(_REMOVE_TRANS)
-    for unit in ("円", "ドル", "jpy"):
-        normalized = normalized.replace(unit, "")
+    normalized = _DOLLAR_PREFIX.sub(r"\1ドル", normalized)
+    normalized = _YEN_PREFIX.sub("", normalized)
+    normalized = _YEN_SUFFIX.sub("", normalized)
     return normalized
 
 
@@ -40,7 +46,7 @@ def stabilize_answers(
 ) -> list[StabilizationDecision]:
     """runごとの回答列を質問単位で多数決し、採用回答を返す。"""
     if not per_run_answers:
-        return []
+        raise ValueError("per_run_answers must contain at least one run")
     expected_count = len(question_ids)
     for answers in per_run_answers:
         if len(answers) != expected_count:
@@ -72,6 +78,9 @@ def stabilize_answers(
             (key for key, size in cluster_sizes.items() if size >= majority_threshold),
             None,
         )
+        if majority_key == "":
+            # 正規化で消える回答（空・記号のみ）は提出回答として採用しない
+            majority_key = None
         if majority_key is None:
             decisions.append(
                 StabilizationDecision(
@@ -102,13 +111,30 @@ def stabilize_answers(
     return decisions
 
 
+def align_run_answers(
+    question_ids: list[str],
+    per_run_results: list[dict[str, str]],
+) -> tuple[list[list[str]], list[list[str]]]:
+    """runごとの id→回答 を question_ids の順に整列する。
+
+    runに欠けた質問は MISSING_RESPONSE で補完し（欠落＝そのrunは棄権票）、
+    run別の欠落IDリストを併せて返す。想定外のIDは黙って捨てずValueError。
+    """
+    expected = set(question_ids)
+    per_run_answers: list[list[str]] = []
+    dropped: list[list[str]] = []
+    for results in per_run_results:
+        unexpected = sorted(set(results) - expected)
+        if unexpected:
+            raise ValueError(f"unexpected question_id in run: {unexpected}")
+        per_run_answers.append([results.get(qid, MISSING_RESPONSE) for qid in question_ids])
+        dropped.append([qid for qid in question_ids if qid not in results])
+    return per_run_answers, dropped
+
+
 def _representative_raw_answer(run_indexed_answers: list[tuple[int, str]]) -> str:
-    counts = Counter(answer for _, answer in run_indexed_answers)
-    return min(
-        (answer for _, answer in run_indexed_answers),
-        key=lambda answer: (-counts[answer], _first_run_index(run_indexed_answers, answer)),
+    # NFC同士で数え、最頻（同数はrun番号が小さい方）のNFC形を代表にする
+    counts = Counter(
+        unicodedata.normalize("NFC", answer) for _, answer in run_indexed_answers
     )
-
-
-def _first_run_index(run_indexed_answers: list[tuple[int, str]], target: str) -> int:
-    return next(run_index for run_index, answer in run_indexed_answers if answer == target)
+    return max(counts, key=counts.get)
