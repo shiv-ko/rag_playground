@@ -14,6 +14,7 @@ from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
 from src.generator.confidence_gate import MISSING_RESPONSE
+from src.generator.contract_calc import ContractCalcAnswerer
 from src.generator.enumeration_gate import is_enumeration_complete
 from src.generator.milestone_date_answerer import (
     MilestoneDurationAnswerer,
@@ -93,6 +94,7 @@ class Pipeline:
 
         self.dispatcher = ParserDispatcher()
         self.retriever = ProjectScopedRetriever(project_aliases=project_aliases)
+        self.project_aliases = project_aliases or {}
         self.term_registry = term_registry or []
         self.project_primary_aliases = project_primary_aliases or {}
         self.query_expander = QueryExpander(self.term_registry)
@@ -102,6 +104,10 @@ class Pipeline:
             StructuredArtifactStore.from_artifacts_dir(artifacts_dir) if artifacts_dir else None
         )
         self.spreadsheet_calc_answerer = SpreadsheetCalcAnswerer(threshold=confidence_threshold)
+        self.contract_calc_answerer = ContractCalcAnswerer(
+            threshold=confidence_threshold,
+            data_dir=data_dir,
+        )
         self.milestone_duration_answerer = MilestoneDurationAnswerer(threshold=confidence_threshold)
         self.milestone_threshold_list_answerer = MilestoneThresholdListAnswerer(
             threshold=confidence_threshold
@@ -166,6 +172,17 @@ class Pipeline:
             # 解決できなければMissing固定にせず後続のパスへ委ねる
 
         project_name = self._resolve_project_name(qa.question)
+        if self.structured_store is not None and "contract_rule" in tags:
+            contract_answer = self.contract_calc_answerer.answer(
+                qa.question,
+                project_name,
+                self.structured_store,
+                self.project_primary_aliases,
+                self.project_aliases,
+            )
+            if not contract_answer.was_gated:
+                return contract_answer
+
         if project_name is None:
             return None
 
@@ -282,6 +299,7 @@ class Pipeline:
                 "version_diff",
                 "ms_date_duration",
                 "ms_date_cross_project_list",
+                "contract_rule",
             )
         ):
             answer = self._process_structured(qa, tags)

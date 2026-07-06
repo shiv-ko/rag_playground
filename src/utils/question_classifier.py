@@ -38,6 +38,10 @@ MS_DATE_DURATION_KEYWORDS = ("日数", "何日")
 MS_DATE_EVENT_KEYWORDS = ("キックオフ", "中間報告", "中間レビュー", "最終報告", "最終レビュー", "検収")
 MS_DATE_DIRECTION_KEYWORDS = ("以前", "以降")
 _MS_DATE_TOKEN_RE = re.compile(r"\d{4}年\d{1,2}月\d{1,2}日")
+CONTRACT_RULE_KEYWORDS = (
+    "契約金額", "契約期間", "見込税込", "最終請求", "実績工数", "想定総工数",
+    "時間単価", "APR-M", "固定金額契約", "固定価格", "事後精算", "ACTH",
+)
 
 
 def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:
@@ -88,6 +92,8 @@ def classify_question(question: str) -> list[str]:
         and "案件" in question
     ):
         tags.append("ms_date_cross_project_list")
+    if any(k in question for k in CONTRACT_RULE_KEYWORDS):
+        tags.append("contract_rule")
     if not tags:
         tags.append("text_only")
     return tags

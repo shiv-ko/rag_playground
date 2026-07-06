@@ -16,6 +16,7 @@ _ARTIFACT_FILES = {
     "train_xlsx_small_sheet_cells": "train_xlsx_small_sheet_cells.jsonl",
     "train_xlsx_pivot_aggregates": "train_xlsx_pivot_aggregates.jsonl",
     "version_diff_pairs": "version_diff_poc.jsonl",
+    "contracts": "contracts.jsonl",
 }
 
 
@@ -86,3 +87,12 @@ class StructuredArtifactStore:
 
     def version_diff_pairs_for(self, project_name: str) -> list[dict]:
         return self._get("version_diff_pairs", project_name)
+
+    def contracts_for(self, project_name: str) -> list[dict]:
+        return self._get("contracts", project_name)
+
+    def all_contracts(self) -> list[dict]:
+        rows: list[dict] = []
+        for project_rows in self._data.get("contracts", {}).values():
+            rows.extend(project_rows)
+        return rows

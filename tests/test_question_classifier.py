@@ -131,6 +131,15 @@ def test_ms_date_cross_project_list_requires_direction_and_date_and_project() ->
     assert "ms_date_cross_project_list" not in tags
 
 
+def test_detects_contract_rule_question() -> None:
+    assert "contract_rule" in classify_question(
+        "APR-M3必要案件を主略称ですべて挙げ契約金額合計を答えてください。"
+    )
+    assert "contract_rule" in classify_question(
+        "ひがし丘のACTH=155h10mなら見込税込と比べて何円減額ですか。"
+    )
+
+
 def test_generic_phrases_alone_do_not_trigger_spreadsheet_calc():
     """「の中で」「該当する」は一般文に頻出するため、単独ではcalcタグを付けない。"""
     assert "spreadsheet_calc" not in classify_question(
