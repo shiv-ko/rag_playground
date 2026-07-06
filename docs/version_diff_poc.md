@@ -13,16 +13,16 @@
 | project | type | old | new | changed | added | removed | status |
 |---|---|---|---|---:|---:|---:|---|
 | 京橋信用ソリューションズ株式会社 | proposal | 提案書_v1.pptx | 提案書_final.pptx | 1 | 0 | 0 | ok |
-| 医療法人社団 恒一会 かえで総合病院 | final_report | 医療法人社団 恒一会 かえで総合病院_最終報告_old.pptx | 医療法人社団 恒一会 かえで総合病院_最終報告.pptx | 4 | 43 | 1 | ok |
-| 株式会社青嶺不動産アセットマネジメント | proposal | 提案書.pptx | 提案書.pptx | 0 | 0 | 0 | ok |
+| 医療法人社団 恒一会 かえで総合病院 | final_report | 医療法人社団 恒一会 かえで総合病院_最終報告_old.pptx | 医療法人社団 恒一会 かえで総合病院_最終報告.pptx | 4 | 43 | 5 | ok |
+| 株式会社青嶺不動産アセットマネジメント | proposal | 提案書.pptx | 提案書.pptx | 1 | 0 | 0 | ok |
 | 株式会社青嶺不動産アセットマネジメント | plan | スケジュール_r1.xlsx | スケジュール_r2.xlsx | 23 | 0 | 0 | ok |
 | 株式会社青葉バイオメディカル機器 | contract | 契約書_draft.docx | 契約書.docx | 0 | 0 | 0 | ok |
 | 白峰信用リスク評価株式会社 | proposal | 提案書old.pptx | 提案書.pptx | 0 | 10 | 0 | ok |
 | 白峰信用リスク評価株式会社 | notebook | 01_eda_old.ipynb | 01_eda.ipynb | 0 | 0 | 0 | ok |
 | 青葉与信マネジメント株式会社 | proposal | 提案書_v1.pptx | 提案書_v2.pptx | 26 | 0 | 0 | ok |
-| 青葉与信マネジメント株式会社 | proposal | 提案書_v1.pptx | 提案書_v3.pptx | 31 | 34 | 0 | ok |
-| 青葉与信マネジメント株式会社 | proposal | 提案書_v2.pptx | 提案書_v3.pptx | 7 | 34 | 0 | ok |
-| 青葉与信マネジメント株式会社 | final_report | 青葉与信マネジメント株式会社_最終報告.pptx | 青葉与信マネジメント株式会社_最終報告.pptx | 71 | 0 | 1 | ok |
+| 青葉与信マネジメント株式会社 | proposal | 提案書_v1.pptx | 提案書_v3.pptx | 37 | 28 | 0 | ok |
+| 青葉与信マネジメント株式会社 | proposal | 提案書_v2.pptx | 提案書_v3.pptx | 13 | 28 | 0 | ok |
+| 青葉与信マネジメント株式会社 | final_report | 青葉与信マネジメント株式会社_最終報告.pptx | 青葉与信マネジメント株式会社_最終報告.pptx | 98 | 0 | 1 | ok |
 
 ## 差分サンプル
 
@@ -40,9 +40,13 @@
 - added: slide 2 shape 2: 肝疾患リスク把握を支援する分析基盤と運用判断材料を納品。業務での閾値運用案と導入前検証要件を提示。
 - added: slide 2 shape 3: 分析成果
 - added: slide 2 shape 4: 最終モデル：hist_gradient_boosting（特徴量10） AUC-ROC = 0.905 / Accuracy = 0.833 F1-macro = 0.829 中間段階の線形系試行（T04等）から性能改善を確認。
-- removed: slide 7 shape 3: 中間段階 vs 最終モデル性能比較
+- removed: slide 7 shape 2 table row 0: 指標 | 中間 (T04 linear) | 最終 (hist_gradient_boosting) | 改善幅
+- removed: slide 7 shape 2 table row 1: AUC-ROC | 0.825 | 0.905 | +0.080
+- removed: slide 7 shape 2 table row 2: F1-macro | 0.733 | 0.829 | +0.096
 
 ### 株式会社青嶺不動産アセットマネジメント / proposal / 提案書.pptx -> 提案書.pptx
+- before: slide 8 shape 1 table row 6: QAレビューア | 池田 直哉 | 成果物レビュー、整合性確認
+  after: slide 8 shape 1 table row 6: QAレビューア | 小林 直樹 | 成果物レビュー、整合性確認
 
 ### 株式会社青嶺不動産アセットマネジメント / plan / スケジュール_r1.xlsx -> スケジュール_r2.xlsx
 - before: スケジュール row 3: No. | タスクID | 依存タスク | ステータス | フェーズ | タスク名 | 詳細・内容 | クリティカルパス | マイルストーン | チェックポイント | 成果物 | 開始日 | 終了日 | 担当者 | 備考

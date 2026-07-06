@@ -52,6 +52,15 @@ def pptx_lines(path: Path) -> list[str]:
     lines: list[str] = []
     for slide_idx, slide in enumerate(prs.slides, start=1):
         for shape_idx, shape in enumerate(slide.shapes):
+            if getattr(shape, "has_table", False):
+                for row_idx, row in enumerate(shape.table.rows):
+                    values = [clean(cell.text) for cell in row.cells]
+                    text = " | ".join(value for value in values if value)
+                    if text:
+                        lines.append(
+                            f"slide {slide_idx} shape {shape_idx} table row {row_idx}: {text}"
+                        )
+                continue
             if not getattr(shape, "has_text_frame", False):
                 continue
             text = clean(shape.text)
