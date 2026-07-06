@@ -103,9 +103,12 @@ step-reviewはコミット前セルフレビュー1周で代替する（`.claude
       （「変更なし」誤答）を検出→原因はPPTXテーブル内テキストの抽出漏れ（PoCスクリプトと**本番
       `OfficeParser`の両方**）→修正後 official mean 0.3667→0.4667（Q9 Missing→Perfect）、no-harm確認済み。
       詳細は`docs/daily作業ログ/20260706_213550.md`。test 10問（valid以外）は生成・較正まだ未実施
-- [ ] contract_rule（10問）→ cross_project（9問）の順。ただし**実データ（`data/raw`の契約書実物）が
-  無いと抽出仕様（契約方式・ESTH/ACTH等の実際の書式）を推測することになり手戻りリスクが高いため、
-  `data/raw`とAPIキーがある環境での着手を推奨**（2026-07-06、クラウド環境での判断）。
+- [x] contract_rule実データ調査＋実装計画作成（2026-07-06完了）: 全10案件の契約書実物・APR決裁基準文書・
+  term_registryを確認。料金モデルはtime_and_materials/固定価格の2種、工数丸め規則は案件ごとに文言・
+  規則が異なり単純な正規表現使い回し不可（`version_diff_poc.jsonl`と同じ半PoC方式が必要）。
+  APR判定は完全に決定的関数化可能（最高信頼度）。実装計画は`docs/plan/2026-07-06-contract-rule-block.md`
+  （7タスクのTDD分割、期待値+0.06〜0.07）。**実装自体は未着手**（次アクション）
+- [ ] contract_rule実装（上記計画のタスク1から）→ cross_project（9問）の順。
   valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め。
 - [x] internal_terms（test 11問、MS日付・営業日計算系）: `docs/plan/2026-07-06-internal-terms-ms-date.md`の
   Task 0〜3をTDDで実装完了（2026-07-06）。詳細は`docs/daily作業ログ/20260706_023431.md`参照。
