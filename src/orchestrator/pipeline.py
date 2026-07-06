@@ -13,13 +13,14 @@ from pathlib import Path
 from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
+from src.generator.confidence_gate import MISSING_RESPONSE
 from src.generator.enumeration_gate import is_enumeration_complete
 from src.generator.milestone_date_answerer import (
     MilestoneDurationAnswerer,
     MilestoneThresholdListAnswerer,
 )
 from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
-from src.models import Answer, JudgeResult, ScoredDocument
+from src.models import Answer, CRAGLabel, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.retriever.query_expander import QueryExpander
@@ -333,6 +334,21 @@ class Pipeline:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._process_one, qa)
 
+    def _missing_result_for_exception(self, qa: QAPair, error: Exception) -> PipelineResult:
+        # 提出物は1問1行が前提のため、例外で行ごと消えるとpredictionsが壊れる。
+        # judgeは呼ばずMissing相当を直接埋める（例外がAPI障害由来だと再度落ちうるため）。
+        return PipelineResult(
+            question_id=qa.question_id,
+            question=qa.question,
+            answer=MISSING_RESPONSE,
+            confidence=0.0,
+            was_gated=True,
+            judge_label=CRAGLabel.MISSING.value if self.run_judge else "",
+            judge_score=CRAGLabel.MISSING.score if self.run_judge else 0.0,
+            judge_reason=f"question processing raised an exception: {error}",
+            gate_reason="exception",
+        )
+
     async def run_async(self, qa_pairs: list[QAPair]) -> list[PipelineResult]:
         total = len(qa_pairs)
         self.logger.info(f"パイプライン開始: {total} 問")
@@ -345,14 +361,16 @@ class Pipeline:
         for i, r in enumerate(raw_results, 1):
             if isinstance(r, Exception):
                 self.logger.error(f"Q{i} エラー: {r}")
+                result = self._missing_result_for_exception(qa_pairs[i - 1], r)
             else:
-                results.append(r)
-                elapsed = time.time() - start
-                remaining = estimate_remaining_time(i, total, elapsed)
-                self.logger.debug(
-                    f"[{i}/{total}] {r.judge_label} (conf={r.confidence:.2f}) "
-                    f"残り推定 {remaining/60:.1f}分"
-                )
+                result = r
+            results.append(result)
+            elapsed = time.time() - start
+            remaining = estimate_remaining_time(i, total, elapsed)
+            self.logger.debug(
+                f"[{i}/{total}] {result.judge_label} (conf={result.confidence:.2f}) "
+                f"残り推定 {remaining/60:.1f}分"
+            )
 
         self.last_elapsed = time.time() - start
         return results

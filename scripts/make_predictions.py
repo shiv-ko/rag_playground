@@ -85,8 +85,8 @@ def main() -> None:
         print(f"書き出し完了: {args.out} ({len(results)}件)")
         return
 
-    # pipeline.runは例外を起こした質問を黙って落とすため、質問リスト由来のIDを正とし
-    # runごとの欠落はMissing票として補完する（1問の一時エラーで全runを捨てない）
+    # pipeline.runは例外時もMissing行で埋めて返すが、念のため質問リスト由来のIDを正とし
+    # 万一runごとに欠落があってもMissing票として補完する（1問の一時エラーで全runを捨てない）
     question_ids = sorted((qa.question_id for qa in qa_pairs), key=int)
     per_run_maps = [
         {r.question_id: r.answer for r in pipeline.run(qa_pairs)}

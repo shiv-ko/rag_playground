@@ -811,3 +811,71 @@ def test_save_results_without_judge_does_not_crash(tmp_path: Path) -> None:
     result0 = payload["results"][0]
     assert "gate_reason" in result0
     assert "retrieved_sources" in result0
+
+
+def test_run_async_fills_missing_row_on_exception(tmp_path: Path) -> None:
+    """1問で例外が起きても行ごと欠落させず、Missing相当の行で埋めて件数を維持する。"""
+    from src.generator.confidence_gate import MISSING_RESPONSE
+    from src.orchestrator.pipeline import Pipeline, PipelineResult, QAPair
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=data_dir, run_judge=True)
+    pipeline.build_index()
+
+    def fake_process_one(qa: QAPair) -> PipelineResult:
+        if qa.question_id == "1":
+            raise RuntimeError("boom")
+        return PipelineResult(
+            question_id=qa.question_id,
+            question=qa.question,
+            answer="ok",
+            confidence=0.9,
+            was_gated=False,
+            judge_label="Perfect",
+            judge_score=1.0,
+            judge_reason="r",
+        )
+
+    pipeline._process_one = fake_process_one
+
+    results = pipeline.run(
+        [
+            QAPair(question_id="0", question="Q0"),
+            QAPair(question_id="1", question="Q1"),
+            QAPair(question_id="2", question="Q2"),
+        ]
+    )
+
+    assert [r.question_id for r in results] == ["0", "1", "2"]
+    failed = results[1]
+    assert failed.answer == MISSING_RESPONSE
+    assert failed.judge_label == "Missing"
+    assert failed.judge_score == 0.0
+    assert failed.gate_reason == "exception"
+    assert failed.was_gated is True
+
+
+def test_run_async_missing_row_has_empty_judge_label_when_judge_disabled(tmp_path: Path) -> None:
+    """--no-judge診断runでは例外埋めの行もjudge_labelは空文字のままにする（既存の規約を踏襲）。"""
+    from src.orchestrator.pipeline import Pipeline, PipelineResult, QAPair
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=data_dir, run_judge=False)
+    pipeline.build_index()
+
+    def fake_process_one(qa: QAPair) -> PipelineResult:
+        raise RuntimeError("boom")
+
+    pipeline._process_one = fake_process_one
+
+    results = pipeline.run([QAPair(question_id="0", question="Q0")])
+
+    assert len(results) == 1
+    assert results[0].judge_label == ""
+    assert results[0].gate_reason == "exception"

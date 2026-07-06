@@ -35,7 +35,7 @@ class Answer:
     source_docs: list[ScoredDocument] = field(default_factory=list)
     was_gated: bool = False    # 確信度ゲートによってMissingになった場合True
     raw_text: str = ""         # ゲート適用前のLLM回答（切り分け分析用）
-    gate_reason: str = ""      # どのゲートで落ちたか（""=非ゲート。capability/no_context/missing_text/confidence/citation）
+    gate_reason: str = ""      # どのゲートで落ちたか（""=非ゲート。capability/no_context/missing_text/confidence/citation/exception）
 
 
 class CRAGLabel(str, Enum):
