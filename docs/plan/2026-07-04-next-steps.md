@@ -98,8 +98,11 @@ step-reviewはコミット前セルフレビュー1周で代替する（`.claude
 - [x] version_diff（11問）の構造化回答パス実装（2026-07-06完了）: `build_version_diff_context`で
       `version_diff_poc.jsonl`を接続。タイトル＋バージョンタグで対象ペアを1つに絞り、曖昧なら`[]`
       （Missingに逃がす）。実データ8問（valid Q9, test Q0/1/9/14/74/95/22）でオフライン検証しペア特定は全問成功。
-      詳細は`docs/daily作業ログ/20260706_004522.md`。**未実施**: 実データ・APIキー環境でのvalid実行・
-      official較正・test生成（本セッションはキー無しのクラウド環境のため不可）
+      詳細は`docs/daily作業ログ/20260706_004522.md`。
+- [x] version_diffの実データ・API環境での検証（2026-07-06完了、同日21時台）: valid Q9で3/3 Incorrect
+      （「変更なし」誤答）を検出→原因はPPTXテーブル内テキストの抽出漏れ（PoCスクリプトと**本番
+      `OfficeParser`の両方**）→修正後 official mean 0.3667→0.4667（Q9 Missing→Perfect）、no-harm確認済み。
+      詳細は`docs/daily作業ログ/20260706_213550.md`。test 10問（valid以外）は生成・較正まだ未実施
 - [ ] contract_rule（10問）→ cross_project（9問）の順。ただし**実データ（`data/raw`の契約書実物）が
   無いと抽出仕様（契約方式・ESTH/ACTH等の実際の書式）を推測することになり手戻りリスクが高いため、
   `data/raw`とAPIキーがある環境での着手を推奨**（2026-07-06、クラウド環境での判断）。
