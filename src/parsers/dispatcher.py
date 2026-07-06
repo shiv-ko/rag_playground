@@ -24,6 +24,20 @@ def _is_noise(file_path: Path) -> bool:
     return False
 
 
+def normalized_resolved_posix(path: Path) -> str:
+    """除外判定用のパス正規化。macOS/zip展開由来のNFDパスと引数由来のNFCパスを
+    突き合わせるため、resolve後にNFCへ揃える（_extract_metadataと同じ事故対策）。"""
+    return unicodedata.normalize("NFC", path.resolve().as_posix())
+
+
+def is_under_excluded(file_path: Path, excluded_normalized: list[str]) -> bool:
+    """file_path が正規化済み除外ディレクトリのいずれかの配下（または同一）か。"""
+    if not excluded_normalized:
+        return False
+    fp = normalized_resolved_posix(file_path)
+    return any(fp == d or fp.startswith(d + "/") for d in excluded_normalized)
+
+
 def _extract_metadata(root: Path, file_path: Path) -> dict:
     try:
         rel_parts = file_path.relative_to(root).parts
@@ -65,12 +79,19 @@ class ParserDispatcher:
             location="unsupported",
         )]
 
-    def parse_directory(self, directory: Path) -> list[Document]:
+    def parse_directory(
+        self, directory: Path, exclude_dirs: list[Path] | None = None
+    ) -> list[Document]:
+        # 評価用の質問CSV等、コーパスに含めてはいけないディレクトリを除外する
+        # （質問回答ディレクトリを取り込むと正解リーク・検索汚染になる）
+        excluded = [normalized_resolved_posix(d) for d in (exclude_dirs or [])]
         docs: list[Document] = []
         for file_path in sorted(directory.rglob("*")):
             if not file_path.is_file() or file_path.name.startswith("."):
                 continue
             if _is_noise(file_path):
+                continue
+            if is_under_excluded(file_path, excluded):
                 continue
             file_docs = self.parse(file_path)
             metadata = _extract_metadata(directory, file_path)

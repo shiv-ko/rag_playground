@@ -7,9 +7,11 @@
 from __future__ import annotations
 
 import unicodedata
+from pathlib import Path
 
 from src.indexer.keyword_store import KeywordStore
 from src.models import Document, ScoredDocument
+from src.retriever.question_file_scope import find_named_files, question_mentions_extension
 
 _CORPORATE_AFFIXES = ("株式会社", "医療法人社団", "有限会社", "合同会社")
 
@@ -77,6 +79,22 @@ class ProjectScopedRetriever:
 
     def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
         project = self.detect_project(query)
-        if project is not None:
-            return self._project_stores[project].search(query, top_k)
-        return self._global_store.search(query, top_k)
+        store = self._project_stores[project] if project is not None else self._global_store
+        if not question_mentions_extension(query):
+            return store.search(query, top_k)
+
+        # 名指しファイルのチャンクを優先する。候補を広めに取り、候補のbasename
+        # 集合を既知名として質問文と部分文字列照合する（find_named_files）。
+        # 一致ゼロなら従来結果と同一 — ハードフィルタにしない。
+        candidates = store.search(query, top_k * 4)
+        known_names = [c.document.source_path for c in candidates]
+        matched_basenames = set(find_named_files(query, known_names))
+        if not matched_basenames:
+            return candidates[:top_k]
+
+        matched: list[ScoredDocument] = []
+        others: list[ScoredDocument] = []
+        for c in candidates:
+            basename = unicodedata.normalize("NFC", Path(str(c.document.source_path)).name)
+            (matched if basename in matched_basenames else others).append(c)
+        return (matched + others)[:top_k]

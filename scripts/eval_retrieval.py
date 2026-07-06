@@ -35,12 +35,23 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=ROOT / "experiments")
     parser.add_argument("--no-cache", action="store_true",
                         help="パースキャッシュを使わず、現在のparser/chunkerで再パースする")
+    parser.add_argument("--exclude-dir", type=Path, action="append", default=None,
+                        help="コーパスから除外するディレクトリ（複数指定可）。"
+                             "評価用質問CSVの置き場（質問回答/等）をdata-dir配下に含む場合は必須 — "
+                             "取り込むと正解リークになる")
     args = parser.parse_args()
 
+    # 既定のdata-dir（共有ドライブ）は質問回答/の兄弟なので安全だが、
+    # data/raw/share を渡した場合に備え、質問回答/ が配下にあれば自動で除外する
+    exclude_dirs = list(args.exclude_dir or [])
+    default_qa_dir = args.data_dir / "質問回答"
+    if default_qa_dir.is_dir():
+        exclude_dirs.append(default_qa_dir)
+
     docs = (
-        ParserDispatcher().parse_directory(args.data_dir)
+        ParserDispatcher().parse_directory(args.data_dir, exclude_dirs=exclude_dirs)
         if args.no_cache
-        else load_or_parse(args.data_dir, ROOT / ".cache")
+        else load_or_parse(args.data_dir, ROOT / ".cache", exclude_dirs=exclude_dirs)
     )
 
     project_registry = json.loads(
