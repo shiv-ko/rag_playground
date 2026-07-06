@@ -22,7 +22,8 @@
 | `docs/`直下の各種md/csv | データ調査レポート（coverage系、scan系）と`question_labels.csv`（人手ラベル・**評価専用**） | 調査スクリプトの出力先。回答生成コードから読み込むのは禁止（`question_labels.csv`由来のもの） |
 | リポジトリ直下 | `predictions.csv`（git管理）と`submission_*.zip`（提出物） | zipは`submission_YYYYMMDD_<内容>.zip` |
 | `.cache/` | パース結果キャッシュ（gitignore） | 消してよい。`--no-cache`で無視できる |
-| `.claude/skills/`・`.codex/skills/` | エージェント向けスキル（architecture / scoring / dev-process / experiments） | 開発規約はここが正 |
+| `.claude/skills/`・`.codex/skills/` | エージェント向けスキル（architecture / scoring / dev-process / experiments / step-review / reviewing-pipeline-stages） | 開発規約はここが正 |
+| `docs/imp/` | パイプライン各ステージの実装レビュー結果（reviewing-pipeline-stages スキルの出力） | `<stage>_review_YYYYMMDD.md`（ステージ別、日付付きで新規作成）＋横断優先度リスト`summary_YYYYMMDD.md` |
 
 ## ルート直下のmdの役割
 

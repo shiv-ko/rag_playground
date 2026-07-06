@@ -9,4 +9,4 @@
 - **絶対制約: 回答は1000トークン以内**（超過はエラー）
 - コンペ開始: 2026/7/3 12:00（本番データはその時に公開）
 
-Skills: architecture / scoring / dev-process / experiments/ step-review
+Skills: architecture / scoring / dev-process / experiments / step-review / reviewing-pipeline-stages

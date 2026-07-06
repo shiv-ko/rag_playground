@@ -16,11 +16,12 @@ description: 実装の1タスク（1コミット単位）が完成するたび�
    - 通常の変更 → **model: haiku**（general-purposeエージェント）
    - リスクの高い変更（パイプラインの分岐・ゲート・提出経路・データ抽出）→ **sonnet以上**に上げる
 3. レビュー結果のうち **CONFIRMED（file:line付きの確実な問題）だけ**修正する。スタイル指摘・好みは無視
-4. 修正したら再度全テストPASS→コミット。レビューで判断が割れた指摘は握りつぶさず作業ログにメモ
+4. 修正したら再度全テストPASS→コミット。レビューで判断が割れた指摘は握りつぶさず
+   `docs/daily作業ログ/` の当該ブロックのログ（`YYYYMMDD_HHMMSS.md`）にメモする（vault.mdではない）
 
 ## レビューエージェントへの依頼テンプレート
 
-Agentツール（subagent_type: "general-purpose", model: "haiku"）に以下を渡す。
+Agentツール（subagent_type: "general-purpose"、**model はフロー手順2の判定で決める**: 通常=haiku / リスク高=sonnet）に以下を渡す。
 diffは親が貼らず、エージェント自身に `git diff`（未コミット分）を実行させる:
 
 ```
