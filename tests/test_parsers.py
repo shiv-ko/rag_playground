@@ -170,6 +170,32 @@ class TestOfficeParser:
         assert len(docs) == 1
         assert "解析失敗" in docs[0].text
 
+    def test_pptx_parse_includes_table_cell_text(self, tmp_path: Path) -> None:
+        """テーブルシェイプ（GraphicFrame）内のセルテキストも索引対象に含める。
+
+        GraphicFrameは.text属性を持たないため、通常のテキストフレームのみを見る
+        実装だとスライド内の表の内容（例: レビューア・承認欄）が丸ごと検索対象から
+        消える（実データ: 青嶺不動産アセットマネジメント案件のQ9でIncorrectを誘発）。
+        """
+        from pptx import Presentation
+        from pptx.util import Inches
+
+        f = tmp_path / "with_table.pptx"
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table_shape = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(4), Inches(2))
+        table = table_shape.table
+        table.cell(0, 0).text = "QAレビューア"
+        table.cell(0, 1).text = "小林 直樹"
+        prs.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)
+
+        assert any("小林 直樹" in doc.text for doc in docs), (
+            "テーブルセルのテキストがパース結果に含まれていない"
+        )
+
 
 # ─────────────────────── ImageParser ───────────────────────
 

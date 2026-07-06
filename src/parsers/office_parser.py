@@ -79,6 +79,17 @@ class OfficeParser:
             for i, slide in enumerate(prs.slides):
                 texts = []
                 for shape in slide.shapes:
+                    if getattr(shape, "has_table", False):
+                        for row in shape.table.rows:
+                            # cell.textは複数段落/ソフト改行で\n・\vを含みうるため空白に正規化する
+                            cells = [
+                                " ".join(cell.text.split())
+                                for cell in row.cells
+                                if cell.text.strip()
+                            ]
+                            if cells:
+                                texts.append(" | ".join(cells))
+                        continue
                     if hasattr(shape, "text") and shape.text.strip():
                         texts.append(shape.text)
                 if texts:
