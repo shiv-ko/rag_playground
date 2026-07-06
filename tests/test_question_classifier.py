@@ -36,6 +36,16 @@ def test_question_can_have_multiple_tags() -> None:
     assert "version_diff" in tags
 
 
+def test_detects_version_diff_question_phrased_as_modified_into() -> None:
+    q = "提案書_v1.pptxから提案書_v3.pptxに修正されたもののうち、案件遂行に関連する変更を挙げてください。"
+    assert "version_diff" in classify_question(q)
+
+
+def test_detects_version_diff_question_phrased_as_compared_when() -> None:
+    q = "スケジュール_r1.xlsxとスケジュール_r2.xlsxを比較したとき、案件遂行に関連する変更点を挙げてください。"
+    assert "version_diff" in classify_question(q)
+
+
 def test_detects_spreadsheet_state_question() -> None:
     assert "spreadsheet_state" in classify_question(
         "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。"

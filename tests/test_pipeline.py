@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from src.models import CRAGLabel, Document, JudgeResult, ScoredDocument
 from src.evaluator.metrics import summarize
 from src.generator.confidence_gate import ConfidenceGate
 from src.indexer.keyword_store import KeywordStore
 from src.indexer.vector_store import VectorStore
+from src.models import CRAGLabel, Document, JudgeResult
 from src.retriever.hybrid_retriever import HybridRetriever
 
 
@@ -77,8 +77,9 @@ def test_pipeline_uses_project_scoped_retriever(tmp_path: Path) -> None:
 def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> None:
     """パイプライン全体が通ることを確認する（Anthropic APIはモック）。"""
     from unittest.mock import patch
-    from src.generator.answer_generator import AnswerGenerator
+
     from src.evaluator.judge import LocalJudge
+    from src.generator.answer_generator import AnswerGenerator
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("CLAUDE_MODEL", "claude-sonnet-5")
@@ -114,6 +115,7 @@ def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> N
 def test_pipeline_skips_judge_when_run_judge_false(tmp_path: Path) -> None:
     """run_judge=False のとき judge_label は空文字で、Judge._call_llmは呼ばれない"""
     from unittest.mock import MagicMock
+
     from src.orchestrator.pipeline import Pipeline, QAPair
 
     pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
@@ -515,6 +517,56 @@ def test_pipeline_falls_back_to_search_when_calc_answer_is_gated(tmp_path: Path)
     ))
 
     assert result.answer == "通常パスの回答"
+
+
+def test_pipeline_routes_version_diff_question_through_structured_context(tmp_path: Path) -> None:
+    """version_diffタグの質問は該当ペアのdiffを構造化コンテキストとしてLLMに渡す。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "version_diff_poc.jsonl").write_text(
+        json.dumps({
+            "project_name": "テスト社",
+            "normalized_title": "提案書",
+            "old_path": "data/raw/x/提案書_old.pptx",
+            "new_path": "data/raw/x/提案書.pptx",
+            "old_file_name": "提案書_old.pptx",
+            "new_file_name": "提案書.pptx",
+            "old_version_tag": "old",
+            "new_version_tag": None,
+            "status": "ok",
+            "added_count": 0, "removed_count": 0, "changed_count": 1,
+            "added_samples": [], "removed_samples": [],
+            "changed_samples": [{"before": "料金体系：固定", "after": "料金体系：Time & Materials"}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    captured_contexts: list[str] = []
+
+    def _fake_llm(question: str, context: str) -> str:
+        captured_contexts.append(context)
+        return json.dumps({
+            "answer": "料金体系が固定からTime & Materialsに変更されました。",
+            "confidence": 0.9,
+            "citation": "料金体系：Time & Materials",
+            "reasoning": "r",
+        }, ensure_ascii=False)
+
+    pipeline.generator._call_llm = _fake_llm
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社の提案書old.pptxから提案書.pptxへの更新内容のうち、案件遂行に関連する実質的な変更を挙げてください。",
+    ))
+
+    assert captured_contexts and "料金体系：固定" in captured_contexts[0]
+    assert "Time & Materials" in result.answer
 
 
 def test_load_train_csv_does_not_fall_back_to_other_projects_csv(tmp_path: Path) -> None:

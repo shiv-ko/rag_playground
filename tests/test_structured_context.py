@@ -4,6 +4,7 @@ from __future__ import annotations
 from src.retriever.structured_context import (
     build_office_style_context,
     build_spreadsheet_state_context,
+    build_version_diff_context,
 )
 from src.structured.artifact_store import StructuredArtifactStore
 
@@ -17,6 +18,7 @@ def _full_store(**kinds) -> StructuredArtifactStore:
         "train_xlsx_sheets": {},
         "spreadsheet_sheets": {},
         "train_xlsx_pivot_aggregates": {},
+        "version_diff_pairs": {},
     }
     base.update(kinds)
     return StructuredArtifactStore(base)
@@ -478,3 +480,106 @@ def test_pivot_cache_aggregate_abstains_when_multiple_data_fields_do_not_match()
     ]})
     docs = build_spreadsheet_state_context("Pivotシートで平均売上が最も高い層は？", "テスト案件", store)
     assert docs == []
+
+
+class TestVersionDiffContext:
+    def test_single_pair_returns_diff_context(self) -> None:
+        store = _store({"version_diff_pairs": [{
+            "project_name": "テスト案件",
+            "normalized_title": "提案書",
+            "old_path": "data/raw/x/提案書_v1.pptx",
+            "new_path": "data/raw/x/提案書_final.pptx",
+            "old_file_name": "提案書_v1.pptx",
+            "new_file_name": "提案書_final.pptx",
+            "old_version_tag": "v1",
+            "new_version_tag": "final",
+            "status": "ok",
+            "added_count": 0, "removed_count": 0, "changed_count": 1,
+            "added_samples": [], "removed_samples": [],
+            "changed_samples": [{"before": "担当: 鈴木", "after": "担当: 高橋"}],
+        }]})
+        docs = build_version_diff_context(
+            "テスト案件の提案書について、旧版と最新版を比較し、実質的な変更を挙げてください。",
+            "テスト案件", store,
+        )
+        assert len(docs) == 1
+        text = docs[0].document.text
+        assert "担当: 鈴木" in text
+        assert "担当: 高橋" in text
+        assert docs[0].retrieval_method == "structured_version_diff"
+        assert str(docs[0].document.source_path) == "data/raw/x/提案書_final.pptx"
+
+    def test_no_pairs_for_project_returns_empty(self) -> None:
+        store = _store({"version_diff_pairs": []})
+        docs = build_version_diff_context("旧版と最新版の実質的な変更を挙げてください。", "テスト案件", store)
+        assert docs == []
+
+    def test_narrows_by_version_tags_when_multiple_pairs_share_title(self) -> None:
+        rows = [
+            {
+                "project_name": "テスト案件", "normalized_title": "提案書", "status": "ok",
+                "old_path": "x/提案書_v1.pptx", "new_path": "x/提案書_v2.pptx",
+                "old_file_name": "提案書_v1.pptx", "new_file_name": "提案書_v2.pptx",
+                "old_version_tag": "v1", "new_version_tag": "v2",
+                "added_count": 0, "removed_count": 0, "changed_count": 1,
+                "added_samples": [], "removed_samples": [],
+                "changed_samples": [{"before": "v1->v2の変更", "after": "v1->v2の変更後"}],
+            },
+            {
+                "project_name": "テスト案件", "normalized_title": "提案書", "status": "ok",
+                "old_path": "x/提案書_v1.pptx", "new_path": "x/提案書_v3.pptx",
+                "old_file_name": "提案書_v1.pptx", "new_file_name": "提案書_v3.pptx",
+                "old_version_tag": "v1", "new_version_tag": "v3",
+                "added_count": 0, "removed_count": 0, "changed_count": 1,
+                "added_samples": [], "removed_samples": [],
+                "changed_samples": [{"before": "v1->v3の変更", "after": "v1->v3の変更後"}],
+            },
+        ]
+        store = _store({"version_diff_pairs": rows})
+        docs = build_version_diff_context(
+            "テスト案件の提案書_v1.pptxから提案書_v3.pptxに修正されたもののうち、案件遂行に関連する変更を挙げてください。",
+            "テスト案件", store,
+        )
+        assert len(docs) == 1
+        assert "v1->v3の変更" in docs[0].document.text
+        assert "v1->v2の変更" not in docs[0].document.text
+
+    def test_ambiguous_pair_returns_empty_instead_of_guessing(self) -> None:
+        rows = [
+            {
+                "project_name": "テスト案件", "normalized_title": "提案書", "status": "ok",
+                "old_path": "x/提案書_v1.pptx", "new_path": "x/提案書_v2.pptx",
+                "old_file_name": "提案書_v1.pptx", "new_file_name": "提案書_v2.pptx",
+                "old_version_tag": "v1", "new_version_tag": "v2",
+                "added_count": 0, "removed_count": 0, "changed_count": 0,
+                "added_samples": [], "removed_samples": [], "changed_samples": [],
+            },
+            {
+                "project_name": "テスト案件", "normalized_title": "提案書", "status": "ok",
+                "old_path": "x/提案書_v1.pptx", "new_path": "x/提案書_v3.pptx",
+                "old_file_name": "提案書_v1.pptx", "new_file_name": "提案書_v3.pptx",
+                "old_version_tag": "v1", "new_version_tag": "v3",
+                "added_count": 0, "removed_count": 0, "changed_count": 0,
+                "added_samples": [], "removed_samples": [], "changed_samples": [],
+            },
+        ]
+        store = _store({"version_diff_pairs": rows})
+        docs = build_version_diff_context(
+            "テスト案件の提案書について、案件遂行に関連する変更を挙げてください。",
+            "テスト案件", store,
+        )
+        assert docs == []
+
+    def test_status_not_ok_pairs_are_excluded(self) -> None:
+        store = _store({"version_diff_pairs": [{
+            "project_name": "テスト案件", "normalized_title": "提案書", "status": "error",
+            "old_path": "x/提案書_old.pptx", "new_path": "x/提案書.pptx",
+            "old_file_name": "提案書_old.pptx", "new_file_name": "提案書.pptx",
+            "old_version_tag": "old", "new_version_tag": None,
+            "added_samples": [], "removed_samples": [], "changed_samples": [],
+        }]})
+        docs = build_version_diff_context(
+            "テスト案件の提案書について、旧版と最新版の実質的な変更を挙げてください。",
+            "テスト案件", store,
+        )
+        assert docs == []

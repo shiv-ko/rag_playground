@@ -32,6 +32,7 @@ def test_missing_artifact_file_returns_empty_list(tmp_path: Path) -> None:
     assert store.train_xlsx_sheets_for("A社") == []
     assert store.spreadsheet_sheets_for("A社") == []
     assert store.pivot_aggregates_for("A社") == []
+    assert store.version_diff_pairs_for("A社") == []
 
 
 def test_unknown_project_returns_empty_list(tmp_path: Path) -> None:
@@ -101,3 +102,23 @@ def test_rows_with_null_project_name_do_not_crash(tmp_path: Path):
     ])
     store = StructuredArtifactStore.from_artifacts_dir(tmp_path)
     assert len(store.office_marks_for("A社")) == 1
+
+
+def test_version_diff_pairs_loaded_and_filtered_by_project(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "version_diff_poc.jsonl", [
+        {"project_name": "A社", "normalized_title": "提案書", "old_version_tag": "v1", "new_version_tag": "final"},
+        {"project_name": "B社", "normalized_title": "提案書", "old_version_tag": "old", "new_version_tag": None},
+    ])
+    store = StructuredArtifactStore.from_artifacts_dir(tmp_path)
+    rows = store.version_diff_pairs_for("A社")
+    assert len(rows) == 1
+    assert rows[0]["old_version_tag"] == "v1"
+
+
+def test_version_diff_pairs_lookup_normalizes_unicode(tmp_path: Path) -> None:
+    nfd_name = unicodedata.normalize("NFD", "京橋信用ソリューションズ株式会社")
+    _write_jsonl(tmp_path / "version_diff_poc.jsonl", [
+        {"project_name": nfd_name, "normalized_title": "提案書"},
+    ])
+    store = StructuredArtifactStore.from_artifacts_dir(tmp_path)
+    assert len(store.version_diff_pairs_for("京橋信用ソリューションズ株式会社")) == 1

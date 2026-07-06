@@ -317,7 +317,7 @@ def _pivot_argmax_docs(question: str, cells: list[dict]) -> list[Document]:
         lines = [
             f"シート: {sheet_name}（Pivot集計表・xlsxセル値から機械抽出）",
             f"判定列: {headers[col]}",
-            f"ヘッダ行: " + ", ".join(f"{c}={v}" for c, v in sorted(headers.items())),
+            "ヘッダ行: " + ", ".join(f"{c}={v}" for c, v in sorted(headers.items())),
             f"{'最大' if want_max else '最小'}の行: "
             + ", ".join(f"{headers.get(c, c)}={grid[pick].get(c)}" for c in sorted(grid[pick])),
         ]
@@ -500,4 +500,98 @@ def build_spreadsheet_state_context(
             )
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
+    return docs
+
+
+def _version_diff_tag_matches(tag: str | None, question_lower: str) -> bool:
+    """バージョンタグ（v1/v2/old/final等）が質問文に含まれるか。タグ無し（None）は
+    「最新版」等の未タグ付き候補を指すため、比較なしで条件成立とみなす。"""
+    if not tag:
+        return True
+    return str(tag).lower() in question_lower
+
+
+_TITLE_SEPARATOR_RE = re.compile(r"[ _\-.]")
+
+
+def _normalize_title_token(text: str) -> str:
+    """タイトル・ファイル名比較用のゆるい正規化: 区切り文字（_ - . 空白）を除去し
+    casefoldする。normalized_titleが「01eda」、実ファイル名/質問文が「01_eda」の
+    ような区切り文字違いでも同一視できるようにする。"""
+    return _TITLE_SEPARATOR_RE.sub("", unicodedata.normalize("NFC", text)).casefold()
+
+
+def _narrow_version_diff_pairs(question: str, rows: list[dict]) -> list[dict]:
+    """案件内に複数の新旧ペア（提案書のv1/v2/v3等）がある場合に、質問文の
+    タイトル・バージョンタグ手がかりで対象ペアを1つに絞る。絞り込んでも複数残る
+    場合は誤ったペアで回答するリスクが高いため、何も返さない（保守側）。"""
+    ok_rows = [r for r in rows if r.get("status", "ok") == "ok"]
+    if not ok_rows:
+        return []
+
+    question_nfc = unicodedata.normalize("NFC", question)
+    question_title_key = _normalize_title_token(question_nfc)
+    by_title = [
+        r for r in ok_rows
+        if r.get("normalized_title") and _normalize_title_token(r["normalized_title"]) in question_title_key
+    ]
+    candidates = by_title or ok_rows
+    if len(candidates) == 1:
+        return candidates
+
+    question_lower = question_nfc.lower()
+    tag_matched = [
+        r for r in candidates
+        if _version_diff_tag_matches(r.get("old_version_tag"), question_lower)
+        and _version_diff_tag_matches(r.get("new_version_tag"), question_lower)
+    ]
+    if len(tag_matched) == 1:
+        return tag_matched
+    return []
+
+
+def _render_version_diff_pair(row: dict) -> str:
+    old_tag = row.get("old_version_tag") or "(タグなし)"
+    new_tag = row.get("new_version_tag") or "(タグなし・最新候補)"
+    lines = [
+        f"比較対象: {row.get('old_file_name')}（{old_tag}） → {row.get('new_file_name')}（{new_tag}）",
+        "以下は機械diffの結果（自動抽出のため見出し番号のずれ等の表面的な差分を含みうる。"
+        "案件遂行に関連する実質的な変更かどうかは内容を読んで判断すること）:",
+    ]
+    added = row.get("added_samples") or []
+    removed = row.get("removed_samples") or []
+    changed = row.get("changed_samples") or []
+    if added:
+        lines.append(f"[新版で追加された内容 {row.get('added_count', len(added))}件]")
+        lines.extend(f"  + {s}" for s in added)
+    if removed:
+        lines.append(f"[旧版から削除された内容 {row.get('removed_count', len(removed))}件]")
+        lines.extend(f"  - {s}" for s in removed)
+    if changed:
+        lines.append(f"[変更された内容 {row.get('changed_count', len(changed))}件]")
+        for c in changed:
+            lines.append(f"  変更前: {c.get('before')}")
+            lines.append(f"  変更後: {c.get('after')}")
+    if not (added or removed or changed):
+        lines.append("(diff上の差分は検出されなかった)")
+    return "\n".join(lines)
+
+
+def build_version_diff_context(
+    question: str, project_name: str, store: StructuredArtifactStore
+) -> list[ScoredDocument]:
+    rows = store.version_diff_pairs_for(project_name)
+    matched = _narrow_version_diff_pairs(question, rows)
+
+    docs: list[ScoredDocument] = []
+    for row in matched:
+        source = row.get("new_path") or row.get("old_path")
+        if not source:
+            continue
+        doc = Document(
+            text=_render_version_diff_pair(row),
+            source_path=Path(source),
+            location=f"version_diff_{row.get('old_version_tag')}_{row.get('new_version_tag')}",
+        )
+        docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_version_diff"))
     return docs

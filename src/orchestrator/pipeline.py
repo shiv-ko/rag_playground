@@ -22,6 +22,7 @@ from src.retriever.query_expander import QueryExpander
 from src.retriever.structured_context import (
     build_office_style_context,
     build_spreadsheet_state_context,
+    build_version_diff_context,
     question_mentions_spreadsheet,
 )
 from src.structured.artifact_store import StructuredArtifactStore
@@ -29,7 +30,6 @@ from src.utils.logging import setup_logging
 from src.utils.parallel import estimate_remaining_time, run_with_semaphore
 from src.utils.paths import to_repo_relative
 from src.utils.question_classifier import classify_question
-
 
 # 「〜を（すべて）抜き出す/抽出する」の動詞用法のみ抽出意図とみなす。
 # 「抽出条件」のような名詞複合語（装飾内容の説明を求める質問）は含めない。
@@ -160,12 +160,15 @@ class Pipeline:
 
         # 「ハイライト」等のキーワードは両タグに付きうるため排他にせず、
         # 質問中のファイル種別ヒントで優先順を決め、空なら他方も試す
-        builders = [
+        pair = [
             ("office_style", build_office_style_context),
             ("spreadsheet_state", build_spreadsheet_state_context),
         ]
         if question_mentions_spreadsheet(qa.question):
-            builders.reverse()
+            pair.reverse()
+        # version_diffは他の2タグと排反に近い（新旧比較の明示的な言い回しでのみ付く）ため、
+        # office_style/spreadsheet_stateの優先順スワップには含めず常に最後に試す
+        builders = pair + [("version_diff", build_version_diff_context)]
 
         contexts: list[ScoredDocument] = []
         used_tag = ""
@@ -226,12 +229,14 @@ class Pipeline:
                 + len(self.structured_store.small_sheet_cells_for(project_name))
                 + len(self.structured_store.pivot_aggregates_for(project_name))
             )
+        if tag == "version_diff":
+            return len(self.structured_store.version_diff_pairs_for(project_name))
         return 0
 
     def _process_one(self, qa: QAPair) -> PipelineResult:
         tags = classify_question(qa.question)
         answer = None
-        if any(t in tags for t in ("office_style", "spreadsheet_state", "spreadsheet_calc")):
+        if any(t in tags for t in ("office_style", "spreadsheet_state", "spreadsheet_calc", "version_diff")):
             answer = self._process_structured(qa, tags)
 
         if answer is None:

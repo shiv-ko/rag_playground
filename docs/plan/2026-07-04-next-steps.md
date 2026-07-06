@@ -95,7 +95,12 @@ step-reviewはコミット前セルフレビュー1周で代替する（`.claude
 
 `plan_0703.md` §Phase 3 の既定路線。資産（`version_diff_poc.jsonl`全11ペアdiff成功等）があり着手可能。
 
-- [ ] version_diff（11問）→ contract_rule（10問）→ cross_project（9問）の順（valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め）
+- [x] version_diff（11問）の構造化回答パス実装（2026-07-06完了）: `build_version_diff_context`で
+      `version_diff_poc.jsonl`を接続。タイトル＋バージョンタグで対象ペアを1つに絞り、曖昧なら`[]`
+      （Missingに逃がす）。実データ8問（valid Q9, test Q0/1/9/14/74/95/22）でオフライン検証しペア特定は全問成功。
+      詳細は`docs/daily作業ログ/20260706_004522.md`。**未実施**: 実データ・APIキー環境でのvalid実行・
+      official較正・test生成（本セッションはキー無しのクラウド環境のため不可）
+- [ ] contract_rule（10問）→ cross_project（9問）の順（valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め）
 - [ ] internal_terms（test 11問）はPhase 3扱いで追加検討: valid Q15/Q16はMS日付・営業日計算系で、
   上記スケジュール/マイルストーン資産（§3のMS表）を流用できる可能性が高い
 
