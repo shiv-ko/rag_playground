@@ -65,6 +65,41 @@ def billed_amount_incl_tax(contract: dict[str, Any], hours: float, rate_delta: i
     return int(round(rounded * (int(rate) + rate_delta) * (1 + float(contract.get("tax_rate") or 0.10))))
 
 
+_DATE_ISO_RE = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})")
+_DATE_JP_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日")
+
+
+def parse_two_dates(question: str) -> tuple[date, date] | None:
+    matches = _DATE_ISO_RE.findall(question)
+    if len(matches) < 2:
+        matches = _DATE_JP_RE.findall(question)
+    if len(matches) < 2:
+        return None
+    d1 = date(*(int(x) for x in matches[0]))
+    d2 = date(*(int(x) for x in matches[1]))
+    return d1, d2
+
+
+_YEN_DELTA_RE = re.compile(r"([0-9]+(?:,[0-9]{3})*)\s*円\s*(高く|安く|高い|低く|低い)")
+_HOUR_DELTA_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*時間\s*(少な|多)")
+
+
+def parse_yen_delta(question: str) -> int | None:
+    match = _YEN_DELTA_RE.search(question)
+    if not match:
+        return None
+    amount = int(match.group(1).replace(",", ""))
+    return -amount if match.group(2) in ("安く", "低く", "低い") else amount
+
+
+def parse_hour_delta(question: str) -> float | None:
+    match = _HOUR_DELTA_RE.search(question)
+    if not match:
+        return None
+    magnitude = float(match.group(1))
+    return -magnitude if match.group(2) == "少な" else magnitude
+
+
 def _project_alias(project: str, primary_aliases: dict[str, str]) -> str:
     normalized = unicodedata.normalize("NFC", project)
     for key, value in primary_aliases.items():
@@ -102,7 +137,7 @@ class ContractCalcAnswerer:
         if not rows:
             return _missing(self.gate, "contract_not_found")
         contract = rows[0]
-        if "単価" in question and ("+2000" in question or "＋2000" in question):
+        if "単価" in question and parse_yen_delta(question) is not None and parse_hour_delta(question) is not None:
             return self._answer_rate_delta(question, contract)
         if "ESTH" in question and "ACTH" in question and "割" in question:
             return self._answer_derived_hourly_rate(contract)
@@ -147,14 +182,18 @@ class ContractCalcAnswerer:
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_derived_rate")
 
     def _answer_rate_delta(self, question: str, contract: dict[str, Any]) -> Answer:
-        match = re.search(r"ACTH\s*[-−]\s*([0-9]+(?:\.[0-9]+)?)\s*h", question, re.IGNORECASE)
-        if not match or contract.get("esth_hours") is None or contract.get("estimated_amount_incl_tax") is None:
+        yen_delta = parse_yen_delta(question)
+        hour_delta = parse_hour_delta(question)
+        actual_hours = contract.get("actual_hours")
+        if yen_delta is None or hour_delta is None or actual_hours is None:
             return _missing(self.gate)
-        scenario_hours = float(contract["esth_hours"]) - float(match.group(1))
-        scenario = billed_amount_incl_tax(contract, scenario_hours, rate_delta=2000)
-        if scenario is None:
+        baseline = billed_amount_incl_tax(contract, float(actual_hours))
+        scenario = billed_amount_incl_tax(
+            contract, float(actual_hours) + hour_delta, rate_delta=yen_delta
+        )
+        if baseline is None or scenario is None:
             return _missing(self.gate)
-        diff = scenario - int(contract["estimated_amount_incl_tax"])
+        diff = scenario - baseline
         suffix = "増額" if diff >= 0 else "減額"
         text = f"{_fmt_yen(abs(diff))}{suffix}"
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_calc")
@@ -191,19 +230,19 @@ class ContractCalcAnswerer:
         store: StructuredArtifactStore,
         primary_aliases: dict[str, str],
     ) -> Answer:
-        dates = re.findall(r"(\d{4})年(\d{1,2})月(\d{1,2})日", question)
-        if len(dates) < 2:
+        date_range = parse_two_dates(question)
+        if date_range is None:
             return _missing(self.gate)
-        start = date(*(int(x) for x in dates[0]))
-        end = date(*(int(x) for x in dates[1]))
+        start, end = date_range
         result = []
         for row in store.all_contracts():
             if not row.get("start_date") or not row.get("end_date"):
                 continue
             cs = date.fromisoformat(row["start_date"])
             ce = date.fromisoformat(row["end_date"])
-            overlap = (min(end, ce) - max(start, cs)).days + 1
-            if overlap > 40:
+            overlaps = min(end, ce) >= max(start, cs)
+            period_days = row.get("contract_period_days")
+            if overlaps and period_days is not None and period_days > 40:
                 result.append(_project_alias(row["project_name"], primary_aliases))
         if not result:
             return _missing(self.gate)
@@ -213,7 +252,7 @@ class ContractCalcAnswerer:
     def _answer_fixed_per_row(self, store: StructuredArtifactStore, primary_aliases: dict[str, str]) -> Answer:
         if self.data_dir is None:
             return _missing(self.gate)
-        best: tuple[float, str] | None = None
+        best: tuple[int, str] | None = None
         for row in store.all_contracts():
             if row.get("contract_type") != "fixed" or not row.get("estimated_amount_incl_tax"):
                 continue
@@ -228,12 +267,13 @@ class ContractCalcAnswerer:
                 n_rows = len(pd.read_csv(csvs[0]))
             except Exception:
                 continue
-            value = int(row["estimated_amount_incl_tax"]) / n_rows
+            value = math.ceil(int(row["estimated_amount_incl_tax"]) / n_rows)
             if best is None or value > best[0]:
                 best = (value, row["project_name"])
         if best is None:
             return _missing(self.gate)
-        text = _project_alias(best[1], primary_aliases)
+        alias = _project_alias(best[1], primary_aliases)
+        text = f"{alias}、{best[0]:,}円"
         return Answer(text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_per_row")
 
     def _answer_largest_hours_gap(self, store: StructuredArtifactStore, primary_aliases: dict[str, str]) -> Answer:

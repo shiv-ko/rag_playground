@@ -97,6 +97,22 @@ def test_answer_derived_hourly_rate_from_amount_and_hour_gap() -> None:
     assert answer.text == "22,000円"
 
 
+def test_answer_rate_and_hour_delta_from_actual_billed_amount() -> None:
+    # 実データのQ76の文言そのもの（"ACTH-11.2h"/"+2000"のような記法ではなく自然文）。
+    # 基準は見込(ESTH/見込金額)ではなく「実際の税込請求金額」＝実績工数(ACTH)ベース。
+    row = _tm("株式会社青嶺不動産アセットマネジメント")
+    row["actual_hours"] = 184.5
+    answer = ContractCalcAnswerer().answer(
+        "AOMINEの契約条件において、契約単価が現状よりも2,000円高く、実績工数が"
+        "11.2時間少なかった場合、税込請求金額は、実際の税込請求金額と比べて"
+        "いくら変動しますか。",
+        "株式会社青嶺不動産アセットマネジメント",
+        _store([row]),
+    )
+    assert not answer.was_gated
+    assert answer.text == "79,200円増額"
+
+
 def test_answer_apr_m3_list_and_total_uses_primary_aliases() -> None:
     rows = [
         _tm("医療法人社団 蒼泉会 ひがし丘総合病院"),
@@ -155,14 +171,62 @@ def test_primary_alias_lookup_normalizes_nfd_keys() -> None:
     assert answer.text == "SHIRAMINE、合計8,500,000円"
 
 
+def test_answer_overlap_parses_iso_dates_and_uses_own_period_length() -> None:
+    # 実データのQ26の文言そのもの（"2025年8月15日"ではなくISO形式"2025-08-15"）。
+    # 「契約期間が重なっている」＝指定期間との重複有無、「契約期間が40日を超えている」＝
+    # 案件自体の契約期間の長さ、という別々の条件（重複期間の長さが40日超、ではない）。
+    rows = [
+        {
+            # 指定期間と重複し、契約期間自体も40日超 → 該当
+            "project_name": "重複かつ長期契約株式会社",
+            "status": "ok",
+            "start_date": "2025-08-20",
+            "end_date": "2025-10-10",
+            "contract_period_days": 52,
+        },
+        {
+            # 指定期間と重複するが契約期間自体は40日以下 → 非該当
+            "project_name": "重複だが短期契約株式会社",
+            "status": "ok",
+            "start_date": "2025-08-25",
+            "end_date": "2025-09-01",
+            "contract_period_days": 8,
+        },
+        {
+            # 契約期間は40日超だが指定期間と重複しない → 非該当
+            "project_name": "長期だが重複なし株式会社",
+            "status": "ok",
+            "start_date": "2025-01-01",
+            "end_date": "2025-03-01",
+            "contract_period_days": 60,
+        },
+    ]
+    answer = ContractCalcAnswerer().answer(
+        "2025-08-15 から 2025-09-07 の間に契約期間が重なっている案件の中で、"
+        "契約期間が 40日 を超えている案件を、主略称ですべて挙げてください。",
+        None,
+        _store(rows),
+        {
+            "重複かつ長期契約株式会社": "MATCH",
+            "重複だが短期契約株式会社": "SHORT",
+            "長期だが重複なし株式会社": "NOOVERLAP",
+        },
+        {},
+    )
+    assert not answer.was_gated
+    assert answer.text == "MATCH"
+
+
 def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
+    # 実データのQ31は「主略称と1行あたりの金額」の両方、かつ金額は円単位切り上げを要求する
     data_dir = tmp_path / "data"
     nfd_project = unicodedata.normalize("NFD", "固定社")
     (data_dir / nfd_project / "03.データ").mkdir(parents=True)
-    (data_dir / nfd_project / "03.データ" / "train.csv").write_text("a\n1\n2\n", encoding="utf-8")
+    (data_dir / nfd_project / "03.データ" / "train.csv").write_text("a\n1\n2\n3\n", encoding="utf-8")
     answerer = ContractCalcAnswerer(data_dir=data_dir)
     answer = answerer.answer(
-        "固定金額契約中、分析データ1行あたり契約金額最高の案件はどれですか。",
+        "固定金額契約の中で、分析データ1行あたりの契約金額（税込）が最も高い案件を、"
+        "主略称と1行あたりの金額で答えてください。1行あたりの金額は円単位で切り上げてください。",
         None,
         _store([{
             "project_name": "固定社",
@@ -172,4 +236,5 @@ def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
         }]),
     )
     assert not answer.was_gated
-    assert answer.text == "固定社"
+    # 1000円 / 3行 = 333.33... 円単位で切り上げ → 334円
+    assert answer.text == "固定社、334円"
