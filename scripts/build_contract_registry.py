@@ -118,6 +118,23 @@ def first_amount(patterns: list[str], text: str) -> int | None:
     return None
 
 
+def extract_advance_payment(text: str, amount_incl: int | None) -> int | None:
+    direct = first_amount([r"着手金[：:\s]*([0-9,]+)円"], text)
+    if direct is not None:
+        return direct
+    if amount_incl is None:
+        return None
+    # 支払表は案件ごとに列順が異なる(税抜/税込の位置が揺れる)ため、金額セルを直接
+    # 拾わず、同じ行にある比率(%)から契約金額（税込）に対する割合として算出する。
+    for line in text.splitlines():
+        if "着手金" not in line:
+            continue
+        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*[%％]", line)
+        if match:
+            return int(round(amount_incl * float(match.group(1)) / 100))
+    return None
+
+
 def extract_dates(text: str) -> tuple[str | None, str | None, int | None]:
     match = re.search(r"(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?から(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?まで", text)
     if match:
@@ -170,11 +187,7 @@ def parse_contract_text(project_name: str, source_path: str, text: str) -> dict[
     amount_excl = first_amount([r"(?:契約金額|報酬総額|見込金額|想定金額)（税抜）[：:\s|]*([0-9,]+)円", r"税抜\s*([0-9,]+)円"], text)
     amount_incl = first_amount([r"(?:契約金額|報酬総額|見込金額|想定金額)（税込）[：:\s|]*([0-9,]+)円", r"税込\s*([0-9,]+)円"], text)
     tax = first_amount([r"消費税(?:額)?[：:\s]*([0-9,]+)円"], text)
-    advance = first_amount([r"着手金[：:\s]*([0-9,]+)円"], text)
-    if advance is None and amount_incl and ("着手金50%" in text or "着手金50％" in text):
-        advance = amount_incl // 2
-    if advance is None and amount_incl and ("着手金40%" in text or "着手金40％" in text):
-        advance = int(round(amount_incl * 0.4))
+    advance = extract_advance_payment(text, amount_incl)
     return {
         "project_name": project_name,
         "contract_type": contract_type,
