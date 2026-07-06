@@ -13,7 +13,7 @@ def determine_apr_level(
         index = 0
     elif amount_incl_tax < 5_000_000:
         index = 1
-    elif amount_incl_tax < 7_000_000:
+    elif amount_incl_tax < 8_000_000:
         index = 2
     else:
         index = 3

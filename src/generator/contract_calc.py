@@ -104,7 +104,7 @@ class ContractCalcAnswerer:
         contract = rows[0]
         if "単価" in question and ("+2000" in question or "＋2000" in question):
             return self._answer_rate_delta(question, contract)
-        if "時間単価" in question and "割" in question:
+        if "ESTH" in question and "ACTH" in question and "割" in question:
             return self._answer_derived_hourly_rate(contract)
         hours = parse_hours(question)
         if hours is not None and ("見込" in question or "請求" in question):

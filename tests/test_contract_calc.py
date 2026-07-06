@@ -40,6 +40,14 @@ def test_determine_apr_level_applies_medical_and_tm_minimum() -> None:
     assert determine_apr_level(3_300_000, False, True) == "APR-M2"
 
 
+def test_determine_apr_level_normal_bracket_boundaries() -> None:
+    # 社内管理_決裁基準.md: 5,000,000円以上8,000,000円未満は部長承認(APR-M2)、
+    # 8,000,000円以上で初めて本部長承認(APR-M3)。7,480,000円は部長承認のまま。
+    assert determine_apr_level(7_480_000, False, False) == "APR-M2"
+    assert determine_apr_level(7_999_999, False, False) == "APR-M2"
+    assert determine_apr_level(8_000_000, False, False) == "APR-M3"
+
+
 def test_billed_amount_rounds_to_half_hour_ceiling() -> None:
     assert billed_amount_incl_tax(_tm(), 155 + 10 / 60) == 4_276_250
 
@@ -73,14 +81,16 @@ def test_answer_final_difference_from_report_value() -> None:
 
 
 def test_answer_derived_hourly_rate_from_amount_and_hour_gap() -> None:
-    row = _tm()
+    # 実データのQ37の文言そのもの（「時間単価」という語は含まれず「1時間あたり」表記）
+    row = _tm("株式会社青葉バイオメディカル機器")
     row["estimated_amount_incl_tax"] = 3_740_000
     row["final_amount_incl_tax"] = 3_443_000
     row["esth_hours"] = 170.0
     row["actual_hours"] = 156.5
     answer = ContractCalcAnswerer().answer(
-        "見込税込-確定税込をESTH-ACTHの差で割った時間単価はいくらですか。",
-        "医療法人社団 蒼泉会 ひがし丘総合病院",
+        "AOBMにおいて、見込金額（税込）と確定金額（税込）の差を、ESTHとACTHの差で"
+        "割った1時間あたりの減少金額を計算してください。",
+        "株式会社青葉バイオメディカル機器",
         _store([row]),
     )
     assert not answer.was_gated
@@ -91,6 +101,8 @@ def test_answer_apr_m3_list_and_total_uses_primary_aliases() -> None:
     rows = [
         _tm("医療法人社団 蒼泉会 ひがし丘総合病院"),
         {
+            # 7,480,000円は決裁基準上まだ部長承認(APR-M2)であり、APR-M3ではない
+            # (7,000,000円を閾値にすると誤ってAPR-M3扱いになるリグレッションガード)
             "project_name": "白峰信用リスク評価株式会社",
             "status": "ok",
             "contract_type": "fixed",
@@ -102,17 +114,27 @@ def test_answer_apr_m3_list_and_total_uses_primary_aliases() -> None:
             "contract_type": "fixed",
             "estimated_amount_incl_tax": 4620000,
         },
+        {
+            "project_name": "本部長承認案件株式会社",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 8500000,
+        },
     ]
     answerer = ContractCalcAnswerer()
     answer = answerer.answer(
         "APR-M3必要案件を主略称ですべて挙げ契約金額合計を答えてください。",
         None,
         _store(rows),
-        {"医療法人社団 蒼泉会 ひがし丘総合病院": "SOHK", "白峰信用リスク評価株式会社": "SHIRAMINE"},
+        {
+            "医療法人社団 蒼泉会 ひがし丘総合病院": "SOHK",
+            "白峰信用リスク評価株式会社": "SHIRAMINE",
+            "本部長承認案件株式会社": "HONBU",
+        },
         {},
     )
     assert not answer.was_gated
-    assert answer.text == "SHIRAMINE、合計7,480,000円"
+    assert answer.text == "HONBU、合計8,500,000円"
 
 
 def test_primary_alias_lookup_normalizes_nfd_keys() -> None:
@@ -124,13 +146,13 @@ def test_primary_alias_lookup_normalizes_nfd_keys() -> None:
             "project_name": project,
             "status": "ok",
             "contract_type": "fixed",
-            "estimated_amount_incl_tax": 7480000,
+            "estimated_amount_incl_tax": 8500000,
         }]),
         {unicodedata.normalize("NFD", project): "SHIRAMINE"},
         {},
     )
     assert not answer.was_gated
-    assert answer.text == "SHIRAMINE、合計7,480,000円"
+    assert answer.text == "SHIRAMINE、合計8,500,000円"
 
 
 def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
