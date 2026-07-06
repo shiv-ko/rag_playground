@@ -5,15 +5,12 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from src.models import Document
-from src.parsers.text_parser import TextParser
-from src.parsers.pdf_parser import PDFParser
-from src.parsers.office_parser import OfficeParser
-from src.parsers.image_parser import ImageParser
 from src.parsers.dispatcher import ParserDispatcher
-
+from src.parsers.image_parser import ImageParser
+from src.parsers.office_parser import OfficeParser
+from src.parsers.pdf_parser import PDFParser
+from src.parsers.text_parser import TextParser
 
 # ─────────────────────── TextParser ───────────────────────
 
@@ -51,6 +48,20 @@ class TestTextParser:
     def test_can_handle_tsv(self, tmp_path: Path) -> None:
         parser = TextParser()
         assert parser.can_handle(tmp_path / "data.tsv") is True
+
+    def test_can_handle_py(self, tmp_path: Path) -> None:
+        """.pyファイル（modeling.py等）が未対応だと、code_static設問の検索対象が
+        存在しないまま何一つ拾えない（実測: valid Q4/Q28がともに検索失敗）。"""
+        parser = TextParser()
+        assert parser.can_handle(tmp_path / "modeling.py") is True
+
+    def test_parse_py_returns_document_with_source_text(self, tmp_path: Path) -> None:
+        f = tmp_path / "modeling.py"
+        f.write_text("if df['CAT'].dtype == 'object':\n    pass\n", encoding="utf-8")
+        parser = TextParser()
+        docs = parser.parse(f)
+        assert len(docs) == 1
+        assert "df['CAT'].dtype" in docs[0].text
 
 
 # ─────────────────────── PDFParser ───────────────────────
@@ -280,6 +291,20 @@ class TestParserDispatcher:
         assert docs[0].metadata["is_internal"] is True
         assert docs[0].metadata["project"] is None
 
+    def test_parse_directory_indexes_python_source_files(self, tmp_path: Path) -> None:
+        """modeling.py等の.pyファイルが検索対象として拾われることを保証する回帰テスト
+        （実測: valid Q4/Q28はcode_staticタイプで.pyが未対応のため検索失敗していた）。"""
+        (tmp_path / "modeling.py").write_text(
+            "if df['CAT'].dtype == 'object' and df['CAT'].nunique() < 10:\n"
+            "    category_columns.append('CAT')\n",
+            encoding="utf-8",
+        )
+        dispatcher = ParserDispatcher()
+        docs = dispatcher.parse_directory(tmp_path)
+        texts = [d.text for d in docs]
+        assert any("df['CAT'].dtype" in t for t in texts)
+        assert not any("未対応形式" in t for t in texts)
+
     def test_parse_directory_skips_noise_files(self, tmp_path: Path) -> None:
         """__pycache__/*.pyc, *.lock, ~$で始まる一時ファイルを除外する"""
         (tmp_path / "a.txt").write_text("残す", encoding="utf-8")
@@ -312,6 +337,7 @@ class TestNotebookParser:
 
     def test_extracts_markdown_and_code_cell_text(self, tmp_path: Path) -> None:
         import json as jsonlib
+
         from src.parsers.notebook_parser import NotebookParser
 
         notebook = {

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.models import Document
 
-SUPPORTED = {".txt", ".md", ".csv", ".json", ".tsv"}
+SUPPORTED = {".txt", ".md", ".csv", ".json", ".tsv", ".py"}
 
 
 class TextParser:
