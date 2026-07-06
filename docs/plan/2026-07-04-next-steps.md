@@ -100,9 +100,16 @@ step-reviewはコミット前セルフレビュー1周で代替する（`.claude
       （Missingに逃がす）。実データ8問（valid Q9, test Q0/1/9/14/74/95/22）でオフライン検証しペア特定は全問成功。
       詳細は`docs/daily作業ログ/20260706_004522.md`。**未実施**: 実データ・APIキー環境でのvalid実行・
       official較正・test生成（本セッションはキー無しのクラウド環境のため不可）
-- [ ] contract_rule（10問）→ cross_project（9問）の順（valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め）
-- [ ] internal_terms（test 11問）はPhase 3扱いで追加検討: valid Q15/Q16はMS日付・営業日計算系で、
-  上記スケジュール/マイルストーン資産（§3のMS表）を流用できる可能性が高い
+- [ ] contract_rule（10問）→ cross_project（9問）の順。ただし**実データ（`data/raw`の契約書実物）が
+  無いと抽出仕様（契約方式・ESTH/ACTH等の実際の書式）を推測することになり手戻りリスクが高いため、
+  `data/raw`とAPIキーがある環境での着手を推奨**（2026-07-06、クラウド環境での判断）。
+  valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め。
+- [ ] internal_terms（test 11問、MS日付・営業日計算系）: 実装計画を
+  `docs/plan/2026-07-06-internal-terms-ms-date.md`に策定済み（2026-07-06）。
+  `artifacts/schedule_tasks.jsonl` `term_registry.json` `project_registry.json`（既にgit管理下の
+  実データ由来artifacts）を根拠に設計済みのため、`data/raw`無しの環境でも実装・TDD検証まで完結できる。
+  計画時に副次的に発見: `project_registry.json`の`aliases`はソート済みで「主略称」ではない
+  （例: 青潮モビリティの実際の略称は`AOSHIO`だが`aliases[0]`は`AOS`）→ Task 0として先に修正が必要。
 
 ## 5. チャンク・検索の修正（Phase 0の切り分け結果待ち）
 
