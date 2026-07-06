@@ -13,7 +13,11 @@ from docx import Document as DocxDocument
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.utils.glossary import parse_project_aliases, parse_term_entries
+from src.utils.glossary import (
+    parse_project_aliases,
+    parse_project_primary_aliases,
+    parse_term_entries,
+)
 
 SHARE_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ"
 PROJECT_ROOT = SHARE_ROOT / "プロジェクト"
@@ -69,6 +73,14 @@ def aliases_for(project_name: str, project_aliases: dict[str, list[str]]) -> lis
         if token in normalized:
             aliases.add(normalized.replace(token, "").strip())
     return sorted(alias for alias in aliases if alias)
+
+
+def primary_alias_for(project_name: str, project_primary_aliases: dict[str, str]) -> str | None:
+    normalized = normalize_project_name(project_name)
+    for key, value in project_primary_aliases.items():
+        if normalize_project_name(key) == normalized:
+            return value
+    return None
 
 
 def section_for(path: Path) -> tuple[str | None, str | None]:
@@ -164,7 +176,10 @@ def ids_from_path(path: Path) -> list[str]:
     return sorted(set(re.findall(r"\b(?:M|MS|T|A|CP)\d{1,3}\b", text)))
 
 
-def build_project_registry(project_aliases: dict[str, list[str]]) -> list[dict[str, Any]]:
+def build_project_registry(
+    project_aliases: dict[str, list[str]],
+    project_primary_aliases: dict[str, str],
+) -> list[dict[str, Any]]:
     projects = []
     for project_dir in sorted(p for p in PROJECT_ROOT.iterdir() if p.is_dir()):
         files = [p for p in project_dir.rglob("*") if p.is_file()]
@@ -172,6 +187,7 @@ def build_project_registry(project_aliases: dict[str, list[str]]) -> list[dict[s
             {
                 "project_name": project_dir.name,
                 "aliases": aliases_for(project_dir.name, project_aliases),
+                "primary_alias": primary_alias_for(project_dir.name, project_primary_aliases),
                 "file_count": len(files),
                 "sections": sorted({section_for(p)[0] for p in files if section_for(p)[0]}),
             }
@@ -216,9 +232,10 @@ def build_document_registry(project_aliases: dict[str, list[str]]) -> list[dict[
 def main() -> None:
     tables = read_docx_tables(GLOSSARY_PATH)
     project_aliases = parse_project_aliases(tables)
+    project_primary_aliases = parse_project_primary_aliases(tables)
     term_registry = parse_term_entries(tables)
 
-    projects = build_project_registry(project_aliases)
+    projects = build_project_registry(project_aliases, project_primary_aliases)
     documents = build_document_registry(project_aliases)
     write_json(ARTIFACTS / "project_registry.json", projects)
     write_jsonl(ARTIFACTS / "document_registry.jsonl", documents)

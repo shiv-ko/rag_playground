@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import re
+
 IMAGE_KEYWORDS = (".png", ".jpg", "画像", "グラフ", "figure", "マーカー", "折れ線", "図")
 VERSION_DIFF_KEYWORDS = (
     "old", "旧版", "新旧", "更新内容", "変更内容", "実質的な変更", "最新版",
@@ -25,6 +27,17 @@ OFFICE_STYLE_KEYWORDS = (
 SPREADSHEET_CALC_KEYWORDS = (
     "平均", "合計", "四捨五入", "算出してください", "train.csv", "何人", "何件",
 )
+# Q16型（「M01の日からFR実施までの日数は何日ですか」）: マイルストーンコード
+# （M0N等。日本語の\bはUnicode文字境界で機能しないため非英数字境界で判定する）と
+# 日数を問う言い回しが共起する質問。
+_MS_CODE_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])M\d{2}(?![A-Za-z0-9])")
+MS_DATE_DURATION_KEYWORDS = ("日数", "何日")
+# Q15型（「中間報告会または中間レビューが2025年7月1日以前に実施された案件を、
+# 主略称ですべて挙げてください」）: マイルストーンの業務イベント語＋しきい値日付＋
+# 前後方向＋案件列挙の組み合わせが揃う質問。
+MS_DATE_EVENT_KEYWORDS = ("キックオフ", "中間報告", "中間レビュー", "最終報告", "最終レビュー", "検収")
+MS_DATE_DIRECTION_KEYWORDS = ("以前", "以降")
+_MS_DATE_TOKEN_RE = re.compile(r"\d{4}年\d{1,2}月\d{1,2}日")
 
 
 def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:
@@ -66,6 +79,15 @@ def classify_question(question: str) -> list[str]:
         tags.append("office_style")
     if any(k.lower() in lower for k in SPREADSHEET_CALC_KEYWORDS):
         tags.append("spreadsheet_calc")
+    if _MS_CODE_TOKEN_RE.search(question) and any(k in question for k in MS_DATE_DURATION_KEYWORDS):
+        tags.append("ms_date_duration")
+    if (
+        any(k in question for k in MS_DATE_EVENT_KEYWORDS)
+        and any(k in question for k in MS_DATE_DIRECTION_KEYWORDS)
+        and _MS_DATE_TOKEN_RE.search(question)
+        and "案件" in question
+    ):
+        tags.append("ms_date_cross_project_list")
     if not tags:
         tags.append("text_only")
     return tags

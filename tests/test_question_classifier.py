@@ -106,6 +106,31 @@ def test_question_can_have_both_spreadsheet_state_and_highlight_style_tags() -> 
     assert "office_style" in tags
 
 
+def test_detects_ms_date_duration_question() -> None:
+    assert "ms_date_duration" in classify_question(
+        "MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。"
+    )
+
+
+def test_ms_date_duration_requires_both_code_and_duration_wording() -> None:
+    tags = classify_question("M01のキックオフ会議の参加者を教えてください。")
+    assert "ms_date_duration" not in tags
+
+
+def test_detects_ms_date_cross_project_list_question() -> None:
+    assert "ms_date_cross_project_list" in classify_question(
+        "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。"
+    )
+
+
+def test_ms_date_cross_project_list_requires_direction_and_date_and_project() -> None:
+    """中間報告会等の語だけでは付かない（日付・前後方向・「案件」が揃って初めて付く）。"""
+    tags = classify_question(
+        "最終報告における、要因分析のページで、マーカーされている単語をすべて抜き出してください。"
+    )
+    assert "ms_date_cross_project_list" not in tags
+
+
 def test_generic_phrases_alone_do_not_trigger_spreadsheet_calc():
     """「の中で」「該当する」は一般文に頻出するため、単独ではcalcタグを付けない。"""
     assert "spreadsheet_calc" not in classify_question(

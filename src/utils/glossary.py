@@ -55,3 +55,29 @@ def parse_project_aliases(tables: list[list[list[str]]]) -> dict[str, list[str]]
             values = [v for v in ([primary] + alternates) if v]
             aliases[name] = sorted(set(values))
     return aliases
+
+
+def parse_project_primary_aliases(tables: list[list[list[str]]]) -> dict[str, str]:
+    """案件名→「主略称」（社内用語集の`主略称`列そのもの）を1件ずつ返す。
+
+    parse_project_aliases()はalternatesと合わせてソート済みの集合を返すため、
+    「主略称」の情報が失われる（sorted()後の先頭要素はアルファベット順1位に過ぎず、
+    実際の主略称と一致するとは限らない）。cross_project一覧の回答（Q15型）で
+    「主略称」を答えるには、primary列を単独で保持するこの関数が必要。
+    """
+    primaries: dict[str, str] = {}
+    for table in tables:
+        if not table:
+            continue
+        header = [c.strip() for c in table[0]]
+        if header[: len(_ALIAS_HEADER_PREFIX)] != _ALIAS_HEADER_PREFIX:
+            continue
+        for row in table[1:]:
+            if len(row) < 2:
+                continue
+            name = _clean(row[0])
+            primary = _clean(row[1])
+            if not name or not primary:
+                continue
+            primaries[name] = primary
+    return primaries

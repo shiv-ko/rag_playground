@@ -104,12 +104,18 @@ step-reviewはコミット前セルフレビュー1周で代替する（`.claude
   無いと抽出仕様（契約方式・ESTH/ACTH等の実際の書式）を推測することになり手戻りリスクが高いため、
   `data/raw`とAPIキーがある環境での着手を推奨**（2026-07-06、クラウド環境での判断）。
   valid Q3のIncorrect歴があるcross_projectは最後・ゲート厚め。
-- [ ] internal_terms（test 11問、MS日付・営業日計算系）: 実装計画を
-  `docs/plan/2026-07-06-internal-terms-ms-date.md`に策定済み（2026-07-06）。
-  `artifacts/schedule_tasks.jsonl` `term_registry.json` `project_registry.json`（既にgit管理下の
-  実データ由来artifacts）を根拠に設計済みのため、`data/raw`無しの環境でも実装・TDD検証まで完結できる。
-  計画時に副次的に発見: `project_registry.json`の`aliases`はソート済みで「主略称」ではない
-  （例: 青潮モビリティの実際の略称は`AOSHIO`だが`aliases[0]`は`AOS`）→ Task 0として先に修正が必要。
+- [x] internal_terms（test 11問、MS日付・営業日計算系）: `docs/plan/2026-07-06-internal-terms-ms-date.md`の
+  Task 0〜3をTDDで実装完了（2026-07-06）。詳細は`docs/daily作業ログ/20260706_023431.md`参照。
+  - Task 0: `src/utils/glossary.py`に`parse_project_primary_aliases()`を追加、
+    `scripts/build_registries.py`のproject_registry.jsonに`primary_alias`フィールドを追加
+    （`aliases[0]`がアルファベット順1位に過ぎず主略称と一致しない問題への対応）。
+  - Task 1: `src/retriever/milestone_resolver.py`（新規）でマイルストーンコード→日付解決
+    （文字通り一致優先→term_registry語義での意味的一致、白峰の独自M番号にも回帰テストで対応）。
+  - Task 2/3: `src/generator/milestone_date_answerer.py`（新規）で`MilestoneDurationAnswerer`
+    （Q16型）・`MilestoneThresholdListAnswerer`（Q15型）を実装、pipelineに配線。
+  - `.venv/bin/pytest tests/ -v` → 382 passed。sonnetサブエージェントによるstep-reviewもCONFIRMEDなし。
+  - **未実施**（`data/raw`が無いクラウド環境のため）: `artifacts/project_registry.json`自体の
+    `primary_alias`付き再生成、実データでのvalid Q15/Q16再実行・official較正。
 
 ## 5. チャンク・検索の修正（Phase 0の切り分け結果待ち）
 

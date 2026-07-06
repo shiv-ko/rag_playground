@@ -6,7 +6,11 @@ docx読み込み自体はテストしない（scripts/build_registries.py 側の
 """
 from __future__ import annotations
 
-from src.utils.glossary import parse_project_aliases, parse_term_entries
+from src.utils.glossary import (
+    parse_project_aliases,
+    parse_project_primary_aliases,
+    parse_term_entries,
+)
 
 TERM_TABLE = [
     ["正式名称", "社内用語", "補足"],
@@ -79,3 +83,19 @@ def test_parse_project_aliases_ignores_non_alias_tables():
 def test_parse_project_aliases_ignores_term_tables_mixed_in():
     aliases = parse_project_aliases([TERM_TABLE, ALIAS_TABLE])
     assert set(aliases) == {"京橋信用ソリューションズ株式会社", "案件横断"}
+
+
+def test_parse_project_primary_aliases_keeps_primary_column_only():
+    """parse_project_aliases()はprimary/alternatesをソート済み集合にまとめるため、
+    「主略称」列そのものの情報が失われる。cross_project一覧の回答（Q15型）で
+    「主略称ですべて挙げてください」に答えるには、primary列を単独で保持する
+    別関数が必要（aliases[0]はアルファベット順1位に過ぎず主略称と一致しない）。"""
+    primaries = parse_project_primary_aliases([ALIAS_TABLE])
+    assert primaries == {
+        "京橋信用ソリューションズ株式会社": "KSS",
+        "案件横断": "CROSS",
+    }
+
+
+def test_parse_project_primary_aliases_ignores_non_alias_tables():
+    assert parse_project_primary_aliases([TERM_TABLE, NON_TERM_TABLE]) == {}

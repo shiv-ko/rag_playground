@@ -40,12 +40,16 @@ def main() -> None:
 
     # run_pipeline.pyと同じ構成でレジストリを接続する（提出生成でも同一の回答経路を通す）
     project_aliases: dict[str, list[str]] = {}
+    project_primary_aliases: dict[str, str] = {}
     term_registry: list[dict] = []
     projects_path = args.artifacts_dir / "project_registry.json"
     terms_path = args.artifacts_dir / "term_registry.json"
     if projects_path.exists():
         projects = json.loads(projects_path.read_text(encoding="utf-8"))
         project_aliases = {p["project_name"]: p.get("aliases", []) for p in projects}
+        project_primary_aliases = {
+            p["project_name"]: p["primary_alias"] for p in projects if p.get("primary_alias")
+        }
     if terms_path.exists():
         term_registry = json.loads(terms_path.read_text(encoding="utf-8"))
 
@@ -56,6 +60,7 @@ def main() -> None:
         confidence_threshold=args.threshold,
         run_judge=False,
         project_aliases=project_aliases,
+        project_primary_aliases=project_primary_aliases,
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
     )

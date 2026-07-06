@@ -14,6 +14,10 @@ from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
 from src.generator.enumeration_gate import is_enumeration_complete
+from src.generator.milestone_date_answerer import (
+    MilestoneDurationAnswerer,
+    MilestoneThresholdListAnswerer,
+)
 from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
 from src.models import Answer, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
@@ -71,6 +75,7 @@ class Pipeline:
         confidence_threshold: float = 0.4,
         run_judge: bool = True,
         project_aliases: dict[str, list[str]] | None = None,
+        project_primary_aliases: dict[str, str] | None = None,
         term_registry: list[dict] | None = None,
         artifacts_dir: Path | None = None,
         cache_dir: Path | None = None,
@@ -84,13 +89,19 @@ class Pipeline:
 
         self.dispatcher = ParserDispatcher()
         self.retriever = ProjectScopedRetriever(project_aliases=project_aliases)
-        self.query_expander = QueryExpander(term_registry or [])
+        self.term_registry = term_registry or []
+        self.project_primary_aliases = project_primary_aliases or {}
+        self.query_expander = QueryExpander(self.term_registry)
         self.generator = AnswerGenerator(threshold=confidence_threshold)
         self.judge = LocalJudge()
         self.structured_store = (
             StructuredArtifactStore.from_artifacts_dir(artifacts_dir) if artifacts_dir else None
         )
         self.spreadsheet_calc_answerer = SpreadsheetCalcAnswerer(threshold=confidence_threshold)
+        self.milestone_duration_answerer = MilestoneDurationAnswerer(threshold=confidence_threshold)
+        self.milestone_threshold_list_answerer = MilestoneThresholdListAnswerer(
+            threshold=confidence_threshold
+        )
 
     # ------------------------------------------------------------------ #
     # インデックス構築
@@ -141,6 +152,15 @@ class Pipeline:
             return None
 
     def _process_structured(self, qa: QAPair, tags: list[str]) -> Answer | None:
+        if "ms_date_cross_project_list" in tags and self.structured_store is not None:
+            # Q15型は単一案件に紐づかない横断質問のため、project_name解決より先に処理する
+            list_answer = self.milestone_threshold_list_answerer.answer(
+                qa.question, self.structured_store, self.project_primary_aliases
+            )
+            if not list_answer.was_gated:
+                return list_answer
+            # 解決できなければMissing固定にせず後続のパスへ委ねる
+
         project_name = self._resolve_project_name(qa.question)
         if project_name is None:
             return None
@@ -154,6 +174,14 @@ class Pipeline:
             # train.csvが無い・集計仕様に落とせなかった場合はMissing固定にせず
             # 後続の構造化ビルダー（state/office）→通常の検索パスへ委ねる
             # （calc早期returnがQ6/Q21型のPivot質問を殺していた実測に基づく）
+
+        if "ms_date_duration" in tags and self.structured_store is not None:
+            duration_answer = self.milestone_duration_answerer.answer(
+                qa.question, project_name, self.structured_store, self.term_registry
+            )
+            if not duration_answer.was_gated:
+                return duration_answer
+            # 解決できなければMissing固定にせず後続のパスへ委ねる
 
         if self.structured_store is None:
             return None
@@ -241,7 +269,17 @@ class Pipeline:
     def _process_one(self, qa: QAPair) -> PipelineResult:
         tags = classify_question(qa.question)
         answer = None
-        if any(t in tags for t in ("office_style", "spreadsheet_state", "spreadsheet_calc", "version_diff")):
+        if any(
+            t in tags
+            for t in (
+                "office_style",
+                "spreadsheet_state",
+                "spreadsheet_calc",
+                "version_diff",
+                "ms_date_duration",
+                "ms_date_cross_project_list",
+            )
+        ):
             answer = self._process_structured(qa, tags)
 
         if answer is None:

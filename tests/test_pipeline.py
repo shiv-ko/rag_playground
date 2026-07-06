@@ -685,3 +685,103 @@ def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
     assert "generator_tokens" in summary
     assert "judge_tokens" in summary
     assert "models" in summary
+
+
+def test_pipeline_routes_ms_date_duration_question_to_milestone_answerer(tmp_path: Path) -> None:
+    """Q16型: 「M01の日からFR実施までの日数は何日ですか」はLLMではなくPythonで直接計算する。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    schedule_rows = [
+        {
+            "project_name": "MINAMINO",
+            "values": {
+                "タスク名": "キックオフ実施・開始合意", "備考": "CP1",
+                "開始日": "2025-04-03T00:00:00", "終了日": "2025-04-03T00:00:00",
+            },
+        },
+        {
+            "project_name": "MINAMINO",
+            "values": {
+                "タスク名": "最終成果物提出・最終報告会", "備考": "CP6",
+                "開始日": "2025-05-15T00:00:00", "終了日": "2025-05-15T00:00:00",
+            },
+        },
+    ]
+    (artifacts_dir / "schedule_tasks.jsonl").write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in schedule_rows), encoding="utf-8"
+    )
+    term_registry = [
+        {"term": "M01", "expansion": "キックオフ", "note": ""},
+        {"term": "FR", "expansion": "最終報告書", "note": "Final Report"},
+    ]
+
+    pipeline = Pipeline(
+        data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir, term_registry=term_registry,
+    )
+
+    def _boom(question, contexts):
+        raise AssertionError("ms_date_durationは通常のgenerate()を使ってはいけない")
+
+    pipeline.generator.generate = _boom
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。",
+    ))
+
+    assert result.answer == "43"
+
+
+def test_pipeline_routes_ms_date_cross_project_list_question(tmp_path: Path) -> None:
+    """Q15型: 「中間報告会または中間レビューが〜以前に実施された案件を、主略称ですべて挙げてください」
+    は単一案件検出に依存せず、全案件を横断してPythonで直接フィルタする。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    schedule_rows = [
+        {
+            "project_name": "KSS社",
+            "values": {
+                "タスク名": "中間報告会実施", "備考": "",
+                "開始日": "2025-06-01T00:00:00", "終了日": "2025-06-01T00:00:00",
+            },
+        },
+        {
+            "project_name": "TOTO社",
+            "values": {
+                "タスク名": "中間報告会議実施（M02）", "備考": "",
+                "開始日": "2025-08-01T00:00:00", "終了日": "2025-08-01T00:00:00",
+            },
+        },
+    ]
+    (artifacts_dir / "schedule_tasks.jsonl").write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in schedule_rows), encoding="utf-8"
+    )
+
+    pipeline = Pipeline(
+        data_dir=tmp_path,
+        run_judge=False,
+        artifacts_dir=artifacts_dir,
+        project_primary_aliases={"KSS社": "KSS", "TOTO社": "TOTO"},
+    )
+
+    def _boom(question, contexts):
+        raise AssertionError("ms_date_cross_project_listは通常のgenerate()を使ってはいけない")
+
+    pipeline.generator.generate = _boom
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+    ))
+
+    assert result.answer == "KSS"
