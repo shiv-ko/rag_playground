@@ -569,6 +569,73 @@ def test_pipeline_routes_version_diff_question_through_structured_context(tmp_pa
     assert "Time & Materials" in result.answer
 
 
+def test_pipeline_prefers_version_diff_over_schedule_status_overmatch(tmp_path: Path) -> None:
+    """xlsx新旧比較の質問（例:「スケジュール_r1.xlsxとスケジュール_r2.xlsxを比較したとき、
+    未着手から完了への変更を除いて」）は version_diff タグと spreadsheet_state タグの両方が付く。
+    schedule_tasksの「ステータス」列の値（未着手/完了）は一般的な語で質問文にそのまま含まれるため、
+    spreadsheet_stateを先に試すと無関係な行が大量にヒットしてversion_diffへ辿り着けない
+    （実データ実測: 44行 vs 正しいdiff1件）。version_diffを優先することを固定する回帰テスト。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    schedule_rows = [
+        {
+            "project_name": "テスト社",
+            "sheet_name": "WBSタスク一覧",
+            "source_path": "data/raw/x/スケジュール_r2.xlsx",
+            "values": {"タスクID": f"T{i:02d}", "ステータス": "未着手" if i % 2 == 0 else "完了"},
+        }
+        for i in range(20)
+    ]
+    (artifacts_dir / "schedule_tasks.jsonl").write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in schedule_rows), encoding="utf-8",
+    )
+    (artifacts_dir / "version_diff_poc.jsonl").write_text(
+        json.dumps({
+            "project_name": "テスト社",
+            "normalized_title": "スケジュール",
+            "old_path": "data/raw/x/スケジュール_r1.xlsx",
+            "new_path": "data/raw/x/スケジュール_r2.xlsx",
+            "old_file_name": "スケジュール_r1.xlsx",
+            "new_file_name": "スケジュール_r2.xlsx",
+            "old_version_tag": "r1",
+            "new_version_tag": "r2",
+            "status": "ok",
+            "added_count": 0, "removed_count": 0, "changed_count": 1,
+            "added_samples": [], "removed_samples": [],
+            "changed_samples": [{"before": "担当: 鈴木", "after": "担当: 高橋"}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    captured_contexts: list[str] = []
+
+    def _fake_llm(question: str, context: str) -> str:
+        captured_contexts.append(context)
+        return json.dumps({
+            "answer": "担当が鈴木から高橋に変更されました。",
+            "confidence": 0.9,
+            "citation": "担当: 高橋",
+            "reasoning": "r",
+        }, ensure_ascii=False)
+
+    pipeline.generator._call_llm = _fake_llm
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のスケジュール_r1.xlsxとスケジュール_r2.xlsxを比較したとき、"
+                 "未着手から完了への変更を除いて、案件遂行に関連する変更点を挙げてください。",
+    ))
+
+    assert captured_contexts and "担当: 鈴木" in captured_contexts[0]
+    assert "T00" not in captured_contexts[0]
+    assert "高橋" in result.answer
+
+
 def test_load_train_csv_does_not_fall_back_to_other_projects_csv(tmp_path: Path) -> None:
     """案件名にマッチしないtrain.csvは、全体で1つしか無くても使わない
     （別案件のデータで計算した数値はIncorrect直行のため）。"""

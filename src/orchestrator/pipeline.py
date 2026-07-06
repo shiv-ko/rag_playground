@@ -166,9 +166,14 @@ class Pipeline:
         ]
         if question_mentions_spreadsheet(qa.question):
             pair.reverse()
-        # version_diffは他の2タグと排反に近い（新旧比較の明示的な言い回しでのみ付く）ため、
-        # office_style/spreadsheet_stateの優先順スワップには含めず常に最後に試す
-        builders = pair + [("version_diff", build_version_diff_context)]
+        # version_diffを先頭に置く: 新旧比較の明示的な言い回しでのみ付く狭いタグな上、
+        # build_version_diff_context自体がペアを1つに絞れた時だけ非空を返す（絞れなければ[]で
+        # 後続に委ねる）。一方spreadsheet_stateの schedule_tasks 照合は「未着手/完了」のような
+        # 一般的なステータス語がそのまま質問文に含まれるだけで多数行にマッチしうるため、
+        # xlsx新旧比較の質問（例:「スケジュール_r1.xlsxとスケジュール_r2.xlsxを比較したとき、
+        # 未着手から完了への変更を除いて」）でspreadsheet_stateを先に試すと無関係な行が
+        # 大量にヒットしてversion_diffが一度も呼ばれなくなる（実測: 44行 vs 正しいdiff1件）。
+        builders = [("version_diff", build_version_diff_context)] + pair
 
         contexts: list[ScoredDocument] = []
         used_tag = ""

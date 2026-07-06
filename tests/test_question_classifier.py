@@ -46,6 +46,13 @@ def test_detects_version_diff_question_phrased_as_compared_when() -> None:
     assert "version_diff" in classify_question(q)
 
 
+def test_detects_version_diff_question_phrased_as_change_content() -> None:
+    """build_generated_eval.pyのversion_diff生成テンプレートが使う言い回し
+    （「〜への変更内容のうち、変更された箇所を挙げてください。」）を検出できること。"""
+    q = "A社案件の提案書old.pptxから提案書.pptxへの変更内容のうち、変更された箇所を挙げてください。"
+    assert "version_diff" in classify_question(q)
+
+
 def test_detects_spreadsheet_state_question() -> None:
     assert "spreadsheet_state" in classify_question(
         "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。"

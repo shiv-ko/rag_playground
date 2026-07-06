@@ -7,7 +7,7 @@ from __future__ import annotations
 
 IMAGE_KEYWORDS = (".png", ".jpg", "画像", "グラフ", "figure", "マーカー", "折れ線", "図")
 VERSION_DIFF_KEYWORDS = (
-    "old", "旧版", "新旧", "更新内容", "実質的な変更", "最新版",
+    "old", "旧版", "新旧", "更新内容", "変更内容", "実質的な変更", "最新版",
     "修正されたもの", "を比較したとき", "変わっている点",
 )
 PASSWORD_KEYWORDS = ("パスワード", "password", "保護されたファイル")
