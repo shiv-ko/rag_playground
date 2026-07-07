@@ -77,16 +77,44 @@ class ProjectScopedRetriever:
                     return name
         return None
 
+    def _strip_project_tokens(self, query: str, project: str) -> str:
+        """スコープ確定後のクエリから案件名・エイリアストークンを除去する。
+
+        プロジェクトスコープ内では案件名/エイリアスは全チャンク共通で
+        識別力ゼロなのに、表紙スライド（案件名の密度が高い）を不当に
+        上位化してしまう（タイトルスライド汚染）。除去後に空文字/空白のみに
+        なる場合は元クエリのままフォールバックする。
+        """
+        normalized_query = unicodedata.normalize("NFC", query)
+        normalized_project = _normalize_project_name(project)
+        tokens = [normalized_project] if normalized_project else []
+        tokens.extend(
+            _normalize_project_name(alias)
+            for alias in self._aliases_by_normalized_name.get(normalized_project, [])
+        )
+
+        stripped = normalized_query
+        for token in tokens:
+            if token:
+                stripped = stripped.replace(token, "")
+        stripped = stripped.strip()
+        return stripped if stripped else query
+
     def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
         project = self.detect_project(query)
-        store = self._project_stores[project] if project is not None else self._global_store
+        if project is not None:
+            store = self._project_stores[project]
+            search_query = self._strip_project_tokens(query, project)
+        else:
+            store = self._global_store
+            search_query = query
         if not question_mentions_extension(query):
-            return store.search(query, top_k)
+            return store.search(search_query, top_k)
 
         # 名指しファイルのチャンクを優先する。候補を広めに取り、候補のbasename
         # 集合を既知名として質問文と部分文字列照合する（find_named_files）。
         # 一致ゼロなら従来結果と同一 — ハードフィルタにしない。
-        candidates = store.search(query, top_k * 4)
+        candidates = store.search(search_query, top_k * 4)
         known_names = [c.document.source_path for c in candidates]
         matched_basenames = set(find_named_files(query, known_names))
         if not matched_basenames:
