@@ -58,7 +58,7 @@ class StructuredArtifactStore:
     def project_names(self) -> list[str]:
         names: set[str] = set()
         for by_project in self._data.values():
-            names.update(name for name in by_project if name)
+            names.update(unicodedata.normalize("NFC", name) for name in by_project if name)
         return sorted(names)
 
     def highlight_cells_for(self, project_name: str) -> list[dict]:

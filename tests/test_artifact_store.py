@@ -122,3 +122,31 @@ def test_version_diff_pairs_lookup_normalizes_unicode(tmp_path: Path) -> None:
     ])
     store = StructuredArtifactStore.from_artifacts_dir(tmp_path)
     assert len(store.version_diff_pairs_for("京橋信用ソリューションズ株式会社")) == 1
+
+
+def test_project_names_deduplicates_nfc_nfd_variants(tmp_path: Path) -> None:
+    """同一案件がNFCとNFDの両方の形式で複数レジストリに格納されている場合、
+    project_names()は1件に統一して返すこと（重複排除）。
+
+    実データでは、macOSファイルパス由来のNFDと、contracts.jsonlのNFC
+    が混在しているため、回帰テストが必要。
+    """
+    nfc_name = "青葉与信マネジメント株式会社"
+    nfd_name = unicodedata.normalize("NFD", nfc_name)
+    assert nfc_name != nfd_name  # 前提: 分解可能な文字を含む
+
+    # 同一案件がNFCとNFDで異なるレジストリに格納されるケースを再現
+    _write_jsonl(tmp_path / "schedule_tasks.jsonl", [
+        {"project_name": nfd_name, "values": {"タスクID": "T01"}},
+    ])
+    _write_jsonl(tmp_path / "contracts.jsonl", [
+        {"project_name": nfc_name, "contract_id": "C001"},
+    ])
+
+    store = StructuredArtifactStore.from_artifacts_dir(tmp_path)
+    names = store.project_names()
+
+    # 同一案件が1件にまとまっていることを確認
+    assert len(names) == 1
+    # かつ、返されたのはNFC正規化されたもの
+    assert names[0] == nfc_name
