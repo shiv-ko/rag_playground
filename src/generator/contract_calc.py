@@ -100,6 +100,29 @@ def parse_hour_delta(question: str) -> float | None:
     return -magnitude if match.group(2) == "少な" else magnitude
 
 
+# Q87型（「完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が
+# 10000行以上の案件を、案件略称ですべて挙げてください」）: APRレベルとサンプル行数の
+# しきい値の両方を質問文から汎用的にパースする。特定のレベル・しきい値をハードコードしない。
+_APR_LEVEL_RE = re.compile(r"APR-M(\d)")
+_ROW_THRESHOLD_RE = re.compile(r"([0-9][0-9,]*)\s*行以上")
+_VALID_APR_LEVELS = ("APR-M1", "APR-M2", "APR-M3")
+
+
+def parse_apr_level(question: str) -> str | None:
+    match = _APR_LEVEL_RE.search(question)
+    if not match:
+        return None
+    level = f"APR-M{match.group(1)}"
+    return level if level in _VALID_APR_LEVELS else None
+
+
+def parse_row_threshold(question: str) -> int | None:
+    match = _ROW_THRESHOLD_RE.search(question)
+    if not match:
+        return None
+    return int(match.group(1).replace(",", ""))
+
+
 def _project_alias(project: str, primary_aliases: dict[str, str]) -> str:
     normalized = unicodedata.normalize("NFC", project)
     for key, value in primary_aliases.items():
@@ -123,6 +146,11 @@ class ContractCalcAnswerer:
     ) -> Answer:
         project_primary_aliases = project_primary_aliases or {}
         project_aliases = project_aliases or {}
+        # Q87型（APRレベル×サンプル行数しきい値の複合条件での案件列挙）は、
+        # 素朴な "APR-M3" in question 分岐より広い条件（レベル問わず、かつ行数条件を伴う）
+        # にマッチしうるため、より特異的なこちらを先に評価する。
+        if _APR_LEVEL_RE.search(question) and _ROW_THRESHOLD_RE.search(question):
+            return self._answer_apr_row_threshold_list(question, store, project_primary_aliases, project_aliases)
         if "APR-M3" in question:
             return self._answer_apr_list(question, store, project_primary_aliases, project_aliases)
         if "契約期間" in question and "40日" in question:
@@ -224,6 +252,60 @@ class ContractCalcAnswerer:
         text = f"{names}、合計{_fmt_yen(total)}"
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_apr")
 
+    def _project_row_count(self, project_name: str) -> int | None:
+        if self.data_dir is None:
+            return None
+        normalized_project = unicodedata.normalize("NFC", project_name)
+        csvs = sorted(
+            p for p in self.data_dir.rglob("train.csv")
+            if normalized_project in unicodedata.normalize("NFC", str(p))
+        )
+        if not csvs:
+            return None
+        try:
+            return len(pd.read_csv(csvs[0]))
+        except Exception:
+            return None
+
+    def _answer_apr_row_threshold_list(
+        self,
+        question: str,
+        store: StructuredArtifactStore,
+        primary_aliases: dict[str, str],
+        aliases: dict[str, list[str]],
+    ) -> Answer:
+        level = parse_apr_level(question)
+        threshold = parse_row_threshold(question)
+        if level is None or threshold is None:
+            return _missing(self.gate)
+        require_completed = "完了" in question
+        matches: list[dict[str, Any]] = []
+        for row in store.all_contracts():
+            if row.get("status") != "ok":
+                continue
+            # 完了案件＝06.報告書由来のフィールド（最終請求額または実績工数）が
+            # registryに存在する案件、という既存構造に基づく判定。
+            if require_completed and row.get("final_amount_incl_tax") is None and row.get("actual_hours") is None:
+                continue
+            amount = row.get("estimated_amount_incl_tax")
+            if not amount:
+                continue
+            row_level = determine_apr_level(
+                int(amount),
+                is_medical_project(row["project_name"], aliases.get(row["project_name"])),
+                row.get("contract_type") == "time_and_materials",
+            )
+            if row_level != level:
+                continue
+            n_rows = self._project_row_count(row["project_name"])
+            if n_rows is None or n_rows < threshold:
+                continue
+            matches.append(row)
+        if not matches:
+            return _missing(self.gate)
+        text = "、".join(_project_alias(row["project_name"], primary_aliases) for row in matches)
+        return Answer(text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_apr_row_threshold")
+
     def _answer_overlap(
         self,
         question: str,
@@ -256,16 +338,8 @@ class ContractCalcAnswerer:
         for row in store.all_contracts():
             if row.get("contract_type") != "fixed" or not row.get("estimated_amount_incl_tax"):
                 continue
-            normalized_project = unicodedata.normalize("NFC", row["project_name"])
-            csvs = sorted(
-                p for p in self.data_dir.rglob("train.csv")
-                if normalized_project in unicodedata.normalize("NFC", str(p))
-            )
-            if not csvs:
-                continue
-            try:
-                n_rows = len(pd.read_csv(csvs[0]))
-            except Exception:
+            n_rows = self._project_row_count(row["project_name"])
+            if n_rows is None:
                 continue
             value = math.ceil(int(row["estimated_amount_incl_tax"]) / n_rows)
             if best is None or value > best[0]:
