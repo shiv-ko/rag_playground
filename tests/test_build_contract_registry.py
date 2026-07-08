@@ -13,6 +13,7 @@ from scripts.build_contract_registry import (
     candidate_dates_from_filename,
     classify_rounding_rule,
     extract_dates,
+    literal_password_from_filename,
     parse_contract_text,
 )
 from src.utils.office_crypto import derive_office_password
@@ -152,6 +153,17 @@ def test_candidate_dates_from_filename_empty_when_no_pw_marker() -> None:
     assert candidate_dates_from_filename(Path("契約書.docx")) == []
 
 
+def test_literal_password_from_filename_extracts_token_after_pw_prefix() -> None:
+    # 実データ(かえで案件)で判明した実運用パターン: `pw-<トークン>`のトークン自体が
+    # DA-規則を介さずそのまま平文パスワードになっているケースがある。
+    path = Path("契約書_pw-kaede20250902.docx")
+    assert literal_password_from_filename(path) == "kaede20250902"
+
+
+def test_literal_password_from_filename_none_when_no_pw_marker() -> None:
+    assert literal_password_from_filename(Path("契約書.docx")) is None
+
+
 def test_build_contract_registry_decrypts_via_filename_date_candidate(tmp_path: Path) -> None:
     project_root = tmp_path / "projects"
     contract_dir = project_root / "検証用医療法人テスト" / "01.契約"
@@ -186,6 +198,42 @@ def test_build_contract_registry_decrypts_via_filename_date_candidate(tmp_path: 
     assert row["start_date"] == "2025-01-15"
     assert row["end_date"] == "2025-02-11"
     assert row["estimated_amount_incl_tax"] == 1100000
+
+
+def test_build_contract_registry_decrypts_via_literal_filename_password(tmp_path: Path) -> None:
+    # 実データ(かえで案件)で判明したパターン: `pw-<トークン>`のトークンがDA-規則を介さず
+    # そのまま平文パスワードになっている（DA-規則の候補は全滅する状況でも、こちらで復号できる）。
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト6" / "01.契約"
+    contract_dir.mkdir(parents=True)
+
+    literal_password = "kaede20250902"
+    _write_encrypted_docx(
+        contract_dir / "契約書_pw-kaede20250902.docx",
+        literal_password,
+        [
+            "5. 契約期間",
+            "本契約の契約期間は、2025-09-02から2025-10-14までの6週間とする。",
+            "6. 報酬および支払条件",
+            "本契約の契約形態は固定価格契約とし、契約金額（税抜）：3,000,000円、"
+            "消費税額：300,000円、契約金額（税込）：3,300,000円とする。",
+        ],
+    )
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト6", "KAEDE")
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=tmp_path / "no_schedule.jsonl",
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["status"] == "ok"
+    assert row["start_date"] == "2025-09-02"
+    assert row["estimated_amount_incl_tax"] == 3300000
 
 
 def test_build_contract_registry_falls_back_to_schedule_date_candidate_when_filename_has_none(

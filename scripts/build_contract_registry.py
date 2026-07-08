@@ -36,6 +36,12 @@ _OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 # 抽出する（特定の案件名をハードコードしない汎用パターン）。
 _FILENAME_DATE_RE = re.compile(r"pw-[a-zA-Z0-9]{0,32}?(\d{8})", re.IGNORECASE)
 
+# 実データで判明した別の命名慣習: `pw-<トークン>`のトークン自体がDA-規則を介さず
+# そのまま平文パスワードになっているケースがある。マーカー以降・拡張子より前の
+# 英数字列全体を1つのリテラルパスワード候補として扱う（特定案件名のハードコードではなく
+# `pw-`マーカーという汎用の命名規則から導出する）。
+_FILENAME_LITERAL_PASSWORD_RE = re.compile(r"pw-([a-zA-Z0-9]+)", re.IGNORECASE)
+
 
 def normalize_text(text: str) -> str:
     return unicodedata.normalize("NFC", text).replace("\u3000", " ")
@@ -95,6 +101,16 @@ def candidate_dates_from_filename(path: Path) -> list[str]:
     return _FILENAME_DATE_RE.findall(path.stem)
 
 
+def literal_password_from_filename(path: Path) -> str | None:
+    """ファイル名の`pw-<トークン>`命名慣習から、トークン自体をリテラルパスワード候補として返す。
+
+    DA-規則（案件略号・開始日・拡張子からの導出）とは別の、より直接的な命名慣習。
+    マーカーが無ければNoneを返す。
+    """
+    match = _FILENAME_LITERAL_PASSWORD_RE.search(path.stem)
+    return match.group(1) if match else None
+
+
 def load_primary_aliases(project_registry_path: Path = PROJECT_REGISTRY_PATH) -> dict[str, str]:
     """project_registry.jsonから`project_name(NFC正規化) -> primary_alias`の対応表を作る。"""
     if not project_registry_path.exists():
@@ -140,6 +156,18 @@ def candidate_dates_from_schedule(
     return candidates
 
 
+def _try_decrypt_with_password(path: Path, password: str) -> str | None:
+    """1つのパスワード候補で復号を試み、成功すれば平文テキストを返す（誤りならNone）。"""
+    ext = path.suffix
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        output_path = Path(tmp_dir) / f"decrypted{ext}"
+        try:
+            decrypt_office_file(path, password, output_path)
+        except InvalidKeyError:
+            return None
+        return read_docx_text(output_path)
+
+
 def attempt_decrypt_contract_text(
     path: Path,
     project_name: str,
@@ -148,33 +176,36 @@ def attempt_decrypt_contract_text(
 ) -> str | None:
     """暗号化された契約書docxに対し、候補パスワードを順に試して復号し、平文テキストを返す。
 
-    設計判断（パスワード候補の日付をどこから得るか）: パスワードは
-    `DA-[案件略号]-[開始年月日8桁]-[拡張子]`だが、開始年月日はそのファイル自身の契約期間
-    フィールドにしか書かれておらず、暗号化されたファイル自身からは読めない（鶏と卵）。
-    そこでまず(1)ファイル名の`pw-...<8桁>`命名慣習（実運用で使われている、
-    docs/encrypted_file_queue.md記載）から日付候補を抽出し、それが見つからない場合のみ
-    (2)同一案件のスケジュールregistry(schedule_tasks.jsonl)の開始日/終了日候補を順に試す。
+    実データで2種類の命名慣習が確認されている:
+    (1) `pw-<トークン>`のトークン自体がDA-規則を介さずそのまま平文パスワードになっているケース
+        （かえで案件の契約書で確認済み）。まずこちらを試す（案件略号・日付を必要としない、
+        最も直接的な候補）。
+    (2) 規定の `DA-[案件略号]-[開始年月日8桁]-[拡張子]` 形式。開始年月日はそのファイル自身の
+        契約期間フィールドにしか書かれておらず、暗号化されたファイル自身からは読めない
+        （鶏と卵）ため、(2-a)ファイル名の`pw-...<8桁>`命名慣習から日付候補を抽出し、
+        それが見つからない場合のみ(2-b)同一案件のスケジュールregistry
+        (schedule_tasks.jsonl)の開始日/終了日候補を順に試す。
     全候補が`InvalidKeyError`（パスワード誤り）で失敗した場合はNoneを返し、
     呼び出し側は既存どおり安全側のstatus=failedにフォールバックする。
     """
+    literal_password = literal_password_from_filename(path)
+    if literal_password is not None:
+        text = _try_decrypt_with_password(path, literal_password)
+        if text is not None:
+            return text
+
     alias = primary_aliases.get(normalize_text(project_name))
     if not alias:
         return None
     candidates = candidate_dates_from_filename(path)
     if not candidates:
         candidates = candidate_dates_from_schedule(project_name, schedule_tasks_path)
-    if not candidates:
-        return None
     ext = path.suffix
     for candidate in candidates:
         password = derive_office_password(alias, candidate, ext)
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            output_path = Path(tmp_dir) / f"decrypted{ext}"
-            try:
-                decrypt_office_file(path, password, output_path)
-            except InvalidKeyError:
-                continue
-            return read_docx_text(output_path)
+        text = _try_decrypt_with_password(path, password)
+        if text is not None:
+            return text
     return None
 
 
