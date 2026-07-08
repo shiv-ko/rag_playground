@@ -1,6 +1,8 @@
 """Q15型（横断MS日付しきい値リスト）・Q16型（単一案件MS間日数計算）のテスト。"""
 from __future__ import annotations
 
+import unicodedata
+
 from src.generator.milestone_date_answerer import (
     MilestoneDurationAnswerer,
     MilestoneThresholdListAnswerer,
@@ -152,6 +154,27 @@ def test_threshold_list_answerer_filters_projects_by_date_after() -> None:
     )
     assert not answer.was_gated
     assert answer.text == "TOTO"
+
+
+def test_threshold_list_answerer_does_not_duplicate_nfc_nfd_project_variants() -> None:
+    """実データ実測（valid Q15）: 同一案件がNFC/NFDで別レジストリキーとして格納されていると
+    project_names()経由で二重列挙されていたバグ（`AYM、AYM、MINAMINO、SHR`）の回帰テスト。"""
+    nfc_name = "青葉与信マネジメント株式会社"
+    nfd_name = unicodedata.normalize("NFD", nfc_name)
+    assert nfc_name != nfd_name  # 前提: 実際にバイト列として異なる
+    rows = [
+        _row(nfc_name, "中間報告会実施", "", "2025-06-01", "2025-06-01"),
+        _row(nfd_name, "中間報告会実施", "", "2025-06-01", "2025-06-01"),
+    ]
+    store = _store(rows)
+    answerer = MilestoneThresholdListAnswerer()
+    answer = answerer.answer(
+        "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+        store,
+        {nfc_name: "AYM"},
+    )
+    assert not answer.was_gated
+    assert answer.text == "AYM"
 
 
 def test_threshold_list_answerer_excludes_prep_tasks_from_matching() -> None:

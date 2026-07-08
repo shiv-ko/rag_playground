@@ -36,18 +36,21 @@ NFC/NFD正規化せず素の`set()`で重複排除しているため、同一案
 
 ## 修正方針
 
-- [ ] `StructuredArtifactStore.project_names()`をNFC正規化してから重複排除するよう修正する
-      （`names.update(unicodedata.normalize("NFC", name) for name in by_project if name)`）
-- [ ] 回帰テスト追加: `tests/test_artifact_store.py`（無ければ新規）に、同一案件がNFCとNFDの
+- [x] `StructuredArtifactStore.project_names()`をNFC正規化してから重複排除するよう修正する
+      （`names.update(unicodedata.normalize("NFC", name) for name in by_project if name)`、
+      2026-07-07完了 `1cec020`）
+- [x] 回帰テスト追加: `tests/test_artifact_store.py`に、同一案件がNFCとNFDの
       両方の文字列キーで別々のレジストリ辞書に登録されているケースを合成し、
-      `project_names()`が1件にまとまることを確認するテストを追加
-- [ ] `tests/test_milestone_date_answerer.py`にも、`MilestoneThresholdListAnswerer`が
-      NFC/NFD重複下で二重列挙しないことを確認する回帰テストを追加（実データの再現ケース）
-- [ ] 修正後、`.venv/bin/pytest tests/ -v`全件PASSを確認
+      `project_names()`が1件にまとまることを確認するテストを追加（`1cec020`）
+- [x] `tests/test_milestone_date_answerer.py`にも、`MilestoneThresholdListAnswerer`が
+      NFC/NFD重複下で二重列挙しないことを確認する回帰テストを追加（`e7913aa`。
+      修正前は実際に`AYM、AYM`を再現し、修正後`AYM`になることを確認済み）
+- [x] 修正後、`.venv/bin/pytest tests/ -v`全件PASSを確認（464 passed）
 - [ ] 実データで`experiments/`診断runを再実行し、Q15が`AYM、MINAMINO、SHR`（重複なし）に
-      なることを確認する
-- [ ] `_get()`メソッド（同ファイル内）は既にNFC正規化フォールバックを持っているため、
-      同様のロジックを踏襲する
+      なることを確認する — **未実施**（本セッションは`data/raw`が無い環境のため。次回実データ
+      環境で実施）
+- [x] `_get()`メソッド（同ファイル内）は既にNFC正規化フォールバックを持っているため、
+      同様のロジックを踏襲した
 
 **優先度**: 中（1問への影響は確認済みだが、影響範囲は`project_names()`を直接使う横断列挙系の
 今後の実装すべてに波及しうるため、早めに直す方が安全）。

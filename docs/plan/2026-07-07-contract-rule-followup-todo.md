@@ -30,9 +30,13 @@ test 100問診断run（`contract_fix_test_diag_1783351147.json`）で確認済�
       `DA-[案件略号]-[開始年月日8桁]-[拡張子コード]`（規則文書本体では「契約開始日8桁」ではなく
       「開始年月日8桁」表記）。案件略号は`社内用語集.docx`の主略称＝`project_registry.json`の
       `primary_alias`と一致（KAEDE等）。例: `DA-AOMINE-20250806-xlsx`
-- [ ] `msoffcrypto-tool`等でdocxを復号するユーティリティを追加（`scripts/build_contract_registry.py`から
-      呼ぶ。復号済みコピーは一時ディレクトリに書き、元ファイルは変更しない — `encrypted_file_queue.md`の
-      注意書きに従う）
+- [x] （部分完了・2026-07-07 `c011861`）`msoffcrypto-tool`によるOffice復号ユーティリティ
+      `src/utils/office_crypto.py`を追加: `derive_office_password()`（`DA-[案件略号]-[開始年月日8桁]-
+      [拡張子コード]`規則の純粋関数）と`decrypt_office_file()`（元ファイル非破壊・誤パスワード時は
+      `InvalidKeyError`を伝播）。TDD9ケース（合成暗号化フィクスチャ、msoffcrypto-tool 6.0.0自体の
+      暗号化側4KB未満バグを回避するパディング済み）で全件PASS。
+      **未実施**: `build_contract_registry.py`への配線（呼び出し側の実装）は本セッションでは
+      `data/raw`（実際の暗号化契約書ファイル）が無いため次アクションとして残す
 - [ ] 復号成功後、`build_contract_registry.py`でかえでの契約行を`status=ok`にし、`contracts.jsonl`を再生成
 - [ ] Q38の実際の回答が変わるか（かえでがAPR-M3に加わるか）を診断runで確認
 - [ ] 同じ規則で`02.計画/スケジュール.xlsx`（かえで、`encrypted_file_queue.md`に記載の2件目）も復号できるか
