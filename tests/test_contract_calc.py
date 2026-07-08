@@ -7,6 +7,7 @@ import unicodedata
 from src.generator.approval_rule import determine_apr_level
 from src.generator.contract_calc import ContractCalcAnswerer, billed_amount_incl_tax, parse_hours
 from src.structured.artifact_store import StructuredArtifactStore
+from src.utils.question_classifier import classify_question
 
 
 def _store(rows: list[dict]) -> StructuredArtifactStore:
@@ -238,3 +239,148 @@ def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
     assert not answer.was_gated
     # 1000円 / 3行 = 333.33... 円単位で切り上げ → 334円
     assert answer.text == "固定社、334円"
+
+
+def _write_train_csv(data_dir: Path, project: str, n_rows: int) -> None:
+    proj_dir = data_dir / project / "03.データ"
+    proj_dir.mkdir(parents=True)
+    content = "a\n" + "\n".join(str(i) for i in range(n_rows)) + "\n"
+    (proj_dir / "train.csv").write_text(content, encoding="utf-8")
+
+
+def test_q87_style_question_gets_contract_rule_tag() -> None:
+    # Q87型の実際の文言そのもの。src側にこの文言をハードコードしていないことを、
+    # ここでのみ使用することで担保する（ルーティングは汎用キーワード条件）。
+    question = (
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。"
+    )
+    assert "contract_rule" in classify_question(question)
+
+
+def test_answer_apr_row_threshold_list_filters_completed_apr_and_sample_size(tmp_path: Path) -> None:
+    # 該当2件のうち、行数不足1件・未完了1件・APRレベル違い1件がそれぞれ別理由で除外される
+    # ことを確認する判別テスト。
+    data_dir = tmp_path / "data"
+    _write_train_csv(data_dir, "APR一致完了大量株式会社", 10500)
+    _write_train_csv(data_dir, "APR一致完了少量株式会社", 200)
+    _write_train_csv(data_dir, "APR一致未完了株式会社", 10500)
+    _write_train_csv(data_dir, "APRレベル違い完了大量株式会社", 10500)
+
+    rows = [
+        {
+            "project_name": "APR一致完了大量株式会社",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 4_000_000,
+            "final_amount_incl_tax": 3_900_000,
+        },
+        {
+            # 行数不足（200行 < 10000行）で除外
+            "project_name": "APR一致完了少量株式会社",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 4_000_000,
+            "final_amount_incl_tax": 3_900_000,
+        },
+        {
+            # 報告書由来フィールドが無く未完了扱いのため除外
+            "project_name": "APR一致未完了株式会社",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 4_000_000,
+        },
+        {
+            # 600万円はAPR-M2（APR-M1ではない）のため除外
+            "project_name": "APRレベル違い完了大量株式会社",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 6_000_000,
+            "final_amount_incl_tax": 5_900_000,
+        },
+    ]
+    answerer = ContractCalcAnswerer(data_dir=data_dir)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store(rows),
+        {
+            "APR一致完了大量株式会社": "MATCH",
+            "APR一致完了少量株式会社": "SMALL",
+            "APR一致未完了株式会社": "INCOMPLETE",
+            "APRレベル違い完了大量株式会社": "WRONGLEVEL",
+        },
+        {},
+    )
+    assert not answer.was_gated
+    assert answer.text == "MATCH"
+
+
+def test_answer_apr_row_threshold_list_no_matches_returns_missing(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    _write_train_csv(data_dir, "APR一致完了少量株式会社", 2)
+    rows = [{
+        "project_name": "APR一致完了少量株式会社",
+        "status": "ok",
+        "contract_type": "fixed",
+        "estimated_amount_incl_tax": 4_000_000,
+        "final_amount_incl_tax": 3_900_000,
+    }]
+    answerer = ContractCalcAnswerer(data_dir=data_dir)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store(rows),
+        {},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_answer_apr_row_threshold_list_missing_threshold_returns_missing() -> None:
+    # 「行以上」のようなしきい値パターンが無ければパース不能としてMissingになる
+    answerer = ContractCalcAnswerer()
+    answer = answerer._answer_apr_row_threshold_list(
+        "完了案件のうちAPR-M1に該当する案件を挙げてください。",
+        _store([]),
+        {},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_answer_apr_row_threshold_list_missing_level_returns_missing() -> None:
+    # APRレベルのパターンが無ければパース不能としてMissingになる
+    answerer = ContractCalcAnswerer()
+    answer = answerer._answer_apr_row_threshold_list(
+        "顧客データのサンプル数が10000行以上の案件を挙げてください。",
+        _store([]),
+        {},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_answer_apr_row_threshold_list_supports_other_level_and_threshold(tmp_path: Path) -> None:
+    # レベル・しきい値が異なる別パターンでも汎用的にパースできることを確認する
+    data_dir = tmp_path / "data"
+    _write_train_csv(data_dir, "M2一致完了株式会社", 600)
+    rows = [{
+        "project_name": "M2一致完了株式会社",
+        "status": "ok",
+        "contract_type": "fixed",
+        "estimated_amount_incl_tax": 6_000_000,
+        "actual_hours": 100.0,
+    }]
+    answerer = ContractCalcAnswerer(data_dir=data_dir)
+    answer = answerer.answer(
+        "完了案件のうち、APR-M2に該当し、かつサンプル数が500行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store(rows),
+        {"M2一致完了株式会社": "M2ALIAS"},
+        {},
+    )
+    assert not answer.was_gated
+    assert answer.text == "M2ALIAS"
