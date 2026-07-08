@@ -1,7 +1,21 @@
 """contracts.jsonl extraction tests."""
 from __future__ import annotations
 
-from scripts.build_contract_registry import classify_rounding_rule, parse_contract_text
+import io
+import json
+from pathlib import Path
+
+import msoffcrypto
+from docx import Document as DocxDocument
+
+from scripts.build_contract_registry import (
+    build_contract_registry,
+    candidate_dates_from_filename,
+    classify_rounding_rule,
+    extract_dates,
+    parse_contract_text,
+)
+from src.utils.office_crypto import derive_office_password
 
 
 def test_parse_time_and_materials_contract_values() -> None:
@@ -75,3 +89,214 @@ def test_parse_advance_payment_from_docx_table_row_with_different_column_order()
 """
     row = parse_contract_text("青葉与信風", "契約書.docx", text)
     assert row["advance_payment_amount"] == 2_310_000
+
+
+def test_extract_dates_allows_whitespace_before_kara_and_made() -> None:
+    # 実データで見つかった表記ゆれ:「日 から」「日 まで」のように日付とキーワードの間にスペースが入る。
+    text = "本契約の契約期間は、2025-05-13 から 2025-07-22 まで とする。"
+    start, end, days = extract_dates(text)
+    assert start == "2025-05-13"
+    assert end == "2025-07-22"
+    assert days == 71
+
+
+def test_extract_dates_no_space_form_still_parses() -> None:
+    # 既存の非スペース表記（従来通り）が引き続き通ることの非回帰確認。
+    text = "本契約の契約期間は、2025-07-08から2025-08-11までの5週間とする。"
+    start, end, days = extract_dates(text)
+    assert start == "2025-07-08"
+    assert end == "2025-08-11"
+    assert days == 35
+
+
+# --- office_crypto wiring (encrypted contract fallback) ---
+
+# msoffcrypto-tool 6.0.0のOLEコンテナ書き込み処理は、暗号化payloadが小さい(<=4096バイト)と
+# mini-FAT/regular-FATの不整合で往復（自前暗号化→自前復号）してもバイト列が壊れることがある
+# （tests/test_office_crypto.pyのコメントで裏取り済みの既知のクセ）。ここでは実際に
+# python-docxで開ける最小限のdocxを作り、十分な段落を足して4KB超のペイロードにしてから
+# 暗号化することでこの不具合を回避する。
+def _build_real_docx_bytes(paragraphs: list[str]) -> bytes:
+    doc = DocxDocument()
+    for text in paragraphs:
+        doc.add_paragraph(text)
+    for i in range(300):
+        doc.add_paragraph(f"padding padding padding padding padding paragraph {i}")
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _write_encrypted_docx(dest: Path, password: str, paragraphs: list[str]) -> None:
+    plain_buf = io.BytesIO(_build_real_docx_bytes(paragraphs))
+    office_file = msoffcrypto.OfficeFile(plain_buf)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "wb") as f:
+        office_file.encrypt(password, f)
+
+
+def _write_project_registry(path: Path, project_name: str, primary_alias: str) -> None:
+    path.write_text(
+        json.dumps([{"project_name": project_name, "primary_alias": primary_alias}], ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def test_candidate_dates_from_filename_extracts_8digit_date_after_pw_prefix() -> None:
+    # 実運用の命名慣習（docs/encrypted_file_queue.md記載）: `pw-<略号><開始年月日8桁>`。
+    path = Path("契約書_pw-testalias20250115.docx")
+    assert candidate_dates_from_filename(path) == ["20250115"]
+
+
+def test_candidate_dates_from_filename_empty_when_no_pw_marker() -> None:
+    assert candidate_dates_from_filename(Path("契約書.docx")) == []
+
+
+def test_build_contract_registry_decrypts_via_filename_date_candidate(tmp_path: Path) -> None:
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト" / "01.契約"
+    contract_dir.mkdir(parents=True)
+
+    alias = "TESTALIAS"
+    password = derive_office_password(alias, "2025-01-15", ".docx")
+    _write_encrypted_docx(
+        contract_dir / "契約書_pw-testalias20250115.docx",
+        password,
+        [
+            "5. 契約期間",
+            "本契約の契約期間は、2025-01-15から2025-02-11までの4週間とする。",
+            "6. 報酬および支払条件",
+            "本契約の契約形態は固定価格契約とし、契約金額（税抜）：1,000,000円、"
+            "消費税額：100,000円、契約金額（税込）：1,100,000円とする。",
+        ],
+    )
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト", alias)
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=tmp_path / "no_schedule.jsonl",
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["status"] == "ok"
+    assert row["start_date"] == "2025-01-15"
+    assert row["end_date"] == "2025-02-11"
+    assert row["estimated_amount_incl_tax"] == 1100000
+
+
+def test_build_contract_registry_falls_back_to_schedule_date_candidate_when_filename_has_none(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト2" / "01.契約"
+    contract_dir.mkdir(parents=True)
+
+    alias = "TESTALIAS2"
+    password = derive_office_password(alias, "2025-03-03", ".docx")
+    # ファイル名には日付候補が無い(pw-マーカー無し)ので、スケジュールregistry側の候補で試す。
+    _write_encrypted_docx(
+        contract_dir / "契約書.docx",
+        password,
+        [
+            "5. 契約期間",
+            "本契約の契約期間は、2025-03-03から2025-03-31までの4週間とする。",
+            "6. 報酬および支払条件",
+            "本契約の契約形態は固定価格契約とし、契約金額（税抜）：2,000,000円、"
+            "消費税額：200,000円、契約金額（税込）：2,200,000円とする。",
+        ],
+    )
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト2", alias)
+
+    schedule_tasks_path = tmp_path / "schedule_tasks.jsonl"
+    schedule_row = {
+        "project_name": "検証用医療法人テスト2",
+        "values": {"開始日": "2025-03-03T00:00:00", "終了日": "2025-03-31T00:00:00"},
+    }
+    schedule_tasks_path.write_text(json.dumps(schedule_row, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=schedule_tasks_path,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "ok"
+    assert rows[0]["start_date"] == "2025-03-03"
+
+
+def test_build_contract_registry_falls_back_to_failed_when_no_date_candidate_available(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト3" / "01.契約"
+    contract_dir.mkdir(parents=True)
+
+    password = derive_office_password("UNKNOWNALIAS", "2025-03-03", ".docx")
+    _write_encrypted_docx(contract_dir / "契約書.docx", password, ["本文"])
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト3", "UNKNOWNALIAS")
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=tmp_path / "no_schedule.jsonl",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "failed"
+
+
+def test_build_contract_registry_falls_back_to_failed_when_all_candidates_wrong(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト4" / "01.契約"
+    contract_dir.mkdir(parents=True)
+
+    real_password = derive_office_password("WRONGALIAS", "2025-06-06", ".docx")
+    # ファイル名の日付候補(20250101)は実際のパスワード生成に使った日付(2025-06-06)と異なるため、
+    # 候補はあるが全滅してInvalidKeyErrorとなり、既存どおりstatus=failedへ後退する。
+    _write_encrypted_docx(contract_dir / "契約書_pw-wrongalias20250101.docx", real_password, ["本文"])
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト4", "WRONGALIAS")
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=tmp_path / "no_schedule.jsonl",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "failed"
+
+
+def test_build_contract_registry_non_encrypted_corruption_still_falls_back_to_failed(
+    tmp_path: Path,
+) -> None:
+    # 暗号化(CDFV2)ではない、単なる破損/非docxファイルは、復号フォールバックを試みずに
+    # 従来どおりstatus=failedへ後退すること（今回の変更による非回帰の確認）。
+    project_root = tmp_path / "projects"
+    contract_dir = project_root / "検証用医療法人テスト5" / "01.契約"
+    contract_dir.mkdir(parents=True)
+    (contract_dir / "契約書.docx").write_bytes(b"not a docx at all, just garbage bytes")
+
+    project_registry_path = tmp_path / "project_registry.json"
+    _write_project_registry(project_registry_path, "検証用医療法人テスト5", "IRRELEVANT")
+
+    rows = build_contract_registry(
+        project_root=project_root,
+        project_registry_path=project_registry_path,
+        schedule_tasks_path=tmp_path / "no_schedule.jsonl",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "failed"
