@@ -4,21 +4,32 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tempfile
 import unicodedata
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import msoffcrypto
 from docx import Document as DocxDocument
 from pptx import Presentation
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.utils.office_crypto import decrypt_office_file, derive_office_password
+
 SHARE_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ"
 PROJECT_ROOT = SHARE_ROOT / "プロジェクト"
 ARTIFACTS = ROOT / "artifacts"
 CONTRACTS_PATH = ARTIFACTS / "contracts.jsonl"
+PROJECT_REGISTRY_PATH = ARTIFACTS / "project_registry.json"
+
+# 実データの暗号化契約書は「契約書_pw-<英字トークン><開始年月日8桁>.docx」のような
+# 命名規則を使う（社内規定のパスワード導出規則:
+# DA-[案件略号]-[開始年月日8桁]-[拡張子コード]）。特定ファイル名のハードコードは
+# 競技規約違反のため、汎用の命名規則regexのみを使う。
+PW_FILENAME_RE = re.compile(r"pw-([A-Za-z]+)(\d{8})", re.IGNORECASE)
 
 
 def normalize_text(text: str) -> str:
@@ -42,6 +53,79 @@ def read_docx_text(path: Path) -> str:
             if values:
                 lines.append(" | ".join(values))
     return normalize_text("\n".join(lines))
+
+
+def _load_project_registry(registry_path: Path) -> list[dict[str, Any]]:
+    if not registry_path.exists():
+        return []
+    with registry_path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _password_alias_candidates(
+    path: Path, project_dir_name: str, registry_path: Path
+) -> list[str]:
+    """パスワード導出に使う案件略号候補を優先順（ファイル名 → registry）で返す。
+
+    ファイル名の汎用パターン `pw-<英字トークン><8桁数字>` に一致しない場合は空リスト
+    （＝復号を試みない）。8桁の開始年月日はファイル名由来のみを使う
+    （registry側は日付を持たないため）。
+    """
+    match = PW_FILENAME_RE.search(path.stem)
+    if not match:
+        return []
+    aliases = [match.group(1).upper()]
+    registry = _load_project_registry(registry_path)
+    normalized_dir_name = unicodedata.normalize("NFC", project_dir_name)
+    for proj in registry:
+        proj_name = unicodedata.normalize("NFC", proj.get("project_name", ""))
+        if proj_name != normalized_dir_name:
+            continue
+        # パスワード規則の略号は大文字（DA-KAEDE-...）。registry値は現状すべて
+        # 大文字だが、導出規則側の前提として明示的に揃える。
+        primary_alias = (proj.get("primary_alias") or "").upper()
+        if primary_alias and primary_alias not in aliases:
+            aliases.append(primary_alias)
+        break
+    return aliases
+
+
+def read_docx_text_with_decryption(
+    path: Path,
+    project_dir_name: str,
+    registry_path: Path = PROJECT_REGISTRY_PATH,
+) -> str:
+    """暗号化docxの復号を試みてからテキストを抽出するフォールバック。
+
+    パスワードは「ファイル名の汎用パターン」から導出した案件略号・開始年月日8桁を
+    最優先候補とし、project_registry.jsonのprimary_aliasが読めれば追加候補として
+    順に試す（`InvalidKeyError`は次候補へ）。ファイル名がパターンに一致しない、
+    または全候補で復号失敗した場合は例外を送出し、呼び出し側で従来通り
+    `status=failed`に落とす。
+    """
+    match = PW_FILENAME_RE.search(path.stem)
+    if not match:
+        raise ValueError(
+            f"filename does not match pw-<alias><8digits> pattern: {path.name}"
+        )
+    start_date = match.group(2)
+    aliases = _password_alias_candidates(path, project_dir_name, registry_path)
+
+    last_error: Exception | None = None
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        output_path = Path(tmp_dir) / f"decrypted{path.suffix}"
+        for alias in aliases:
+            password = derive_office_password(alias, start_date, path.suffix)
+            try:
+                decrypt_office_file(path, password, output_path)
+            except msoffcrypto.exceptions.InvalidKeyError as exc:
+                last_error = exc
+                continue
+            return read_docx_text(output_path)
+
+    if last_error is not None:
+        raise last_error
+    raise ValueError(f"no usable password candidates for {path.name}")
 
 
 def read_pptx_text(path: Path) -> str:
@@ -219,9 +303,30 @@ def build_contract_registry(project_root: Path = PROJECT_ROOT) -> list[dict[str,
         if path is None:
             continue
         project_name = normalize_text(project_dir.name)
-        rel_path = str(path.relative_to(ROOT))
         try:
-            row = parse_contract_text(project_name, rel_path, read_docx_text(path))
+            rel_path = str(path.relative_to(ROOT))
+        except ValueError:
+            # project_root がROOT配下でない場合（テストのtmp_pathフィクスチャ等）。
+            rel_path = str(path)
+        # 復号フォールバックはread_docx_text（暗号化ファイル等での読み込み失敗）にのみ
+        # 適用する。parse/report抽出の例外まで巻き込むと、無関係な失敗の元例外が
+        # パターン不一致のValueErrorで上書きされてデバッグ時に誤誘導になる。
+        try:
+            text = read_docx_text(path)
+        except Exception as read_exc:  # noqa: BLE001
+            try:
+                text = read_docx_text_with_decryption(path, project_dir.name)
+            except Exception as decrypt_exc:  # noqa: BLE001
+                rows.append({
+                    "project_name": project_name,
+                    "source_path": rel_path,
+                    "contract_type": "unknown",
+                    "status": "failed",
+                    "error": f"{read_exc!r} (decrypt fallback: {decrypt_exc!r})",
+                })
+                continue
+        try:
+            row = parse_contract_text(project_name, rel_path, text)
             row.update(extract_report_values(project_dir))
         except Exception as exc:  # noqa: BLE001
             row = {
