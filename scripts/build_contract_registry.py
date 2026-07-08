@@ -136,13 +136,13 @@ def extract_advance_payment(text: str, amount_incl: int | None) -> int | None:
 
 
 def extract_dates(text: str) -> tuple[str | None, str | None, int | None]:
-    match = re.search(r"(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?から(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?まで", text)
+    match = re.search(r"(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?\s*から\s*(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?\s*まで", text)
     if match:
         values = [int(v) for v in match.groups()]
         start = date(values[0], values[1], values[2])
         end = date(values[3], values[4], values[5])
         return start.isoformat(), end.isoformat(), (end - start).days + 1
-    match = re.search(r"(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?から起算して(\d+)週間", text)
+    match = re.search(r"(\d{4})[-年/](\d{1,2})[-月/](\d{1,2})日?\s*から起算して(\d+)週間", text)
     if not match:
         return None, None, None
     year, month, day, weeks = [int(v) for v in match.groups()]

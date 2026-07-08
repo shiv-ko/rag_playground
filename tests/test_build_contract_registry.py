@@ -1,7 +1,11 @@
 """contracts.jsonl extraction tests."""
 from __future__ import annotations
 
-from scripts.build_contract_registry import classify_rounding_rule, parse_contract_text
+from scripts.build_contract_registry import (
+    classify_rounding_rule,
+    extract_dates,
+    parse_contract_text,
+)
 
 
 def test_parse_time_and_materials_contract_values() -> None:
@@ -75,3 +79,21 @@ def test_parse_advance_payment_from_docx_table_row_with_different_column_order()
 """
     row = parse_contract_text("青葉与信風", "契約書.docx", text)
     assert row["advance_payment_amount"] == 2_310_000
+
+
+def test_extract_dates_allows_whitespace_before_kara_and_made() -> None:
+    # 実データで見つかった表記ゆれ:「日 から」「日 まで」のように日付とキーワードの間にスペースが入る。
+    text = "本契約の契約期間は、2025-05-13 から 2025-07-22 まで とする。"
+    start, end, days = extract_dates(text)
+    assert start == "2025-05-13"
+    assert end == "2025-07-22"
+    assert days == 71
+
+
+def test_extract_dates_no_space_form_still_parses() -> None:
+    # 既存の非スペース表記（従来通り）が引き続き通ることの非回帰確認。
+    text = "本契約の契約期間は、2025-07-08から2025-08-11までの5週間とする。"
+    start, end, days = extract_dates(text)
+    assert start == "2025-07-08"
+    assert end == "2025-08-11"
+    assert days == 35
