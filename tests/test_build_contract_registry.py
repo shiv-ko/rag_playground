@@ -40,6 +40,36 @@ def test_parse_fixed_contract_values() -> None:
     assert row["advance_payment_amount"] == 2887500
 
 
+def test_parse_contract_period_with_spaces_around_kara_made() -> None:
+    # 実データの一部契約書は「日?から」「日?まで」の前後にスペースが入る表記を使う
+    # （例: 白峰の契約書相当の合成データ）。regexがスペースを許容しないと
+    # start_date/end_date/contract_period_daysが全てnullになる回帰を防ぐ。
+    text = """
+5. 契約期間
+本契約の契約期間は、2025-05-13 から 2025-07-22 までとする。
+6. 報酬および支払条件
+本契約の料金モデルは、time_and_materialsとし、実績工数に基づく事後精算（月次精算）とする。
+"""
+    row = parse_contract_text("架空商事", "契約書.docx", text)
+    assert row["start_date"] == "2025-05-13"
+    assert row["end_date"] == "2025-07-22"
+    assert row["contract_period_days"] == 71
+
+
+def test_parse_contract_period_kiten_with_spaces() -> None:
+    # 起算型表記でもスペース入りで日付が正しく返ること
+    text = """
+5. 契約期間
+本契約の契約期間は、2025-05-13 から起算して4週間とする。
+6. 報酬および支払条件
+本契約の料金モデルは、time_and_materialsとし、実績工数に基づく事後精算（月次精算）とする。
+"""
+    row = parse_contract_text("架空物産", "契約書.docx", text)
+    assert row["start_date"] == "2025-05-13"
+    assert row["end_date"] == "2025-06-09"
+    assert row["contract_period_days"] == 28
+
+
 def test_classify_half_unit_bucket_rounding() -> None:
     clause = "工数計上の丸め単位は30分とし、30分未満を0.5時間、30分超60分未満を1.0時間として0.5時間単位で計上する。"
     assert classify_rounding_rule(clause) == "half_unit_bucket"
