@@ -23,10 +23,10 @@
 「日?から」「日?まで」の直前にスペースを許容しないため、白峰の契約書
 （「2025-05-13 から 2025-07-22 まで」とスペース入り表記）で `start_date`/`end_date` が両方nullになる。
 
-- [ ] 該当regex 2箇所（139行の期間型・145行の起算型）に `\s*` を許容:
-      `日?\s*から`, `日?\s*まで`, `日?\s*から起算して`
-- [ ] 回帰テスト追加: スペース入り表記（`2025-05-13 から 2025-07-22 まで`）で
-      `start_date`/`end_date`/`contract_period_days` が正しく返ること＋既存表記の非退行
+- [x] 該当regex 2箇所（139行の期間型・145行の起算型）に `\s*` を許容:
+      `日?\s*から`, `日?\s*まで`, `日?\s*から起算して`（2026-07-08 `47d85b3`）
+- [x] 回帰テスト追加: スペース入り表記（`2025-05-13 から 2025-07-22 まで`）で
+      `start_date`/`end_date`/`contract_period_days` が正しく返ること＋既存表記の非退行（`47d85b3`）
 - [ ] `contracts.jsonl` の再生成は実データ必須 → Aブロック Task 3に委譲（白峰行の確認項目を記載済み）
 
 **期待効果**: 直接の設問影響は現状なし（白峰はQ26の指定期間と重複しない）が、
@@ -38,21 +38,26 @@
 現状は `build_contract_registry()`（`scripts/build_contract_registry.py:212` 付近）で
 `read_docx_text(path)` が暗号化ファイルで例外→`status=failed` に落ちる。
 
-- [ ] 配線方針: `read_docx_text` 失敗時（または暗号化検出時）に
+- [x] 配線方針: `read_docx_text` 失敗時（または暗号化検出時）に
       `derive_office_password(primary_alias, start_date, ext)` → `decrypt_office_file()` →
       復号済み一時ファイルに対して再度 `parse_contract_text` を試みるフォールバックを追加。
       復号失敗（`InvalidKeyError`）時は従来通り `status=failed` に落とす（挙動非退行）
-- [ ] **設計上の論点（実装前に決める）**: パスワードの「開始年月日8桁」の入手元。
+      （2026-07-08 `2d715b5`。フォールバック適用範囲は`read_docx_text`失敗時のみに限定し、
+      parse/report抽出の無関係な例外を握り潰さないようレビューで修正済み）
+- [x] **設計上の論点（実装前に決める）**: パスワードの「開始年月日8桁」の入手元。
       契約書自体が暗号化されており中身から取れない鶏卵問題があるため、候補は
       ①ファイル名の汎用パターン（`pw-<alias><8桁>` 型の命名規則から抽出 — 特定ファイル名の
       ハードコードではなく正規表現による汎用規則なら規約適合）
       ②スケジュールxlsx等の別ソース由来の日付候補を順に試行（`InvalidKeyError`で棄却）。
       いずれも案件略号は `project_registry.json` の `primary_alias` を使う
       （＝Aブロック Task 2の再生成が実データ側の前提）
-- [ ] TDD: 合成暗号化docxフィクスチャで「暗号化→配線経由で復号→抽出成功」「誤パスワード→
+      → **採用: ①ファイル名パターンを最優先候補、`project_registry.json`の`primary_alias`を
+      補助候補として順に試行**（`InvalidKeyError`は次候補へ）。②は未実装（実データでの
+      検証が前提のためAブロックへ委譲）
+- [x] TDD: 合成暗号化docxフィクスチャで「暗号化→配線経由で復号→抽出成功」「誤パスワード→
       `status=failed`」の両経路をテスト。**footgun**: `msoffcrypto-tool` 6.0.0は暗号化側に
       4KB未満ペイロードでmini-FAT/regular-FAT不整合バグがあるため、フィクスチャは
-      パディングして4KB以上にする（`tests/` の既存フィクスチャ生成コードを流用）
+      パディングして4KB以上にする（`tests/` の既存フィクスチャ生成コードを流用）（`2d715b5`）
 - [ ] 実データでの `contracts.jsonl` 再生成・Q38/Q79診断はAブロック Task 3に委譲
 
 **期待効果**: Aブロック Task 3が「実行して確認するだけ」になる。復号は他の暗号化ファイル
@@ -64,16 +69,18 @@
 **Q87だけは既存部品の組み合わせで実データ調査なしに実装可能**（Q46は座席表registry、
 Q67は提案書/FR金額突合の実データ調査が先行のため対象外）。
 
-- [ ] 部品はすべて既存: APR判定 = `determine_apr_level()`（`src/generator/approval_rule.py:7`、
+- [x] 部品はすべて既存: APR判定 = `determine_apr_level()`（`src/generator/approval_rule.py:7`、
       金額・医療・T&Mの決定的関数）、train.csv行数 = `src/generator/contract_calc.py:252`
-      `_answer_fixed_per_row()` の `rglob("train.csv")` パターンを流用
-- [ ] 「完了案件」の判定基準を既存registry（`contracts.jsonl` の報告書由来フィールド等）から
+      `_answer_fixed_per_row()` の `rglob("train.csv")` パターンを流用（`_project_row_count()`
+      へ切り出し、`_answer_fixed_per_row`側もこれを使うよう統一。2026-07-08 `551e75e`）
+- [x] 「完了案件」の判定基準を既存registry（`contracts.jsonl` の報告書由来フィールド等）から
       決める — 実装前に既存answerer（Q26/Q31/Q37系）がどう判定しているか実物確認
-- [ ] 質問ルーティング: `contract_rule` 系answerer（`src/generator/contract_calc.py` /
+      → 採用: `final_amount_incl_tax`/`actual_hours`（06.報告書由来）のいずれかが非Noneなら完了
+- [x] 質問ルーティング: `contract_rule` 系answerer（`src/generator/contract_calc.py` /
       `approval_rule.py` の既存ディスパッチ）に条件追加。**該当0件・判定不能はMissingへ**
-      （ゲート厚めの原則）
-- [ ] TDD: 合成 `contracts.jsonl` フィクスチャ＋合成train.csvで「APR-M1×完了×10000行以上」の
-      絞り込みを検証。実データでの発火確認（test Q87診断run）はAブロックに委譲
+      （ゲート厚めの原則）（`551e75e`）
+- [x] TDD: 合成 `contracts.jsonl` フィクスチャ＋合成train.csvで「APR-M1×完了×10000行以上」の
+      絞り込みを検証。実データでの発火確認（test Q87診断run）はAブロックに委譲（`551e75e`）
 
 **期待効果**: +1問相当（test）。低コスト（既存パターン流用）。
 
@@ -87,3 +94,16 @@ Q67は提案書/FR金額突合の実データ調査が先行のため対象外�
 
 完了条件: 3タスクとも「実装→全件PASS→step-review→コミット」で main へ。
 その後の実データ検証・診断run・提出はすべて `2026-07-08-realdata-verification-block.md`（A）で行う。
+
+## 完了ログ（2026-07-08）
+
+3タスクとも実装完了。テストは464 passed（開始時）→479 passed（完了時、全件維持）。
+各タスクをSonnetサブエージェントに実装させ、別のSonnetサブエージェントにレビューさせる
+step-reviewフローで進行。Task 2はレビューで「無関係な例外の握り潰し」CONFIRMED指摘が出て
+親エージェントが修正、Task 3はレビューで「train.csv行数取得ロジックの二重管理」PLAUSIBLE
+指摘が出て`_answer_fixed_per_row`側を共用メソッドへ統一。詳細は
+`docs/daily作業ログ/20260708_085900.md` を参照。
+
+- Task 1: `47d85b3`
+- Task 2: `2d715b5`
+- Task 3: `551e75e`
