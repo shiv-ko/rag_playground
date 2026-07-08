@@ -217,6 +217,96 @@ def test_answer_overlap_parses_iso_dates_and_uses_own_period_length() -> None:
     assert answer.text == "MATCH"
 
 
+def _apr_m1_completed_row(project: str, n_rows: int, tmp_path: Path, final_amount: int | None = 4_000_000) -> dict:
+    # APR-M1: 3,000,000円以上5,000,000円未満（非医療・fixed）
+    nfd_project = unicodedata.normalize("NFD", project)
+    data_dir = tmp_path / nfd_project / "03.データ"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    rows_text = "\n".join(["a"] + [str(i) for i in range(n_rows)]) + "\n"
+    (data_dir / "train.csv").write_text(rows_text, encoding="utf-8")
+    row: dict = {
+        "project_name": project,
+        "status": "ok",
+        "contract_type": "fixed",
+        "estimated_amount_incl_tax": 4_000_000,
+    }
+    if final_amount is not None:
+        row["final_amount_incl_tax"] = final_amount
+    return row
+
+
+def test_apr_m1_completed_row_threshold_returns_matching_project(tmp_path: Path) -> None:
+    row = _apr_m1_completed_row("完了済APRM1社", 10_000, tmp_path)
+    answerer = ContractCalcAnswerer(data_dir=tmp_path)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([row]),
+        {"完了済APRM1社": "DONEM1"},
+        {},
+    )
+    assert not answer.was_gated
+    assert answer.text == "DONEM1"
+
+
+def test_apr_m1_completed_row_threshold_excludes_non_m1_level(tmp_path: Path) -> None:
+    row = _apr_m1_completed_row("非M1社", 10_000, tmp_path)
+    row["estimated_amount_incl_tax"] = 8_500_000  # APR-M3帯
+    answerer = ContractCalcAnswerer(data_dir=tmp_path)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([row]),
+        {"非M1社": "NOTM1"},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_apr_m1_completed_row_threshold_excludes_row_count_under_threshold(tmp_path: Path) -> None:
+    row = _apr_m1_completed_row("行数不足社", 9_999, tmp_path)
+    answerer = ContractCalcAnswerer(data_dir=tmp_path)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([row]),
+        {"行数不足社": "SHORTROWS"},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_apr_m1_completed_row_threshold_excludes_unknown_completion_status(tmp_path: Path) -> None:
+    # final_amount_incl_tax（報告書由来・完了案件の判定基準）が無い＝完了未確定 → 対象外
+    row = _apr_m1_completed_row("未完了社", 10_000, tmp_path, final_amount=None)
+    answerer = ContractCalcAnswerer(data_dir=tmp_path)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([row]),
+        {"未完了社": "UNKNOWNDONE"},
+        {},
+    )
+    assert answer.was_gated
+
+
+def test_apr_m1_completed_row_threshold_missing_when_no_matches_at_all() -> None:
+    answerer = ContractCalcAnswerer()
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([]),
+        {},
+        {},
+    )
+    assert answer.was_gated
+
+
 def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
     # 実データのQ31は「主略称と1行あたりの金額」の両方、かつ金額は円単位切り上げを要求する
     data_dir = tmp_path / "data"

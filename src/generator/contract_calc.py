@@ -125,6 +125,10 @@ class ContractCalcAnswerer:
         project_aliases = project_aliases or {}
         if "APR-M3" in question:
             return self._answer_apr_list(question, store, project_primary_aliases, project_aliases)
+        if "APR-M1" in question and "10000" in question:
+            return self._answer_apr_m1_completed_row_threshold(
+                store, project_primary_aliases, project_aliases
+            )
         if "契約期間" in question and "40日" in question:
             return self._answer_overlap(question, store, project_primary_aliases)
         if "1行あたり" in question and ("固定" in question or "固定金額" in question):
@@ -223,6 +227,59 @@ class ContractCalcAnswerer:
         names = "、".join(_project_alias(row["project_name"], primary_aliases) for row in matches)
         text = f"{names}、合計{_fmt_yen(total)}"
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_apr")
+
+    def _answer_apr_m1_completed_row_threshold(
+        self,
+        store: StructuredArtifactStore,
+        primary_aliases: dict[str, str],
+        aliases: dict[str, list[str]],
+    ) -> Answer:
+        """APR-M1該当・完了案件・train.csv行数10000行以上の案件を列挙する（Q87型）。
+
+        「完了案件」は既存の`_answer_final_difference`と同じ判定基準を流用する:
+        `final_amount_incl_tax`（最終報告書由来の確定請求額）が埋まっている＝
+        報告書が提出済みで案件が完了している、という既存の暗黙の前提。
+        この値が無い（完了未確定）案件は対象外とし、誤ってMissingへ倒す
+        （ゲート厚めの原則、勝手に「未完了」と断定して除外はするが「完了」と断定はしない）。
+        """
+        if self.data_dir is None:
+            return _missing(self.gate, "contract_apr_m1_no_data_dir")
+        matches: list[str] = []
+        for row in store.all_contracts():
+            if row.get("status") != "ok":
+                continue
+            amount = row.get("estimated_amount_incl_tax")
+            if not amount:
+                continue
+            if row.get("final_amount_incl_tax") is None:
+                continue
+            level = determine_apr_level(
+                int(amount),
+                is_medical_project(row["project_name"], aliases.get(row["project_name"])),
+                row.get("contract_type") == "time_and_materials",
+            )
+            if level != "APR-M1":
+                continue
+            normalized_project = unicodedata.normalize("NFC", row["project_name"])
+            csvs = sorted(
+                p for p in self.data_dir.rglob("train.csv")
+                if normalized_project in unicodedata.normalize("NFC", str(p))
+            )
+            if not csvs:
+                continue
+            try:
+                n_rows = len(pd.read_csv(csvs[0]))
+            except Exception:
+                continue
+            if n_rows < 10_000:
+                continue
+            matches.append(_project_alias(row["project_name"], primary_aliases))
+        if not matches:
+            return _missing(self.gate, "contract_apr_m1_no_match")
+        text = "、".join(matches)
+        return Answer(
+            text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_apr_m1_completed"
+        )
 
     def _answer_overlap(
         self,
