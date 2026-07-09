@@ -40,6 +40,30 @@ def test_parse_time_and_materials_contract_values() -> None:
     assert row["contract_period_days"] == 35
 
 
+def test_parse_time_and_materials_contract_values_tax_status_first_bullet_form() -> None:
+    # 実データ(かえで総合病院)で確認された表記ゆれ: 「見込金額（税込）」のような
+    # 名目→税区分の順ではなく、「税込見込金額」のように税区分→名目の順で、
+    # かつ箇条書き(- ラベル：値)形式になっているケース。
+    text = """
+5. 契約期間
+本契約の契約期間は、2025-09-02から2025-10-07までの5週間とする。
+6.1 料金体系
+本契約の料金体系は、time_and_materialsとし、以下の条件を適用する。
+- 通貨：JPY
+- 請求単位：hour
+- 時間単価：25,000円
+- 想定総工数：140時間
+- 税抜見込金額：3,500,000円
+- 消費税率：10%
+- 消費税額：350,000円
+- 税込見込金額：3,850,000円
+"""
+    row = parse_contract_text("テスト社2", "契約書.docx", text)
+    assert row["contract_type"] == "time_and_materials"
+    assert row["estimated_amount_excl_tax"] == 3500000
+    assert row["estimated_amount_incl_tax"] == 3850000
+
+
 def test_parse_fixed_contract_values() -> None:
     text = """
 5. 契約期間

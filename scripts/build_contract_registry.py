@@ -327,8 +327,22 @@ def parse_contract_text(project_name: str, source_path: str, text: str) -> dict[
     rate = first_amount([r"時間単価[は：:\s|]*([0-9,]+)円", r"1時間当たり([0-9,]+)円"], text)
     esth_match = re.search(r"(?:想定総工数|見込工数)[は：:\s]*([0-9]+(?:\.[0-9]+)?)\s*時間", text)
     esth = parse_float(esth_match.group(1)) if esth_match else None
-    amount_excl = first_amount([r"(?:契約金額|報酬総額|見込金額|想定金額)（税抜）[：:\s|]*([0-9,]+)円", r"税抜\s*([0-9,]+)円"], text)
-    amount_incl = first_amount([r"(?:契約金額|報酬総額|見込金額|想定金額)（税込）[：:\s|]*([0-9,]+)円", r"税込\s*([0-9,]+)円"], text)
+    amount_excl = first_amount(
+        [
+            r"(?:契約金額|報酬総額|見込金額|想定金額)（税抜）[：:\s|]*([0-9,]+)円",
+            r"税抜(?:契約金額|報酬総額|見込金額|想定金額)[：:\s|]*([0-9,]+)円",
+            r"税抜\s*([0-9,]+)円",
+        ],
+        text,
+    )
+    amount_incl = first_amount(
+        [
+            r"(?:契約金額|報酬総額|見込金額|想定金額)（税込）[：:\s|]*([0-9,]+)円",
+            r"税込(?:契約金額|報酬総額|見込金額|想定金額)[：:\s|]*([0-9,]+)円",
+            r"税込\s*([0-9,]+)円",
+        ],
+        text,
+    )
     tax = first_amount([r"消費税(?:額)?[：:\s]*([0-9,]+)円"], text)
     advance = extract_advance_payment(text, amount_incl)
     return {
