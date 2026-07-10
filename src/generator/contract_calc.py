@@ -51,6 +51,26 @@ def rounded_hours(hours: float, rule: str, unit_minutes: int | None) -> float | 
     return None
 
 
+def paid_amount_incl_tax(contract: dict[str, Any]) -> int | None:
+    """案件が最終的に支払った（支払う）税込金額を返す（cross_project Q3型）。
+
+    固定価格契約は事後精算を行わないため見積額（`estimated_amount_incl_tax`）がそのまま
+    支払額。それ以外（T&M/事後精算）は最終報告書由来の確定額`final_amount_incl_tax`を優先し、
+    それも無ければ実績工数から`billed_amount_incl_tax`で計算する。いずれも取れなければNone
+    （呼び出し側で「全件揃わなければMissing」の判断に使う）。
+    """
+    if contract.get("contract_type") == "fixed":
+        amount = contract.get("estimated_amount_incl_tax")
+        return int(amount) if amount is not None else None
+    final = contract.get("final_amount_incl_tax")
+    if final is not None:
+        return int(final)
+    actual_hours = contract.get("actual_hours")
+    if actual_hours is not None:
+        return billed_amount_incl_tax(contract, float(actual_hours))
+    return None
+
+
 def billed_amount_incl_tax(contract: dict[str, Any], hours: float, rate_delta: int = 0) -> int | None:
     rate = contract.get("rate_yen_per_hour")
     if rate is None:
@@ -123,6 +143,8 @@ class ContractCalcAnswerer:
     ) -> Answer:
         project_primary_aliases = project_primary_aliases or {}
         project_aliases = project_aliases or {}
+        if "消費税額の総額" in question:
+            return self._answer_tax_total(store)
         if "APR-M3" in question:
             return self._answer_apr_list(question, store, project_primary_aliases, project_aliases)
         if "APR-M1" in question and "10000" in question:
@@ -201,6 +223,26 @@ class ContractCalcAnswerer:
         suffix = "増額" if diff >= 0 else "減額"
         text = f"{_fmt_yen(abs(diff))}{suffix}"
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_calc")
+
+    def _answer_tax_total(self, store: StructuredArtifactStore) -> Answer:
+        """全案件で支払った税込金額をもとに消費税額の総額を答える（Q3型）。
+
+        1件でも`paid_amount_incl_tax`が算出不能ならMissingにフォールバックする
+        （§1.1の設計: 正答化ではなく安全化が目的。青潮のようにOCR未実装で解決不能な
+        案件が1件でも混じれば、全体をMissingへ倒す）。
+        """
+        rows = [r for r in store.all_contracts() if r.get("status") == "ok"]
+        if not rows:
+            return _missing(self.gate, "contract_tax_total_no_contracts")
+        total_tax = 0.0
+        for row in rows:
+            paid = paid_amount_incl_tax(row)
+            if paid is None:
+                return _missing(self.gate, "contract_tax_total_incomplete")
+            tax_rate = float(row.get("tax_rate") or 0.10)
+            total_tax += paid - paid / (1 + tax_rate)
+        text = _fmt_yen(total_tax)
+        return Answer(text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_tax_total")
 
     def _answer_apr_list(
         self,

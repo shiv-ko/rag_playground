@@ -5,7 +5,12 @@ from pathlib import Path
 import unicodedata
 
 from src.generator.approval_rule import determine_apr_level
-from src.generator.contract_calc import ContractCalcAnswerer, billed_amount_incl_tax, parse_hours
+from src.generator.contract_calc import (
+    ContractCalcAnswerer,
+    billed_amount_incl_tax,
+    paid_amount_incl_tax,
+    parse_hours,
+)
 from src.structured.artifact_store import StructuredArtifactStore
 
 
@@ -358,3 +363,97 @@ def test_fixed_per_row_uses_project_train_csv(tmp_path: Path) -> None:
     assert not answer.was_gated
     # 1000円 / 3行 = 333.33... 円単位で切り上げ → 334円
     assert answer.text == "固定社、334円"
+
+
+# --- paid_amount_incl_tax / 全案件消費税総額（Q3型） ---
+
+
+def test_paid_amount_incl_tax_uses_estimated_for_fixed_contract() -> None:
+    contract = {"contract_type": "fixed", "estimated_amount_incl_tax": 5_775_000}
+    assert paid_amount_incl_tax(contract) == 5_775_000
+
+
+def test_paid_amount_incl_tax_prefers_final_amount_for_tm_contract() -> None:
+    contract = {
+        "contract_type": "time_and_materials",
+        "estimated_amount_incl_tax": 4_675_000,
+        "final_amount_incl_tax": 3_850_000,
+    }
+    assert paid_amount_incl_tax(contract) == 3_850_000
+
+
+def test_paid_amount_incl_tax_falls_back_to_billed_amount_when_no_final_amount() -> None:
+    contract = _tm("株式会社青嶺不動産アセットマネジメント")
+    contract["actual_hours"] = 184.5
+    # final_amount_incl_taxが無い場合はbilled_amount_incl_taxで計算（既存関数を再利用）
+    assert paid_amount_incl_tax(contract) == billed_amount_incl_tax(contract, 184.5)
+
+
+def test_paid_amount_incl_tax_none_when_tm_contract_missing_all_sources() -> None:
+    # 青潮のように実績工数・最終請求額のいずれも取れないケース(OCR未実装で解決不能)
+    contract = {"contract_type": "time_and_materials", "estimated_amount_incl_tax": 4_000_000}
+    assert paid_amount_incl_tax(contract) is None
+
+
+def test_answer_tax_total_sums_across_all_contracts_at_uniform_tax_rate() -> None:
+    # 実データ(plan §1.1)の京橋(固定・estimated)とかえで(T&M・final)の2件を模した合成値。
+    rows = [
+        {
+            "project_name": "京橋風",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 5_775_000,
+            "tax_rate": 0.10,
+        },
+        {
+            "project_name": "かえで風",
+            "status": "ok",
+            "contract_type": "time_and_materials",
+            "estimated_amount_incl_tax": 4_675_000,
+            "final_amount_incl_tax": 3_850_000,
+            "tax_rate": 0.10,
+        },
+    ]
+    answer = ContractCalcAnswerer().answer(
+        "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+        None,
+        _store(rows),
+    )
+    assert not answer.was_gated
+    assert answer.text == "875,000円"
+
+
+def test_answer_tax_total_missing_when_any_contract_unresolvable() -> None:
+    # 1件でもpaid_amount_incl_taxがNoneならMissineへフォールバック（正答化より安全化優先）
+    rows = [
+        {
+            "project_name": "京橋風",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 5_775_000,
+            "tax_rate": 0.10,
+        },
+        {
+            "project_name": "青潮風",
+            "status": "ok",
+            "contract_type": "time_and_materials",
+            "estimated_amount_incl_tax": 4_000_000,
+            "tax_rate": 0.10,
+            # final_amount_incl_taxもactual_hoursも無い＝算出不能
+        },
+    ]
+    answer = ContractCalcAnswerer().answer(
+        "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+        None,
+        _store(rows),
+    )
+    assert answer.was_gated
+
+
+def test_answer_tax_total_missing_when_no_contracts() -> None:
+    answer = ContractCalcAnswerer().answer(
+        "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+        None,
+        _store([]),
+    )
+    assert answer.was_gated

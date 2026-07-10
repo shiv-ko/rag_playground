@@ -42,6 +42,11 @@ CONTRACT_RULE_KEYWORDS = (
     "契約金額", "契約期間", "見込税込", "最終請求", "実績工数", "想定総工数",
     "時間単価", "APR-M", "固定金額契約", "固定価格", "事後精算", "ACTH",
 )
+# 全案件横断の契約集計問い（cross_project block）。「消費税額の総額」等は質問の構造パターン
+# （何を横断集計するか）へのマッチであり、特定の質問文そのものへの分岐ではない。
+CROSS_PROJECT_KEYWORDS = (
+    "消費税額の総額", "支払月", "精算総額", "提案時金額", "FR時",
+)
 
 
 def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:
@@ -94,6 +99,8 @@ def classify_question(question: str) -> list[str]:
         tags.append("ms_date_cross_project_list")
     if any(k in question for k in CONTRACT_RULE_KEYWORDS):
         tags.append("contract_rule")
+    if any(k in question for k in CROSS_PROJECT_KEYWORDS):
+        tags.append("cross_project")
     if not tags:
         tags.append("text_only")
     return tags
