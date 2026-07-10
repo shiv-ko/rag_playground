@@ -10,6 +10,7 @@ CHUNK_OVERLAP = 100
 # 部分コードから誤断定するリスクがある（実測: valid Q28）。スナップは
 # ウィンドウの後半分までに留め、極端に短いチャンクが生まれるのを防ぐ。
 _MIN_SNAP_RATIO = 0.5
+_LINE_SENSITIVE_SUFFIXES = {".py", ".ipynb"}
 
 
 def _snap_end_to_line_boundary(text: str, window_start: int, ideal_end: int) -> int:
@@ -35,7 +36,10 @@ def chunk_documents(
     overlap: int = CHUNK_OVERLAP,
 ) -> list[Document]:
     """text が chunk_size を超える Document を overlap 分重複させながら分割する。
-    分割位置は可能な限り行境界にスナップし、行の途中でチャンクが切れないようにする。"""
+
+    コード系文書だけは行境界へスナップする。Office文書の改行はレイアウト由来であり、
+    スナップすると全後続チャンクの位置と検索順位が不安定になるため固定幅を維持する。
+    """
     result: list[Document] = []
     for doc in documents:
         text = doc.text
@@ -45,9 +49,14 @@ def chunk_documents(
 
         start = 0
         chunk_index = 0
+        snap_to_lines = doc.source_path.suffix.lower() in _LINE_SENSITIVE_SUFFIXES
         while start < len(text):
             ideal_end = start + chunk_size
-            end = _snap_end_to_line_boundary(text, start, ideal_end)
+            end = (
+                _snap_end_to_line_boundary(text, start, ideal_end)
+                if snap_to_lines
+                else ideal_end
+            )
             chunk_index += 1
             result.append(Document(
                 text=text[start:end],
