@@ -7,12 +7,15 @@ from pathlib import Path
 
 import msoffcrypto
 from docx import Document as DocxDocument
+from pptx import Presentation
+from pptx.util import Inches
 
 from scripts.build_contract_registry import (
     build_contract_registry,
     candidate_dates_from_filename,
     classify_rounding_rule,
     extract_dates,
+    extract_report_values,
     literal_password_from_filename,
     parse_contract_text,
 )
@@ -132,6 +135,47 @@ def test_extract_dates_no_space_form_still_parses() -> None:
     assert start == "2025-07-08"
     assert end == "2025-08-11"
     assert days == 35
+
+
+# --- extract_report_values / has_final_report (06.報告書 file-existence flag) ---
+
+
+def _make_pptx_with_text(path: Path, text: str) -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    textbox = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(2))
+    textbox.text_frame.text = text
+    prs.save(path)
+
+
+def test_extract_report_values_true_when_non_old_report_file_exists(tmp_path: Path) -> None:
+    # 実データ(青葉与信・固定価格)を模した回帰ケース: 最終報告書の金額表記は
+    # 「最終請求金額（税込）」「税込金額」のどちらの正規表現にも一致しないが、
+    # 報告ファイル自体は存在する＝完了とみなすべき。
+    project_dir = tmp_path / "テスト案件"
+    report_dir = project_dir / "06.報告書"
+    report_dir.mkdir(parents=True)
+    _make_pptx_with_text(
+        report_dir / "最終報告.pptx", "契約金額：¥4,200,000（税抜）/ ¥4,620,000（税込）"
+    )
+    values = extract_report_values(project_dir)
+    assert values["has_final_report"] is True
+
+
+def test_extract_report_values_false_when_only_old_report_file_exists(tmp_path: Path) -> None:
+    project_dir = tmp_path / "テスト案件2"
+    report_dir = project_dir / "06.報告書"
+    report_dir.mkdir(parents=True)
+    _make_pptx_with_text(report_dir / "最終報告_old.pptx", "旧版のダミーテキスト")
+    values = extract_report_values(project_dir)
+    assert values["has_final_report"] is False
+
+
+def test_extract_report_values_false_when_no_report_dir(tmp_path: Path) -> None:
+    project_dir = tmp_path / "テスト案件3"
+    project_dir.mkdir(parents=True)
+    values = extract_report_values(project_dir)
+    assert values["has_final_report"] is False
 
 
 # --- office_crypto wiring (encrypted contract fallback) ---

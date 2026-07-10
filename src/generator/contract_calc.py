@@ -51,6 +51,26 @@ def rounded_hours(hours: float, rule: str, unit_minutes: int | None) -> float | 
     return None
 
 
+def paid_amount_incl_tax(contract: dict[str, Any]) -> int | None:
+    """案件が最終的に支払った（支払う）税込金額を返す（cross_project Q3型）。
+
+    固定価格契約は事後精算を行わないため見積額（`estimated_amount_incl_tax`）がそのまま
+    支払額。それ以外（T&M/事後精算）は最終報告書由来の確定額`final_amount_incl_tax`を優先し、
+    それも無ければ実績工数から`billed_amount_incl_tax`で計算する。いずれも取れなければNone
+    （呼び出し側で「全件揃わなければMissing」の判断に使う）。
+    """
+    if contract.get("contract_type") == "fixed":
+        amount = contract.get("estimated_amount_incl_tax")
+        return int(amount) if amount is not None else None
+    final = contract.get("final_amount_incl_tax")
+    if final is not None:
+        return int(final)
+    actual_hours = contract.get("actual_hours")
+    if actual_hours is not None:
+        return billed_amount_incl_tax(contract, float(actual_hours))
+    return None
+
+
 def billed_amount_incl_tax(contract: dict[str, Any], hours: float, rate_delta: int = 0) -> int | None:
     rate = contract.get("rate_yen_per_hour")
     if rate is None:
@@ -123,6 +143,8 @@ class ContractCalcAnswerer:
     ) -> Answer:
         project_primary_aliases = project_primary_aliases or {}
         project_aliases = project_aliases or {}
+        if "消費税額の総額" in question:
+            return self._answer_tax_total(store)
         if "APR-M3" in question:
             return self._answer_apr_list(question, store, project_primary_aliases, project_aliases)
         if "APR-M1" in question and "10000" in question:
@@ -202,6 +224,26 @@ class ContractCalcAnswerer:
         text = f"{_fmt_yen(abs(diff))}{suffix}"
         return Answer(text=text, confidence=0.9, was_gated=False, raw_text=text, gate_reason="contract_calc")
 
+    def _answer_tax_total(self, store: StructuredArtifactStore) -> Answer:
+        """全案件で支払った税込金額をもとに消費税額の総額を答える（Q3型）。
+
+        1件でも`paid_amount_incl_tax`が算出不能ならMissingにフォールバックする
+        （§1.1の設計: 正答化ではなく安全化が目的。青潮のようにOCR未実装で解決不能な
+        案件が1件でも混じれば、全体をMissingへ倒す）。
+        """
+        rows = [r for r in store.all_contracts() if r.get("status") == "ok"]
+        if not rows:
+            return _missing(self.gate, "contract_tax_total_no_contracts")
+        total_tax = 0.0
+        for row in rows:
+            paid = paid_amount_incl_tax(row)
+            if paid is None:
+                return _missing(self.gate, "contract_tax_total_incomplete")
+            tax_rate = float(row.get("tax_rate") or 0.10)
+            total_tax += paid - paid / (1 + tax_rate)
+        text = _fmt_yen(total_tax)
+        return Answer(text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_tax_total")
+
     def _answer_apr_list(
         self,
         question: str,
@@ -236,10 +278,13 @@ class ContractCalcAnswerer:
     ) -> Answer:
         """APR-M1該当・完了案件・train.csv行数10000行以上の案件を列挙する（Q87型）。
 
-        「完了案件」は既存の`_answer_final_difference`と同じ判定基準を流用する:
-        `final_amount_incl_tax`（最終報告書由来の確定請求額）が埋まっている＝
-        報告書が提出済みで案件が完了している、という既存の暗黙の前提。
-        この値が無い（完了未確定）案件は対象外とし、誤ってMissingへ倒す
+        「完了案件」は`has_final_report`（`06.報告書/`配下にoldを除く最終報告ファイルが
+        1件以上存在するか）で判定する。以前は`final_amount_incl_tax`（最終報告書からの
+        金額の正規表現抽出）の非null性を代理指標にしていたが、固定価格契約は最終報告書で
+        金額を再掲しない/言い回しが既存正規表現と一致しないため、報告書自体は提出済み
+        （＝完了）でも常にnullになり誤って「未完了」判定されるバグが実データで見つかった。
+        `has_final_report`はファイル存在の確認のみなので、この誤判定を避けられる。
+        フラグが立たない（報告書自体が無い）案件は対象外とし、誤ってMissingへ倒す
         （ゲート厚めの原則、勝手に「未完了」と断定して除外はするが「完了」と断定はしない）。
         """
         if self.data_dir is None:
@@ -251,7 +296,7 @@ class ContractCalcAnswerer:
             amount = row.get("estimated_amount_incl_tax")
             if not amount:
                 continue
-            if row.get("final_amount_incl_tax") is None:
+            if not row.get("has_final_report"):
                 continue
             level = determine_apr_level(
                 int(amount),

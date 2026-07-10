@@ -140,6 +140,12 @@ def test_detects_contract_rule_question() -> None:
     )
 
 
+def test_detects_cross_project_question() -> None:
+    assert "cross_project" in classify_question(
+        "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。"
+    )
+
+
 def test_generic_phrases_alone_do_not_trigger_spreadsheet_calc():
     """「の中で」「該当する」は一般文に頻出するため、単独ではcalcタグを付けない。"""
     assert "spreadsheet_calc" not in classify_question(

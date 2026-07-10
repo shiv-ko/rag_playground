@@ -297,15 +297,23 @@ def extract_dates(text: str) -> tuple[str | None, str | None, int | None]:
 def extract_report_values(project_dir: Path) -> dict[str, Any]:
     report_dirs = [p for p in project_dir.iterdir() if p.is_dir() and p.name.startswith("06.")]
     texts: list[str] = []
+    # 「完了案件」判定用のファイル存在フラグ。final_amount_incl_tax（金額の正規表現抽出）とは
+    # 独立に、06.報告書配下にoldを除く最終報告ファイルが1件でも存在すれば真とする。
+    # 固定価格契約は最終報告書で金額を再掲しない/言い回しが違うため、final_amount_incl_taxの
+    # 非null性だけでは「完了」の代理指標として不十分（実データで確認済みのバグ）。
+    has_final_report = False
     for report_dir in report_dirs:
         for path in sorted(report_dir.glob("*.pptx")):
             if "old" in path.stem.lower() or path.name.startswith("~$"):
                 continue
+            has_final_report = True
             try:
                 texts.append(read_pptx_text(path))
             except Exception:
                 continue
         for path in sorted(report_dir.glob("*.pdf")):
+            if "old" not in path.stem.lower():
+                has_final_report = True
             try:
                 texts.append(read_pdf_text(path))
             except Exception:
@@ -316,7 +324,11 @@ def extract_report_values(project_dir: Path) -> dict[str, Any]:
     if m_hours:
         actual_hours = parse_float(m_hours.group(1))
     final_incl = first_amount([r"最終請求金額（税込）[：:\s|]*([0-9,]+)\s*円", r"税込金額[：:\s|]*([0-9,]+)\s*円"], text)
-    return {"actual_hours": actual_hours, "final_amount_incl_tax": final_incl}
+    return {
+        "actual_hours": actual_hours,
+        "final_amount_incl_tax": final_incl,
+        "has_final_report": has_final_report,
+    }
 
 
 def parse_contract_text(project_name: str, source_path: str, text: str) -> dict[str, Any]:
