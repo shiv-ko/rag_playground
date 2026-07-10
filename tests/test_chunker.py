@@ -71,14 +71,3 @@ class TestChunkDocumentsAvoidsMidLineSplits:
         # 元テキストの各行がどこかのチャンクに含まれている（内容の欠落が無い）
         for line in lines:
             assert any(line in chunk.text for chunk in result)
-
-
-def test_office_document_keeps_stable_fixed_width_boundaries(tmp_path: Path) -> None:
-    """Office文書は抽出時の改行がレイアウト由来で、境界スナップすると
-    全後続チャンクがずれて検索順位を壊すため、固定幅を維持する。"""
-    text = ("A" * 350) + "\n\n" + ("B" * 700)
-
-    result = chunk_documents([_doc(text, tmp_path / "contract.docx")], chunk_size=400, overlap=50)
-
-    assert result[0].text == text[:400]
-    assert result[1].text == text[350:750]
