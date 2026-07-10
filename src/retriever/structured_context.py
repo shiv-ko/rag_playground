@@ -549,7 +549,9 @@ def build_spreadsheet_state_context(
             doc = Document(
                 text=_render_highlight_block(block),
                 source_path=Path(source),
-                location=f"sheet_{block.get('sheet_name')}",
+                # 同じシートに独立したハイライト範囲が複数あるため、範囲まで
+                # locationへ含める。シート名だけでは末尾のdedupで別範囲が消える。
+                location=f"sheet_{block.get('sheet_name')}_range_{block.get('range')}",
             )
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
         docs.extend(_schedule_highlight_docs(question, store.schedule_tasks_for(project_name)))

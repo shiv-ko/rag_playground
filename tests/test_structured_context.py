@@ -83,6 +83,32 @@ class TestSpreadsheetStateContext:
         assert "平均 / bmi" in docs[0].document.text
         assert "35.95" in docs[0].document.text
 
+    def test_distinct_highlight_ranges_on_same_sheet_are_not_deduplicated(self) -> None:
+        store = _full_store(train_xlsx_highlight_blocks={"A社": [
+            {
+                "source_path": "data/raw/x/train.xlsx", "sheet_name": "train", "range": "A2:C2",
+                "fill_color_name": "yellow", "first_value": "row-a",
+                "column_headers": [{"cell": "A1", "value": "id", "formula": None}],
+                "same_row_values": [{"cell": "A2", "value": "row-a", "formula": None}],
+            },
+            {
+                "source_path": "data/raw/x/train.xlsx", "sheet_name": "train", "range": "D2:F2",
+                "fill_color_name": "yellow", "first_value": "10",
+                "column_headers": [{"cell": "D1", "value": "score", "formula": None}],
+                "same_row_values": [{"cell": "D2", "value": "10", "formula": None}],
+            },
+        ]})
+
+        docs = build_spreadsheet_state_context(
+            "train.xlsxで黄色ハイライトが交差するセルを教えてください。", "A社", store
+        )
+
+        assert len(docs) == 2
+        assert {doc.document.location for doc in docs} == {
+            "sheet_train_range_A2:C2",
+            "sheet_train_range_D2:F2",
+        }
+
     def test_filter_question_uses_spreadsheet_sheets_auto_filter(self) -> None:
         store = _full_store(spreadsheet_sheets={"A社": [
             {"source_path": "data/raw/x/train.xlsx", "sheet_name": "train", "auto_filter_ref": "A1:N31", "hidden_rows": [5, 6, 7]},
