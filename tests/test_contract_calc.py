@@ -217,7 +217,13 @@ def test_answer_overlap_parses_iso_dates_and_uses_own_period_length() -> None:
     assert answer.text == "MATCH"
 
 
-def _apr_m1_completed_row(project: str, n_rows: int, tmp_path: Path, final_amount: int | None = 4_000_000) -> dict:
+def _apr_m1_completed_row(
+    project: str,
+    n_rows: int,
+    tmp_path: Path,
+    final_amount: int | None = 4_000_000,
+    has_final_report: bool = True,
+) -> dict:
     # APR-M1: 3,000,000円以上5,000,000円未満（非医療・fixed）
     nfd_project = unicodedata.normalize("NFD", project)
     data_dir = tmp_path / nfd_project / "03.データ"
@@ -229,6 +235,7 @@ def _apr_m1_completed_row(project: str, n_rows: int, tmp_path: Path, final_amoun
         "status": "ok",
         "contract_type": "fixed",
         "estimated_amount_incl_tax": 4_000_000,
+        "has_final_report": has_final_report,
     }
     if final_amount is not None:
         row["final_amount_incl_tax"] = final_amount
@@ -280,8 +287,8 @@ def test_apr_m1_completed_row_threshold_excludes_row_count_under_threshold(tmp_p
 
 
 def test_apr_m1_completed_row_threshold_excludes_unknown_completion_status(tmp_path: Path) -> None:
-    # final_amount_incl_tax（報告書由来・完了案件の判定基準）が無い＝完了未確定 → 対象外
-    row = _apr_m1_completed_row("未完了社", 10_000, tmp_path, final_amount=None)
+    # has_final_report（06.報告書配下にoldを除くファイルが存在するか）が偽＝完了未確定 → 対象外
+    row = _apr_m1_completed_row("未完了社", 10_000, tmp_path, has_final_report=False)
     answerer = ContractCalcAnswerer(data_dir=tmp_path)
     answer = answerer.answer(
         "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
@@ -292,6 +299,29 @@ def test_apr_m1_completed_row_threshold_excludes_unknown_completion_status(tmp_p
         {},
     )
     assert answer.was_gated
+
+
+def test_apr_m1_completed_row_threshold_includes_fixed_price_without_final_amount_when_report_exists(
+    tmp_path: Path,
+) -> None:
+    # 実データで判明したバグの回帰テスト（青葉与信/固定価格・APR-M1該当）:
+    # 固定価格契約は最終報告書で金額を再掲しない/言い回しが違うため
+    # final_amount_incl_taxは常にnullになるが、報告ファイル自体は提出済み
+    # （has_final_report=True）なら完了案件として扱うべき。
+    row = _apr_m1_completed_row(
+        "固定価格完了社", 10_000, tmp_path, final_amount=None, has_final_report=True
+    )
+    answerer = ContractCalcAnswerer(data_dir=tmp_path)
+    answer = answerer.answer(
+        "完了案件のうち、社内管理のAPRでAPR-M1に該当し、かつ顧客データのサンプル数が"
+        "10000行以上の案件を、案件略称ですべて挙げてください。",
+        None,
+        _store([row]),
+        {"固定価格完了社": "FIXEDDONE"},
+        {},
+    )
+    assert not answer.was_gated
+    assert answer.text == "FIXEDDONE"
 
 
 def test_apr_m1_completed_row_threshold_missing_when_no_matches_at_all() -> None:

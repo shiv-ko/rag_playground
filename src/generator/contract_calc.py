@@ -236,10 +236,13 @@ class ContractCalcAnswerer:
     ) -> Answer:
         """APR-M1該当・完了案件・train.csv行数10000行以上の案件を列挙する（Q87型）。
 
-        「完了案件」は既存の`_answer_final_difference`と同じ判定基準を流用する:
-        `final_amount_incl_tax`（最終報告書由来の確定請求額）が埋まっている＝
-        報告書が提出済みで案件が完了している、という既存の暗黙の前提。
-        この値が無い（完了未確定）案件は対象外とし、誤ってMissingへ倒す
+        「完了案件」は`has_final_report`（`06.報告書/`配下にoldを除く最終報告ファイルが
+        1件以上存在するか）で判定する。以前は`final_amount_incl_tax`（最終報告書からの
+        金額の正規表現抽出）の非null性を代理指標にしていたが、固定価格契約は最終報告書で
+        金額を再掲しない/言い回しが既存正規表現と一致しないため、報告書自体は提出済み
+        （＝完了）でも常にnullになり誤って「未完了」判定されるバグが実データで見つかった。
+        `has_final_report`はファイル存在の確認のみなので、この誤判定を避けられる。
+        フラグが立たない（報告書自体が無い）案件は対象外とし、誤ってMissingへ倒す
         （ゲート厚めの原則、勝手に「未完了」と断定して除外はするが「完了」と断定はしない）。
         """
         if self.data_dir is None:
@@ -251,7 +254,7 @@ class ContractCalcAnswerer:
             amount = row.get("estimated_amount_incl_tax")
             if not amount:
                 continue
-            if row.get("final_amount_incl_tax") is None:
+            if not row.get("has_final_report"):
                 continue
             level = determine_apr_level(
                 int(amount),
