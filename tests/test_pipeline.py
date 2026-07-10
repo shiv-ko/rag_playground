@@ -199,6 +199,8 @@ def test_pipeline_routes_office_style_question_through_structured_context(tmp_pa
     )
 
     assert "太字の重要事項" in result.answer
+    assert "office_style" in result.routing_tags
+    assert result.answer_path == "structured:office_style"
 
 
 def test_pipeline_answers_single_office_style_match_without_llm_refusal(tmp_path: Path) -> None:
@@ -677,6 +679,8 @@ def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
     assert "raw_answer" in result0
     assert "retrieved_sources" in result0
     assert "gate_reason" in result0
+    assert result0["routing_tags"] == ["text_only"]
+    assert result0["answer_path"] == "retrieval"
     for source in result0["retrieved_sources"]:
         assert "::" in source
 

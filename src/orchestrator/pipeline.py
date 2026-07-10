@@ -66,6 +66,9 @@ class PipelineResult:
     raw_answer: str = ""
     retrieved_sources: list[str] = field(default_factory=list)
     gate_reason: str = ""
+    # 診断用の経路トレース。評価ラベルには依存せず、回答内容にも影響しない。
+    routing_tags: list[str] = field(default_factory=list)
+    answer_path: str = ""
 
 
 class Pipeline:
@@ -161,14 +164,14 @@ class Pipeline:
         except Exception:
             return None
 
-    def _process_structured(self, qa: QAPair, tags: list[str]) -> Answer | None:
+    def _process_structured(self, qa: QAPair, tags: list[str]) -> tuple[Answer, str] | None:
         if "ms_date_cross_project_list" in tags and self.structured_store is not None:
             # Q15型は単一案件に紐づかない横断質問のため、project_name解決より先に処理する
             list_answer = self.milestone_threshold_list_answerer.answer(
                 qa.question, self.structured_store, self.project_primary_aliases
             )
             if not list_answer.was_gated:
-                return list_answer
+                return list_answer, "structured:ms_date_cross_project_list"
             # 解決できなければMissing固定にせず後続のパスへ委ねる
 
         project_name = self._resolve_project_name(qa.question)
@@ -181,7 +184,7 @@ class Pipeline:
                 self.project_aliases,
             )
             if not contract_answer.was_gated:
-                return contract_answer
+                return contract_answer, "structured:contract_rule"
 
         if project_name is None:
             return None
@@ -191,7 +194,7 @@ class Pipeline:
             if df is not None:
                 calc_answer = self.spreadsheet_calc_answerer.answer(qa.question, df)
                 if not calc_answer.was_gated:
-                    return calc_answer
+                    return calc_answer, "structured:spreadsheet_calc"
             # train.csvが無い・集計仕様に落とせなかった場合はMissing固定にせず
             # 後続の構造化ビルダー（state/office）→通常の検索パスへ委ねる
             # （calc早期returnがQ6/Q21型のPivot質問を殺していた実測に基づく）
@@ -201,7 +204,7 @@ class Pipeline:
                 qa.question, project_name, self.structured_store, self.term_registry
             )
             if not duration_answer.was_gated:
-                return duration_answer
+                return duration_answer, "structured:ms_date_duration"
             # 解決できなければMissing固定にせず後続のパスへ委ねる
 
         if self.structured_store is None:
@@ -244,8 +247,8 @@ class Pipeline:
         if used_tag == "office_style" and is_style_extraction_request(qa.question):
             direct = self._direct_office_style_answer(contexts)
             if direct is not None:
-                return direct
-        return self.generator.generate(qa.question, contexts)
+                return direct, "structured:office_style"
+        return self.generator.generate(qa.question, contexts), f"structured:{used_tag}"
 
     def _direct_office_style_answer(self, contexts: list[ScoredDocument]) -> Answer | None:
         values = []
@@ -290,6 +293,7 @@ class Pipeline:
     def _process_one(self, qa: QAPair) -> PipelineResult:
         tags = classify_question(qa.question)
         answer = None
+        answer_path = "retrieval"
         if any(
             t in tags
             for t in (
@@ -302,7 +306,9 @@ class Pipeline:
                 "contract_rule",
             )
         ):
-            answer = self._process_structured(qa, tags)
+            structured_result = self._process_structured(qa, tags)
+            if structured_result is not None:
+                answer, answer_path = structured_result
 
         if answer is None:
             search_query = self.query_expander.expand_terms(qa.question)
@@ -342,6 +348,8 @@ class Pipeline:
             raw_answer=answer.raw_text,
             retrieved_sources=retrieved_sources,
             gate_reason=answer.gate_reason,
+            routing_tags=tags,
+            answer_path=answer_path,
         )
 
     # ------------------------------------------------------------------ #
@@ -365,6 +373,8 @@ class Pipeline:
             judge_score=CRAGLabel.MISSING.score if self.run_judge else 0.0,
             judge_reason=f"question processing raised an exception: {error}",
             gate_reason="exception",
+            routing_tags=classify_question(qa.question),
+            answer_path="exception",
         )
 
     async def run_async(self, qa_pairs: list[QAPair]) -> list[PipelineResult]:
