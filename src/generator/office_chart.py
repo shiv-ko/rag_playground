@@ -5,6 +5,7 @@ import colorsys
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _CX_NS = {
@@ -79,3 +80,71 @@ def classify_color_name(hex_rgb: str) -> str:
     if deg < 320:
         return "purple"
     return "red"
+
+
+@dataclass
+class ChartSeries:
+    name: str
+    color_name: str | None
+    points: list[float] = field(default_factory=list)
+
+
+_C_NS = {
+    "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+}
+
+
+def extract_office_chart_series(office_file_path: Path) -> dict[str, list[ChartSeries]]:
+    """docx/pptx埋め込みの標準チャート(c:chart)から {チャートタイトル: [系列, ...]} を返す。
+
+    系列の描画色は同一zip内のtheme1.xmlのaccent配色から解決する
+    （解決できない場合はcolor_name=Noneとし、呼び出し側が単一系列時のみ許容する）。
+    """
+    result: dict[str, list[ChartSeries]] = {}
+    with zipfile.ZipFile(office_file_path) as zf:
+        names = zf.namelist()
+        is_docx = any(n.startswith("word/") for n in names)
+        chart_prefix = "word/charts/" if is_docx else "ppt/charts/"
+        theme_prefix = "word/theme/" if is_docx else "ppt/theme/"
+
+        theme_names = sorted(n for n in names if n.startswith(theme_prefix) and n.endswith(".xml"))
+        accents: dict[str, str] = {}
+        if theme_names:
+            accents = resolve_theme_accent_colors(zf.read(theme_names[0]))
+
+        chart_names = sorted(
+            n for n in names
+            if re.fullmatch(rf"{re.escape(chart_prefix)}chart\d+\.xml", n)
+        )
+        for name in chart_names:
+            root = ET.fromstring(zf.read(name))
+            title_runs = root.findall(".//c:title//a:t", _C_NS)
+            title = "".join(t.text or "" for t in title_runs).strip()
+            if not title:
+                continue
+            series_list: list[ChartSeries] = []
+            for ser in root.findall(".//c:ser", _C_NS):
+                sname_el = ser.find("./c:tx//c:v", _C_NS)
+                sname = (sname_el.text or "").strip() if sname_el is not None else ""
+
+                color_name: str | None = None
+                scheme_el = ser.find("./c:spPr//a:schemeClr", _C_NS)
+                if scheme_el is not None:
+                    hex_val = accents.get(scheme_el.get("val", ""))
+                    if hex_val:
+                        color_name = classify_color_name(hex_val)
+
+                points: list[float] = []
+                for pt in ser.findall("./c:val//c:pt", _C_NS):
+                    idx = int(pt.get("idx", "0"))
+                    v_el = pt.find("c:v", _C_NS)
+                    if v_el is not None and v_el.text is not None:
+                        while len(points) <= idx:
+                            points.append(float("nan"))
+                        points[idx] = float(v_el.text)
+
+                series_list.append(ChartSeries(name=sname, color_name=color_name, points=points))
+            if series_list:
+                result[title] = series_list
+    return result

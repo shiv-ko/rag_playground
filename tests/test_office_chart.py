@@ -3,7 +3,13 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from src.generator.office_chart import extract_xlsx_chart_series, classify_color_name, resolve_theme_accent_colors
+from src.generator.office_chart import (
+    extract_xlsx_chart_series,
+    classify_color_name,
+    resolve_theme_accent_colors,
+    ChartSeries,
+    extract_office_chart_series,
+)
 
 _CHARTEX1_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cx:chartSpace xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -97,3 +103,86 @@ class TestClassifyColorName:
 
     def test_gray_low_saturation(self) -> None:
         assert classify_color_name("808080") == "gray"
+
+
+_CHART1_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+<c:chart>
+<c:title><c:tx><c:rich><a:p><a:r><a:t>\xe3\x82\xb0\xe3\x83\xa9\xe3\x83\x95</a:t></a:r><a:r><a:t>1</a:t></a:r></a:p></c:rich></c:tx></c:title>
+<c:plotArea><c:lineChart>
+<c:ser>
+<c:idx val="0"/><c:order val="0"/>
+<c:spPr><a:ln><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></c:spPr>
+<c:val><c:numRef><c:f>Sheet2!$J$4:$J$10</c:f><c:numCache>
+<c:ptCount val="7"/>
+<c:pt idx="0"><c:v>0.48274573517465574</c:v></c:pt>
+<c:pt idx="1"><c:v>0.49839676113360443</c:v></c:pt>
+<c:pt idx="2"><c:v>0.50533551554828282</c:v></c:pt>
+<c:pt idx="3"><c:v>0.50239218877136205</c:v></c:pt>
+</c:numCache></c:numRef></c:val>
+</c:ser>
+</c:lineChart></c:plotArea>
+</c:chart></c:chartSpace>"""
+
+_CHART2_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+<c:chart>
+<c:title><c:tx><c:rich><a:p><a:r><a:t>\xe3\x82\xb0\xe3\x83\xa9\xe3\x83\x95</a:t></a:r><a:r><a:t>2</a:t></a:r></a:p></c:rich></c:tx></c:title>
+<c:plotArea><c:lineChart>
+<c:ser>
+<c:idx val="0"/><c:order val="0"/>
+<c:tx><c:strRef><c:f>Sheet2!$K$3</c:f><c:strCache><c:pt idx="0"><c:v>\xe5\xb9\xb3\xe5\x9d\x87 / cnt</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:spPr><a:ln><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></a:ln></c:spPr>
+<c:val><c:numRef><c:f>Sheet2!$K$4:$K$10</c:f><c:numCache>
+<c:ptCount val="7"/>
+<c:pt idx="3"><c:v>137.64768104149715</c:v></c:pt>
+</c:numCache></c:numRef></c:val>
+</c:ser>
+<c:ser>
+<c:idx val="1"/><c:order val="1"/>
+<c:tx><c:strRef><c:f>Sheet2!$L$3</c:f><c:strCache><c:pt idx="0"><c:v>\xe5\xb9\xb3\xe5\x9d\x87 / windspeed</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:spPr><a:ln><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></c:spPr>
+<c:val><c:numRef><c:f>Sheet2!$L$4:$L$10</c:f><c:numCache>
+<c:ptCount val="7"/>
+<c:pt idx="3"><c:v>0.19555305126118649</c:v></c:pt>
+</c:numCache></c:numRef></c:val>
+</c:ser>
+</c:lineChart></c:plotArea>
+</c:chart></c:chartSpace>"""
+
+
+def _make_docx_with_charts(tmp_path: Path) -> Path:
+    docx_path = tmp_path / "基礎分析.docx"
+    with zipfile.ZipFile(docx_path, "w") as zf:
+        zf.writestr("word/document.xml", "<document/>")
+        zf.writestr("word/charts/chart1.xml", _CHART1_XML)
+        zf.writestr("word/charts/chart2.xml", _CHART2_XML)
+        zf.writestr("word/theme/theme1.xml", _THEME1_XML)
+    return docx_path
+
+
+class TestExtractOfficeChartSeries:
+    def test_single_series_chart_has_no_color_ambiguity(self, tmp_path: Path) -> None:
+        docx_path = _make_docx_with_charts(tmp_path)
+
+        result = extract_office_chart_series(docx_path)
+
+        assert "グラフ1" in result
+        series = result["グラフ1"]
+        assert len(series) == 1
+        assert series[0].color_name == "blue"
+        assert series[0].points[3] == 0.50239218877136205
+
+    def test_multi_series_chart_resolves_each_color(self, tmp_path: Path) -> None:
+        docx_path = _make_docx_with_charts(tmp_path)
+
+        result = extract_office_chart_series(docx_path)
+
+        series = result["グラフ2"]
+        assert len(series) == 2
+        by_color = {s.color_name: s for s in series}
+        assert by_color["orange"].name == "平均 / cnt"
+        assert by_color["blue"].name == "平均 / windspeed"
+        assert by_color["blue"].points[3] == 0.19555305126118649
