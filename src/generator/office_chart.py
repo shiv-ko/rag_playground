@@ -148,3 +148,131 @@ def extract_office_chart_series(office_file_path: Path) -> dict[str, list[ChartS
             if series_list:
                 result[title] = series_list
     return result
+
+
+import unicodedata
+
+from src.generator.confidence_gate import ConfidenceGate
+from src.models import Answer
+
+_CHART_NUM_RE = re.compile(r"グラフ\s*(\d+)")
+_X_VALUE_RE = re.compile(r"x\s*=\s*(\d+)")
+_ROUND_RE = re.compile(r"小数第(\d+)位")
+# 案件名部分（例:「青潮モビリティサービスの」）を巻き込まないよう、\w ではなく明示的な文字クラスを使う。
+# \w はPython3のstrパターンではUnicodeの平仮名も含むため、「案件名+の+ファイル名」のような
+# 助詞区切りの連続をそのまま貪欲マッチしてしまい、案件名までファイル名として抽出するバグになる
+# （平仮名の「の」を境界として使えなくなる）。平仮名を除いたASCII+漢字+カタカナのみを許可することで、
+# 助詞の直後からファイル名だけを正しく切り出す。
+_FILE_RE = re.compile(r"([A-Za-z0-9_\-一-龠ァ-ヶー]+\.(?:xlsx|docx|pptx))")
+
+_COLOR_WORDS: dict[str, str] = {
+    "青色": "blue", "青": "blue",
+    "赤色": "red", "赤": "red",
+    "オレンジ": "orange", "橙色": "orange", "橙": "orange",
+    "緑色": "green", "緑": "green",
+    "黄色": "yellow", "黄": "yellow",
+    "紫色": "purple", "紫": "purple",
+    "灰色": "gray", "グレー": "gray",
+}
+
+
+def _find_color_word(question: str) -> str | None:
+    for word, name in _COLOR_WORDS.items():
+        if word in question:
+            return name
+    return None
+
+
+def _find_project_file(data_dir: Path, project_name: str, filename: str) -> Path | None:
+    # macOSのパスはNFDになりうるためNFCに揃えて比較する（既存_load_train_csvと同じ対策）。
+    normalized_project = unicodedata.normalize("NFC", project_name)
+    matching = sorted(
+        p for p in data_dir.rglob(filename)
+        if normalized_project in unicodedata.normalize("NFC", str(p))
+    )
+    return matching[0] if matching else None
+
+
+class OfficeChartAnswerer:
+    """xlsx/docx/pptxのネイティブ埋め込みチャートから機械抽出で回答する。VLM不要。"""
+
+    def __init__(self, threshold: float = 0.4) -> None:
+        self.gate = ConfidenceGate(threshold=threshold)
+
+    def answer(self, question: str, project_name: str, data_dir: Path) -> Answer:
+        file_match = _FILE_RE.search(question)
+        chart_match = _CHART_NUM_RE.search(question)
+        if not file_match or not chart_match:
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_no_pattern")
+
+        file_path = _find_project_file(data_dir, project_name, file_match.group(1))
+        if file_path is None:
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_file_not_found")
+
+        chart_title = f"グラフ{chart_match.group(1)}"
+
+        if file_path.suffix.lower() == ".xlsx":
+            return self._answer_column_name(file_path, chart_title)
+        # 色語の探索はグラフ番号より後ろの部分文字列に限定する。案件名（例:「青潮モビリティ
+        # サービス」）が色語「青」を部分文字列として含むことがあり、質問全文を対象に探索すると
+        # 案件名から誤って色を検出してしまう（_FILE_REで平仮名を除外したのと同種のバグ）。
+        # 実データの質問文言はすべて「案件名の...グラフN...色語...」の語順で、色語は常に
+        # グラフ番号より後ろに現れるため、この制限で誤検出を避けつつ実際の色語は取りこぼさない。
+        return self._answer_point_value(question[chart_match.end():], file_path, chart_title)
+
+    def _answer_column_name(self, xlsx_path: Path, chart_title: str) -> Answer:
+        try:
+            series_map = extract_xlsx_chart_series(xlsx_path)
+        except (zipfile.BadZipFile, ET.ParseError):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_extract_failed")
+        column = series_map.get(chart_title)
+        if not column:
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_series_not_found")
+        return Answer(text=column, confidence=0.9, was_gated=False, raw_text=column,
+                      gate_reason="office_chart_column")
+
+    def _answer_point_value(self, question: str, file_path: Path, chart_title: str) -> Answer:
+        x_match = _X_VALUE_RE.search(question)
+        if not x_match:
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_no_x")
+        idx = int(x_match.group(1))
+
+        try:
+            chart_map = extract_office_chart_series(file_path)
+        except (zipfile.BadZipFile, ET.ParseError):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_extract_failed")
+        series_list = chart_map.get(chart_title)
+        if not series_list:
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_series_not_found")
+
+        if len(series_list) == 1:
+            target = series_list[0]
+        else:
+            color = _find_color_word(question)
+            candidates = [s for s in series_list if color is not None and s.color_name == color]
+            if len(candidates) != 1:
+                return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                               gate_reason="office_chart_ambiguous_series")
+            target = candidates[0]
+
+        if idx >= len(target.points):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_index_out_of_range")
+        value = target.points[idx]
+
+        round_match = _ROUND_RE.search(question)
+        if round_match:
+            digits = int(round_match.group(1))
+            value_text = f"{round(value, digits):.{digits}f}"
+        else:
+            value_text = str(value)
+
+        return Answer(text=value_text, confidence=0.9, was_gated=False, raw_text=value_text,
+                      gate_reason="office_chart_point_value")

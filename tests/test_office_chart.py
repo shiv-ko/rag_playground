@@ -201,3 +201,97 @@ class TestExtractOfficeChartSeries:
         assert len(series) == 1
         assert series[0].color_name == "blue"
         assert series[0].points[3] == 0.50239218877136205
+
+
+import unicodedata
+
+from src.generator.office_chart import OfficeChartAnswerer
+
+
+def _make_project_dir(tmp_path: Path, project_name: str) -> Path:
+    project_dir = tmp_path / project_name
+    project_dir.mkdir()
+    return project_dir
+
+
+class TestOfficeChartAnswererXlsxColumn:
+    def test_answers_column_name_from_xlsx_chart(self, tmp_path: Path) -> None:
+        project_dir = _make_project_dir(tmp_path, "株式会社青潮モビリティサービス")
+        xlsx_path = project_dir / "train.xlsx"
+        with zipfile.ZipFile(xlsx_path, "w") as zf:
+            zf.writestr("xl/charts/chartEx1.xml", _CHARTEX1_XML)
+
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "青潮モビリティサービスのtrain.xlsxのSheet1にあるグラフ1はどのカラムを可視化したものですか。",
+            "株式会社青潮モビリティサービス",
+            tmp_path,
+        )
+
+        assert result.was_gated is False
+        assert result.text == "hum"
+
+    def test_missing_chart_number_is_gated(self, tmp_path: Path) -> None:
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "train.xlsxのSheet1について教えてください。",
+            "存在しない案件",
+            tmp_path,
+        )
+
+        assert result.was_gated is True
+
+
+class TestOfficeChartAnswererDocxPointValue:
+    def test_single_series_needs_no_color_word(self, tmp_path: Path) -> None:
+        project_dir = _make_project_dir(tmp_path, "株式会社青潮モビリティサービス")
+        docx_path = project_dir / "基礎分析.docx"
+        with zipfile.ZipFile(docx_path, "w") as zf:
+            zf.writestr("word/document.xml", "<document/>")
+            zf.writestr("word/charts/chart1.xml", _CHART1_XML)
+            zf.writestr("word/theme/theme1.xml", _THEME1_XML)
+
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "青潮モビリティサービスの基礎分析.docxのグラフ1で、x=3のときのyの値を小数第5位で答えてください。",
+            "株式会社青潮モビリティサービス",
+            tmp_path,
+        )
+
+        assert result.was_gated is False
+        assert result.text == "0.50239"
+
+    def test_multi_series_uses_color_word_to_disambiguate(self, tmp_path: Path) -> None:
+        project_dir = _make_project_dir(tmp_path, "株式会社青潮モビリティサービス")
+        docx_path = project_dir / "基礎分析.docx"
+        with zipfile.ZipFile(docx_path, "w") as zf:
+            zf.writestr("word/document.xml", "<document/>")
+            zf.writestr("word/charts/chart2.xml", _CHART2_XML)
+            zf.writestr("word/theme/theme1.xml", _THEME1_XML)
+
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "青潮モビリティサービスの基礎分析.docxのグラフ2で、x=3のときの青色の折れ線のyの値を小数第5位で答えてください。",
+            "株式会社青潮モビリティサービス",
+            tmp_path,
+        )
+
+        assert result.was_gated is False
+        assert result.text == "0.19555"
+
+    def test_multi_series_without_color_word_is_gated(self, tmp_path: Path) -> None:
+        project_dir = _make_project_dir(tmp_path, "株式会社青潮モビリティサービス")
+        docx_path = project_dir / "基礎分析.docx"
+        with zipfile.ZipFile(docx_path, "w") as zf:
+            zf.writestr("word/document.xml", "<document/>")
+            zf.writestr("word/charts/chart2.xml", _CHART2_XML)
+            zf.writestr("word/theme/theme1.xml", _THEME1_XML)
+
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "青潮モビリティサービスの基礎分析.docxのグラフ2で、x=3のときのyの値を小数第5位で答えてください。",
+            "株式会社青潮モビリティサービス",
+            tmp_path,
+        )
+
+        assert result.was_gated is True
