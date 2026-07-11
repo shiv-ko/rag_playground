@@ -187,15 +187,17 @@ class Pipeline:
                 return contract_answer, "structured:contract_rule"
 
         if self.structured_store is not None and "cross_project" in tags:
-            cross_project_answer = self.contract_calc_answerer.answer(
+            # contract_ruleと異なり、cross_projectタグは横断集計問い専用のキーワード
+            # （§1.1）で汎用語による誤タグ付けのリスクが低いため、Missing判定も
+            # 「該当なし」ではなく最終回答として確定させる（generate()へのフォール
+            # スルーは、確信のない生成LLMがIncorrectを出すリスクを再び持ち込むため禁止）。
+            return self.contract_calc_answerer.answer(
                 qa.question,
                 project_name,
                 self.structured_store,
                 self.project_primary_aliases,
                 self.project_aliases,
-            )
-            if not cross_project_answer.was_gated:
-                return cross_project_answer, "structured:cross_project"
+            ), "structured:cross_project"
 
         if project_name is None:
             return None

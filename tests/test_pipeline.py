@@ -381,6 +381,57 @@ def test_pipeline_routes_cross_project_question_to_contract_calc_answerer(tmp_pa
     assert "875,000円" in result.answer
 
 
+def test_pipeline_cross_project_missing_is_terminal_not_fallback_to_retrieval(tmp_path: Path) -> None:
+    """cross_projectタグでContractCalcAnswererがMissingと判定した場合、その判定を最終回答とし、
+    通常のgenerate()（検索+LLM）へフォールバックしてはいけない（valid Q3の実データ検証で発見:
+    青潮のように1件でもpaid_amount_incl_taxが算出不能だとMissingが返るが、以前の実装はこれを
+    「このパスは非該当」と誤解釈してgenerate()に処理を渡し、Incorrectのリスクが再発していた）。
+    """
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    contracts = [
+        {
+            "project_name": "京橋風",
+            "status": "ok",
+            "contract_type": "fixed",
+            "estimated_amount_incl_tax": 5_775_000,
+            "tax_rate": 0.10,
+        },
+        {
+            "project_name": "青潮風",
+            "status": "ok",
+            "contract_type": "time_and_materials",
+            "estimated_amount_incl_tax": 4_000_000,
+            "tax_rate": 0.10,
+            # final_amount_incl_taxもactual_hoursも無い＝算出不能→Missingになるはず
+        },
+    ]
+    (artifacts_dir / "contracts.jsonl").write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in contracts),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+
+    def _boom(question, contexts):
+        raise AssertionError("cross_projectがMissingと判定した後にgenerate()を呼んではいけない")
+
+    pipeline.generator.generate = _boom
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+    ))
+
+    assert result.answer_path == "structured:cross_project"
+    assert result.was_gated
+
+
 def test_pipeline_falls_through_to_spreadsheet_state_when_office_style_has_no_match(tmp_path: Path) -> None:
     """「黄色ハイライトされている」等の質問はoffice_styleタグも付くが、
     office_marksに該当が無ければspreadsheet_stateパスを試す（elifで排他にしない）。"""
