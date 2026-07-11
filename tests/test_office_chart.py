@@ -3,7 +3,7 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from src.generator.office_chart import extract_xlsx_chart_series
+from src.generator.office_chart import extract_xlsx_chart_series, classify_color_name, resolve_theme_accent_colors
 
 _CHARTEX1_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cx:chartSpace xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -21,6 +21,24 @@ _CHARTEX1_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </cx:series>
 </cx:plotAreaRegion></cx:plotArea>
 </cx:chart></cx:chartSpace>"""
+
+_THEME1_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office">
+<a:themeElements>
+<a:clrScheme name="Office">
+<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
+<a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
+<a:dk2><a:srgbClr val="0E2841"/></a:dk2>
+<a:lt2><a:srgbClr val="E8E8E8"/></a:lt2>
+<a:accent1><a:srgbClr val="156082"/></a:accent1>
+<a:accent2><a:srgbClr val="E97132"/></a:accent2>
+<a:accent3><a:srgbClr val="196B24"/></a:accent3>
+<a:accent4><a:srgbClr val="0F9ED5"/></a:accent4>
+<a:accent5><a:srgbClr val="A02B93"/></a:accent5>
+<a:accent6><a:srgbClr val="4EA72E"/></a:accent6>
+</a:clrScheme>
+</a:themeElements>
+</a:theme>"""
 
 
 def _make_xlsx_with_chart(tmp_path: Path, chart_xml: bytes, chart_name: str = "chartEx1.xml") -> Path:
@@ -57,3 +75,25 @@ class TestExtractXlsxChartSeries:
         result = extract_xlsx_chart_series(xlsx_path)
 
         assert result == {}
+
+
+class TestResolveThemeAccentColors:
+    def test_resolves_accent1_and_accent2(self) -> None:
+        result = resolve_theme_accent_colors(_THEME1_XML)
+
+        assert result["accent1"] == "156082"
+        assert result["accent2"] == "E97132"
+
+
+class TestClassifyColorName:
+    def test_accent1_is_blue(self) -> None:
+        assert classify_color_name("156082") == "blue"
+
+    def test_accent2_is_orange(self) -> None:
+        assert classify_color_name("E97132") == "orange"
+
+    def test_pure_red(self) -> None:
+        assert classify_color_name("FF0000") == "red"
+
+    def test_gray_low_saturation(self) -> None:
+        assert classify_color_name("808080") == "gray"
