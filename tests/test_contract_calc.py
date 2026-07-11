@@ -457,3 +457,85 @@ def test_answer_tax_total_missing_when_no_contracts() -> None:
         _store([]),
     )
     assert answer.was_gated
+
+
+def test_answer_payment_top3_aggregates_across_all_contracts() -> None:
+    # 実データ縮約版: 10/09/08月がそれぞれ複数案件の支払で構成される想定。
+    rows = [
+        {
+            "project_name": "京橋風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-10", "amount_incl_tax": 2_887_500, "due_date": "2025-10-08"},
+                {"month": "2025-11", "amount_incl_tax": 2_887_500, "due_date": "2025-11-19"},
+            ],
+        },
+        {
+            "project_name": "かえで風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-10", "amount_incl_tax": 3_850_000, "due_date": "2025-10-14"},
+            ],
+        },
+        {
+            "project_name": "青嶺風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-09", "amount_incl_tax": 4_675_000, "due_date": "2025-09-24"},
+            ],
+        },
+        {
+            "project_name": "青潮風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-09", "amount_incl_tax": 4_675_000, "due_date": "2025-09-03"},
+            ],
+        },
+        {
+            "project_name": "白峰風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-05", "amount_incl_tax": 2_992_000, "due_date": "2025-05-20"},
+                {"month": "2025-07", "amount_incl_tax": 4_488_000, "due_date": "2025-07-29"},
+            ],
+        },
+    ]
+    answer = ContractCalcAnswerer().answer(
+        "2026年7月1日時点で存在する案件について、支払月ごとの精算総額が多い月を上位3つ、総額とあわせて答えてください。",
+        None,
+        _store(rows),
+    )
+    assert not answer.was_gated
+    assert answer.text == "2025年9月: 9,350,000円、2025年10月: 6,737,500円、2025年7月: 4,488,000円"
+
+
+def test_answer_payment_top3_missing_when_any_contract_has_no_schedule() -> None:
+    rows = [
+        {
+            "project_name": "京橋風",
+            "status": "ok",
+            "payment_schedule": [
+                {"month": "2025-10", "amount_incl_tax": 2_887_500, "due_date": "2025-10-08"},
+            ],
+        },
+        {
+            "project_name": "抽出失敗風",
+            "status": "ok",
+            "payment_schedule": [],
+        },
+    ]
+    answer = ContractCalcAnswerer().answer(
+        "2026年7月1日時点で存在する案件について、支払月ごとの精算総額が多い月を上位3つ、総額とあわせて答えてください。",
+        None,
+        _store(rows),
+    )
+    assert answer.was_gated
+
+
+def test_answer_payment_top3_missing_when_no_contracts() -> None:
+    answer = ContractCalcAnswerer().answer(
+        "2026年7月1日時点で存在する案件について、支払月ごとの精算総額が多い月を上位3つ、総額とあわせて答えてください。",
+        None,
+        _store([]),
+    )
+    assert answer.was_gated

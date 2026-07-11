@@ -331,6 +331,48 @@ def extract_report_values(project_dir: Path) -> dict[str, Any]:
     }
 
 
+def extract_payment_schedule(text: str) -> list[dict[str, Any]]:
+    """支払回テーブルから{month, amount_incl_tax, due_date}のリストを抽出する（Q40用）。
+
+    列名・列順は案件ごとに揺れる（支払回/名目/比率/... のバリエーションが複数確認済み）ため、
+    ヘッダー行を都度探索し「税込」を含む列・「支払期」を含む列（支払期日/支払期限どちらも
+    カバー）をインデックスで解決する。支払期日列に日付が無く条件文と複合値になっているケース
+    （例:「...5営業日以内（2025-09-24）」）にも対応するため、セル内のYYYY-MM-DD部分文字列を
+    正規表現で探す。
+    """
+    lines = text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        if "|" in line and "支払回" in line:
+            header_idx = i
+            break
+    if header_idx is None:
+        return []
+    headers = [h.strip() for h in lines[header_idx].split("|")]
+    amount_idx = next((i for i, h in enumerate(headers) if "税込" in h), None)
+    due_idx = next((i for i, h in enumerate(headers) if "支払期" in h), None)
+    if amount_idx is None or due_idx is None:
+        return []
+    schedule: list[dict[str, Any]] = []
+    for line in lines[header_idx + 1:]:
+        if "|" not in line:
+            break
+        cells = [c.strip() for c in line.split("|")]
+        if len(cells) != len(headers):
+            break
+        amount_match = re.search(r"([0-9,]+)\s*円", cells[amount_idx])
+        date_match = re.search(r"(\d{4}-\d{2}-\d{2})", cells[due_idx])
+        if not amount_match or not date_match:
+            continue
+        due_date = date_match.group(1)
+        schedule.append({
+            "month": due_date[:7],
+            "amount_incl_tax": parse_yen(amount_match.group(1)),
+            "due_date": due_date,
+        })
+    return schedule
+
+
 def parse_contract_text(project_name: str, source_path: str, text: str) -> dict[str, Any]:
     text = normalize_text(text)
     clause = extract_billing_clause(text)
@@ -371,6 +413,7 @@ def parse_contract_text(project_name: str, source_path: str, text: str) -> dict[
         "end_date": end_date,
         "contract_period_days": days,
         "advance_payment_amount": advance,
+        "payment_schedule": extract_payment_schedule(text),
         "raw_billing_clause": clause,
         "source_path": source_path,
         "status": "ok",

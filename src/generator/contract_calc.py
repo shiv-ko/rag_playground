@@ -24,6 +24,11 @@ def _fmt_yen(value: float | int) -> str:
     return f"{int(round(value)):,}円"
 
 
+def _fmt_month(month: str) -> str:
+    year, mon = month.split("-")
+    return f"{year}年{int(mon)}月"
+
+
 def parse_hours(text: str) -> float | None:
     patterns = [
         r"ACTH\s*[=：:]\s*([0-9]+(?:\.[0-9]+)?)\s*h(?:\s*([0-9]+)\s*m)?",
@@ -145,6 +150,8 @@ class ContractCalcAnswerer:
         project_aliases = project_aliases or {}
         if "消費税額の総額" in question:
             return self._answer_tax_total(store)
+        if "支払月" in question and "精算総額" in question:
+            return self._answer_payment_top3(store)
         if "APR-M3" in question:
             return self._answer_apr_list(question, store, project_primary_aliases, project_aliases)
         if "APR-M1" in question and "10000" in question:
@@ -243,6 +250,27 @@ class ContractCalcAnswerer:
             total_tax += paid - paid / (1 + tax_rate)
         text = _fmt_yen(total_tax)
         return Answer(text=text, confidence=0.85, was_gated=False, raw_text=text, gate_reason="contract_tax_total")
+
+    def _answer_payment_top3(self, store: StructuredArtifactStore) -> Answer:
+        """全案件の支払月ごとの精算総額を集計し、上位3ヶ月と総額を答える（Q40型）。
+
+        1件でもpayment_scheduleが空ならMissingへフォールバックする（Q3の§1.1と同じ
+        「全件揃わなければMissing」の安全側設計を踏襲。抽出失敗した案件を除外して集計すると
+        黙って過小集計になりIncorrectのリスクを持ち込むため）。
+        """
+        rows = [r for r in store.all_contracts() if r.get("status") == "ok"]
+        if not rows:
+            return _missing(self.gate, "contract_payment_top3_no_contracts")
+        monthly: dict[str, int] = {}
+        for row in rows:
+            schedule = row.get("payment_schedule")
+            if not schedule:
+                return _missing(self.gate, "contract_payment_top3_incomplete")
+            for entry in schedule:
+                monthly[entry["month"]] = monthly.get(entry["month"], 0) + int(entry["amount_incl_tax"])
+        top3 = sorted(monthly.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        text = "、".join(f"{_fmt_month(month)}: {_fmt_yen(amount)}" for month, amount in top3)
+        return Answer(text=text, confidence=0.8, was_gated=False, raw_text=text, gate_reason="contract_payment_top3")
 
     def _answer_apr_list(
         self,

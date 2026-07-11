@@ -15,6 +15,7 @@ from scripts.build_contract_registry import (
     candidate_dates_from_filename,
     classify_rounding_rule,
     extract_dates,
+    extract_payment_schedule,
     extract_report_values,
     literal_password_from_filename,
     parse_contract_text,
@@ -416,3 +417,75 @@ def test_build_contract_registry_non_encrypted_corruption_still_falls_back_to_fa
 
     assert len(rows) == 1
     assert rows[0]["status"] == "failed"
+
+
+# --- extract_payment_schedule (Q40用: 支払回テーブルの月次集計) ---
+
+
+def test_extract_payment_schedule_basic_two_rows() -> None:
+    # 実データ（京橋信用ソリューションズ）の列順: 支払回|名目|比率|税抜|消費税額|税込|支払条件|支払期日
+    text = """
+支払回 | 名目 | 比率 | 金額（税抜） | 消費税額 | 金額（税込） | 支払条件 | 支払期日
+第1回 | 着手金 | 50% | 2,625,000円 | 262,500円 | 2,887,500円 | 契約締結後5営業日以内 | 2025-10-08
+第2回 | 検収金 | 50% | 2,625,000円 | 262,500円 | 2,887,500円 | 検収完了後5営業日以内 | 2025-11-19
+"""
+    schedule = extract_payment_schedule(text)
+    assert schedule == [
+        {"month": "2025-10", "amount_incl_tax": 2_887_500, "due_date": "2025-10-08"},
+        {"month": "2025-11", "amount_incl_tax": 2_887_500, "due_date": "2025-11-19"},
+    ]
+
+
+def test_extract_payment_schedule_different_column_order() -> None:
+    # 実データ（青葉与信マネジメント）の列順: 支払回|支払名目|比率|支払条件|税抜|消費税額|税込|支払期日
+    text = """
+支払回 | 支払名目 | 比率 | 支払条件 | 税抜金額 | 消費税額 | 税込金額 | 支払期日
+1 | 着手金 | 50% | 契約締結後5営業日以内 | 2,100,000円 | 210,000円 | 2,310,000円 | 2025-04-16
+2 | 検収金 | 50% | 検収完了後5営業日以内 | 2,100,000円 | 210,000円 | 2,310,000円 | 2025-06-04
+"""
+    schedule = extract_payment_schedule(text)
+    assert schedule == [
+        {"month": "2025-04", "amount_incl_tax": 2_310_000, "due_date": "2025-04-16"},
+        {"month": "2025-06", "amount_incl_tax": 2_310_000, "due_date": "2025-06-04"},
+    ]
+
+
+def test_extract_payment_schedule_date_embedded_in_condition_cell() -> None:
+    # 実データ（青嶺不動産アセットマネジメント）: 独立した支払期日列が無く、最終列（支払期限）に
+    # 「条件文（YYYY-MM-DD）」の複合値として日付が埋め込まれている。
+    text = """
+支払回 | マイルストーン | 比率 | 金額（税抜） | 消費税額 | 金額（税込） | 支払期限
+1 | 最終一括精算 | 100% | 4,250,000円 | 425,000円 | 4,675,000円 | 最終成果物の検収完了後5営業日以内（2025-09-24）
+"""
+    schedule = extract_payment_schedule(text)
+    assert schedule == [
+        {"month": "2025-09", "amount_incl_tax": 4_675_000, "due_date": "2025-09-24"},
+    ]
+
+
+def test_extract_payment_schedule_strips_mikomi_suffix_in_amount_cell() -> None:
+    # 実データ（東都人材プラットフォーム、T&M最終一括精算）: 税込金額セルに「（見込）」が付く。
+    text = """
+支払回 | マイルストーン | 比率 | 金額（税抜） | 消費税額 | 金額（税込） | 支払条件 | 支払期日
+1 | 最終一括精算 | 100% | 4,250,000円（見込） | 425,000円（見込） | 4,675,000円（見込） | 最終成果物の検収完了後5営業日以内 | 2025-10-06
+"""
+    schedule = extract_payment_schedule(text)
+    assert schedule == [
+        {"month": "2025-10", "amount_incl_tax": 4_675_000, "due_date": "2025-10-06"},
+    ]
+
+
+def test_extract_payment_schedule_empty_when_no_table() -> None:
+    assert extract_payment_schedule("支払条件については別途協議する。") == []
+
+
+def test_parse_contract_text_includes_payment_schedule() -> None:
+    text = """
+6. 報酬および支払条件
+支払回 | 名目 | 比率 | 金額（税抜） | 消費税額 | 金額（税込） | 支払条件 | 支払期日
+第1回 | 着手金 | 50% | 2,625,000円 | 262,500円 | 2,887,500円 | 契約締結後5営業日以内 | 2025-10-08
+"""
+    row = parse_contract_text("京橋風", "契約書.docx", text)
+    assert row["payment_schedule"] == [
+        {"month": "2025-10", "amount_incl_tax": 2_887_500, "due_date": "2025-10-08"},
+    ]
