@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import colorsys
+import math
 import re
-import zipfile
+import unicodedata
 import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from src.generator.confidence_gate import ConfidenceGate
+from src.models import Answer
 
 _CX_NS = {
     "cx": "http://schemas.microsoft.com/office/drawing/2014/chartex",
@@ -150,11 +155,6 @@ def extract_office_chart_series(office_file_path: Path) -> dict[str, list[ChartS
     return result
 
 
-import unicodedata
-
-from src.generator.confidence_gate import ConfidenceGate
-from src.models import Answer
-
 _CHART_NUM_RE = re.compile(r"グラフ\s*(\d+)")
 _X_VALUE_RE = re.compile(r"x\s*=\s*(\d+)")
 _ROUND_RE = re.compile(r"小数第(\d+)位")
@@ -266,6 +266,10 @@ class OfficeChartAnswerer:
             return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
                            gate_reason="office_chart_index_out_of_range")
         value = target.points[idx]
+
+        if math.isnan(value):
+            return Answer(text=self.gate.missing_text(), confidence=0.0, was_gated=True,
+                           gate_reason="office_chart_value_unavailable")
 
         round_match = _ROUND_RE.search(question)
         if round_match:

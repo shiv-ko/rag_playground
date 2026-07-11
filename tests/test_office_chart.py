@@ -6,9 +6,9 @@ from pathlib import Path
 from src.generator.office_chart import (
     extract_xlsx_chart_series,
     classify_color_name,
-    resolve_theme_accent_colors,
-    ChartSeries,
     extract_office_chart_series,
+    OfficeChartAnswerer,
+    resolve_theme_accent_colors,
 )
 
 _CHARTEX1_XML = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -203,11 +203,6 @@ class TestExtractOfficeChartSeries:
         assert series[0].points[3] == 0.50239218877136205
 
 
-import unicodedata
-
-from src.generator.office_chart import OfficeChartAnswerer
-
-
 def _make_project_dir(tmp_path: Path, project_name: str) -> Path:
     project_dir = tmp_path / project_name
     project_dir.mkdir()
@@ -295,3 +290,39 @@ class TestOfficeChartAnswererDocxPointValue:
         )
 
         assert result.was_gated is True
+
+    def test_gap_in_sparse_series_is_gated_not_nan(self, tmp_path: Path) -> None:
+        sparse_chart_xml = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+<c:chart>
+<c:title><c:tx><c:rich><a:p><a:r><a:t>\xe3\x82\xb0\xe3\x83\xa9\xe3\x83\x95</a:t></a:r><a:r><a:t>1</a:t></a:r></a:p></c:rich></c:tx></c:title>
+<c:plotArea><c:lineChart>
+<c:ser>
+<c:idx val="0"/><c:order val="0"/>
+<c:spPr><a:ln><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></c:spPr>
+<c:val><c:numRef><c:f>Sheet2!$J$4:$J$10</c:f><c:numCache>
+<c:ptCount val="4"/>
+<c:pt idx="0"><c:v>1.0</c:v></c:pt>
+<c:pt idx="3"><c:v>4.0</c:v></c:pt>
+</c:numCache></c:numRef></c:val>
+</c:ser>
+</c:lineChart></c:plotArea>
+</c:chart></c:chartSpace>"""
+
+        project_dir = _make_project_dir(tmp_path, "株式会社青潮モビリティサービス")
+        docx_path = project_dir / "基礎分析.docx"
+        with zipfile.ZipFile(docx_path, "w") as zf:
+            zf.writestr("word/document.xml", "<document/>")
+            zf.writestr("word/charts/chart1.xml", sparse_chart_xml)
+            zf.writestr("word/theme/theme1.xml", _THEME1_XML)
+
+        answerer = OfficeChartAnswerer()
+        result = answerer.answer(
+            "青潮モビリティサービスの基礎分析.docxのグラフ1で、x=2のときのyの値を小数第5位で答えてください。",
+            "株式会社青潮モビリティサービス",
+            tmp_path,
+        )
+
+        assert result.was_gated is True
+        assert result.gate_reason == "office_chart_value_unavailable"
