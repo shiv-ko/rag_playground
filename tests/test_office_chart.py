@@ -186,3 +186,18 @@ class TestExtractOfficeChartSeries:
         assert by_color["orange"].name == "平均 / cnt"
         assert by_color["blue"].name == "平均 / windspeed"
         assert by_color["blue"].points[3] == 0.19555305126118649
+
+    def test_pptx_file_uses_ppt_charts_prefix(self, tmp_path: Path) -> None:
+        pptx_path = tmp_path / "presentation.pptx"
+        with zipfile.ZipFile(pptx_path, "w") as zf:
+            zf.writestr("ppt/presentation.xml", "<presentation/>")
+            zf.writestr("ppt/charts/chart1.xml", _CHART1_XML)
+            zf.writestr("ppt/theme/theme1.xml", _THEME1_XML)
+
+        result = extract_office_chart_series(pptx_path)
+
+        assert "グラフ1" in result
+        series = result["グラフ1"]
+        assert len(series) == 1
+        assert series[0].color_name == "blue"
+        assert series[0].points[3] == 0.50239218877136205
