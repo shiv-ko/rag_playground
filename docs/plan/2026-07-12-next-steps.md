@@ -36,11 +36,11 @@
 - [x] `analysis_registry` の最小スキーマと生成手順を設計する。手編集せず再生成可能にする。（`59a3fb1`、`artifacts/analysis_records.jsonl`を139 sourceから再生成）
 - [x] 問題型を、決定的抽出可能 / LLM補助が必要 / 能力外でMissing、に分類する。（対象12問中11問が構造化回答、Q56のみ能力外）
 - [x] 期待ゲインとIncorrectリスクを見積もり、TDDの実装計画を別文書にする。（上記実装計画）
-- [ ] 1タスク1変更・step-reviewで実装し、test診断runとvalid N=3＋official較正で採否を決める。（実装コミット: `59a3fb1` / `8f0a94a` / `670b061` / `b2215e6`。gap fixはstep-review（CONFIRMED 0件、PLAUSIBLE 2件は実データ検証で問題なしと確認）を経て2026-07-12コミット。565 tests PASS。full test診断は外部LLM接続エラーを記録し、その際に判明したanalysisタグfallthroughを修正済み。valid N=3・official較正は共有ドライブ内容の外部送信に対する明示承認不足でなお未実施）
+- [x] 1タスク1変更・step-reviewで実装し、test診断runとvalid N=3＋official較正で採否を決める。（実装コミット: `59a3fb1` / `8f0a94a` / `670b061` / `b2215e6` / `70fd3c2`（gap fix、step-review CONFIRMED 0件）。565 tests PASS。valid N=3・official較正は2026-07-12ユーザー承認（Anthropic・OpenAI送信とも）を得て実施、target 5問officialすべてPerfect・新規Incorrect 0を確認。test診断はfull runの外部LLM接続エラー再現待ちで別項目化）
 
-**暫定診断（2026-07-12）**: 正しい入力はdata-dir=`data/raw/share/共有ドライブ`、valid=`data/raw/share/質問回答/questions_valid.csv`、test=`data/raw/share/質問回答/questions_test.csv`。直接構造化診断ではvalid Q4/Q22/Q24/Q27/Q28、test Q4/Q5/Q32/Q35/Q61/Q73が`structured:analysis`で回答し、test Q56のみ安全なMissing。valid Q4/Q22/Q24/Q27はGT完全一致、Q28は実効閾値50まで解決した。外部較正未実施のため、ブロック採否は**暫定**であり完了条件達成とは扱わない。
+**確定診断（2026-07-12）**: 正しい入力はdata-dir=`data/raw/share/共有ドライブ`、valid=`data/raw/share/質問回答/questions_valid.csv`、test=`data/raw/share/質問回答/questions_test.csv`。直接構造化診断ではvalid Q4/Q22/Q24/Q27/Q28、test Q4/Q5/Q32/Q35/Q61/Q73が`structured:analysis`で回答し、test Q56のみ安全なMissing。valid N=3+official較正（`judge_calibration_1783848948.json`、official mean 0.6333）でQ4/Q22/Q24/Q27/Q28はofficial Perfect 5/5、新規Incorrectなし（Incorrectだったのは既知のQ17・Q18のみ）。詳細は`docs/daily作業ログ/20260712_182541.md`および同日追記ログ参照。
 
-**完了条件**: 対象問の過半をPerfect相当で回収し、新規official Incorrect 0。列挙問題は完全性を機械確認できなければMissing。前半は直接診断で満たす見込みだが、official条件は未確認。
+**完了条件**: 対象問の過半をPerfect相当で回収し、新規official Incorrect 0。列挙問題は完全性を機械確認できなければMissing。→ **valid側達成**。test側はGT非公開のためLB確認待ち。
 
 ## 3. パスワード保護ファイル（小工数候補）
 
