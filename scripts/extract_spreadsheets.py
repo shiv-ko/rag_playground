@@ -2,20 +2,36 @@
 from __future__ import annotations
 
 import json
+import re
+import sys
+import tempfile
+import unicodedata
 from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
 
 import openpyxl
+from msoffcrypto.exceptions import InvalidKeyError
 from openpyxl.cell.cell import Cell
 from openpyxl.styles import Color
 from openpyxl.worksheet.worksheet import Worksheet
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from src.utils.office_crypto import (
+    candidate_dates_from_filename,
+    decrypt_office_file,
+    derive_office_password,
+    literal_password_from_filename,
+    looks_like_encrypted_office_file,
+)
 PROJECT_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト"
 ARTIFACTS = ROOT / "artifacts"
+PROJECT_REGISTRY_PATH = ARTIFACTS / "project_registry.json"
+CONTRACTS_PATH = ARTIFACTS / "contracts.jsonl"
 
 
 SECTION_PREFIXES = {
@@ -155,14 +171,136 @@ def sheet_dimensions(ws: Worksheet) -> dict[str, Any]:
     }
 
 
-def load_workbook(path: Path):
-    return openpyxl.load_workbook(
-        path,
-        data_only=True,
-        read_only=False,
-        keep_vba=False,
-        keep_links=False,
-    )
+def normalize_project_text(text: str) -> str:
+    """build_contract_registry.pyのnormalize_textと同一ロジック（NFC正規化＋全角スペース→半角）。
+
+    scripts/build_*.py群は意図的に自己完結スタイルなのでcross-script importはせず複製する。
+    """
+    return unicodedata.normalize("NFC", text).replace("　", " ")
+
+
+def load_primary_aliases(project_registry_path: Path = PROJECT_REGISTRY_PATH) -> dict[str, str]:
+    """project_registry.jsonから`project_name(正規化済み) -> primary_alias`の対応表を作る。"""
+    if not project_registry_path.exists():
+        return {}
+    data = json.loads(project_registry_path.read_text(encoding="utf-8"))
+    return {
+        normalize_project_text(row["project_name"]): row["primary_alias"]
+        for row in data
+        if row.get("primary_alias")
+    }
+
+
+def candidate_start_dates_from_contracts(
+    project_name: str, contracts_path: Path = CONTRACTS_PATH
+) -> list[str]:
+    """同一案件のcontracts.jsonlから開始日候補(YYYYMMDD)を抽出する。
+
+    スケジュールxlsx自身の復号に使うため、schedule_tasks.jsonl由来の日付候補
+    （build_contract_registry.pyのcandidate_dates_from_schedule）は循環参照になり使えない。
+    かえで案件の契約書は既に復号済み・contracts.jsonlにstart_dateが載っているため、
+    こちらを日付候補源にする。
+    """
+    if not contracts_path.exists():
+        return []
+    normalized_project = normalize_project_text(project_name)
+    candidates: list[str] = []
+    seen: set[str] = set()
+    with contracts_path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if normalize_project_text(row.get("project_name", "")) != normalized_project:
+                continue
+            for key in ("start_date", "end_date"):
+                value = row.get(key)
+                if not value:
+                    continue
+                digits = re.sub(r"[^0-9]", "", str(value))[:8]
+                if len(digits) == 8 and digits not in seen:
+                    seen.add(digits)
+                    candidates.append(digits)
+    return candidates
+
+
+def attempt_decrypt_workbook(
+    path: Path,
+    project_name: str,
+    primary_aliases: dict[str, str],
+    output_path: Path,
+    contracts_path: Path = CONTRACTS_PATH,
+) -> bool:
+    """暗号化されたxlsxに対し、候補パスワードを順に試して復号し、output_pathに平文コピーを書く。
+
+    build_contract_registry.pyのattempt_decrypt_contract_textと同じ2系統の候補:
+    (1) ファイル名`pw-<トークン>`のトークン自体をリテラルパスワードとして試す。
+    (2) DA-規則`DA-[案件略号]-[開始年月日8桁]-[拡張子]`。開始年月日はファイル名の
+        `pw-...<8桁>`命名慣習、無ければ同一案件のcontracts.jsonl（既に復号済みの契約書）
+        のstart_date/end_dateを候補にする。
+    全候補が`InvalidKeyError`（パスワード誤り）で失敗した場合はFalseを返す。
+    """
+    literal_password = literal_password_from_filename(path)
+    if literal_password is not None:
+        try:
+            decrypt_office_file(path, literal_password, output_path)
+            return True
+        except InvalidKeyError:
+            pass
+
+    alias = primary_aliases.get(normalize_project_text(project_name))
+    if not alias:
+        return False
+    candidates = candidate_dates_from_filename(path)
+    if not candidates:
+        candidates = candidate_start_dates_from_contracts(project_name, contracts_path)
+    ext = path.suffix
+    for candidate in candidates:
+        password = derive_office_password(alias, candidate, ext)
+        try:
+            decrypt_office_file(path, password, output_path)
+            return True
+        except InvalidKeyError:
+            continue
+    return False
+
+
+def load_workbook(
+    path: Path,
+    primary_aliases: dict[str, str] | None = None,
+    contracts_path: Path = CONTRACTS_PATH,
+):
+    """通常どおりworkbookを開く。暗号化(CDFV2)らしい失敗の場合のみ復号を試みて再ロードする。
+
+    非暗号化の破損等、他の原因での失敗は復号を試みず元の例外をそのまま送出する
+    （main()側の既存failures収集ロジックに影響しない）。
+    """
+    try:
+        return openpyxl.load_workbook(
+            path,
+            data_only=True,
+            read_only=False,
+            keep_vba=False,
+            keep_links=False,
+        )
+    except Exception:
+        if primary_aliases is None or not looks_like_encrypted_office_file(path):
+            raise
+        project_name, _ = get_parts(path)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            decrypted_path = Path(tmp_dir) / f"decrypted{path.suffix}"
+            if not attempt_decrypt_workbook(
+                path, project_name, primary_aliases, decrypted_path, contracts_path
+            ):
+                raise
+            return openpyxl.load_workbook(
+                decrypted_path,
+                data_only=True,
+                read_only=False,
+                keep_vba=False,
+                keep_links=False,
+            )
 
 
 def likely_header_row(ws: Worksheet) -> int | None:
@@ -227,9 +365,13 @@ def extract_schedule_rows(path: Path, ws: Worksheet, meta: dict[str, Any]) -> li
     return rows
 
 
-def extract_workbook(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def extract_workbook(
+    path: Path,
+    primary_aliases: dict[str, str] | None = None,
+    contracts_path: Path = CONTRACTS_PATH,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     meta = base_metadata(path)
-    value_wb = load_workbook(path)
+    value_wb = load_workbook(path, primary_aliases, contracts_path)
     sheets: list[dict[str, Any]] = []
     cells: list[dict[str, Any]] = []
     highlights: list[dict[str, Any]] = []
@@ -290,11 +432,12 @@ def main() -> None:
     all_highlights: list[dict[str, Any]] = []
     all_schedule_rows: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
+    primary_aliases = load_primary_aliases()
 
     for path in xlsx_files:
         print(f"extracting {path.relative_to(ROOT)}", flush=True)
         try:
-            sheets, cells, highlights, schedule_rows = extract_workbook(path)
+            sheets, cells, highlights, schedule_rows = extract_workbook(path, primary_aliases)
         except Exception as exc:  # noqa: BLE001 - keep extraction audit complete.
             failures.append({"source_path": str(path.relative_to(ROOT)), "error": repr(exc)})
             continue

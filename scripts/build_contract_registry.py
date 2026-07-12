@@ -17,7 +17,13 @@ from pptx import Presentation
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.utils.office_crypto import decrypt_office_file, derive_office_password
+from src.utils.office_crypto import (
+    candidate_dates_from_filename,
+    decrypt_office_file,
+    derive_office_password,
+    literal_password_from_filename,
+    looks_like_encrypted_office_file,
+)
 
 SHARE_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ"
 PROJECT_ROOT = SHARE_ROOT / "プロジェクト"
@@ -26,21 +32,9 @@ CONTRACTS_PATH = ARTIFACTS / "contracts.jsonl"
 PROJECT_REGISTRY_PATH = ARTIFACTS / "project_registry.json"
 SCHEDULE_TASKS_PATH = ARTIFACTS / "schedule_tasks.jsonl"
 
-# CDFV2 (OLE2/Compound File Binary) のマジックナンバー。パスワード保護されたOOXMLファイルは
-# 素のzipではなくこのコンテナ形式になるため、read_docx_text失敗時に「暗号化されているらしいか」
-# をここで判定してから復号フォールバックを試みる（他の破損原因と区別するため）。
-_OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
-
-# 実運用の命名慣習（docs/encrypted_file_queue.md記載）: 暗号化された契約書ファイルは
-# ファイル名に `pw-<案件略号><開始年月日8桁>` を含む。案件略号の綴りは問わず8桁の日付だけを
-# 抽出する（特定の案件名をハードコードしない汎用パターン）。
-_FILENAME_DATE_RE = re.compile(r"pw-[a-zA-Z0-9]{0,32}?(\d{8})", re.IGNORECASE)
-
-# 実データで判明した別の命名慣習: `pw-<トークン>`のトークン自体がDA-規則を介さず
-# そのまま平文パスワードになっているケースがある。マーカー以降・拡張子より前の
-# 英数字列全体を1つのリテラルパスワード候補として扱う（特定案件名のハードコードではなく
-# `pw-`マーカーという汎用の命名規則から導出する）。
-_FILENAME_LITERAL_PASSWORD_RE = re.compile(r"pw-([a-zA-Z0-9]+)", re.IGNORECASE)
+# looks_like_encrypted_office_file / candidate_dates_from_filename / literal_password_from_filename
+# は src/utils/office_crypto.py へ移動済み（extract_spreadsheets.pyとの共有のため）。
+# この行より下で使用する名前はそちらからのimportで解決される。
 
 
 def normalize_text(text: str) -> str:
@@ -86,29 +80,6 @@ def read_pdf_text(path: Path) -> str:
 
     reader = pypdf.PdfReader(str(path))
     return normalize_text("\n".join(page.extract_text() or "" for page in reader.pages))
-
-
-def looks_like_encrypted_office_file(path: Path) -> bool:
-    """先頭8バイトのCDFV2マジックナンバーで、パスワード保護されたOOXMLコンテナらしいかを判定する。"""
-    try:
-        return path.read_bytes()[:8] == _OLE_MAGIC
-    except OSError:
-        return False
-
-
-def candidate_dates_from_filename(path: Path) -> list[str]:
-    """ファイル名の`pw-...<8桁>`命名慣習から、パスワード導出用の日付候補(YYYYMMDD)を抽出する。"""
-    return _FILENAME_DATE_RE.findall(path.stem)
-
-
-def literal_password_from_filename(path: Path) -> str | None:
-    """ファイル名の`pw-<トークン>`命名慣習から、トークン自体をリテラルパスワード候補として返す。
-
-    DA-規則（案件略号・開始日・拡張子からの導出）とは別の、より直接的な命名慣習。
-    マーカーが無ければNoneを返す。
-    """
-    match = _FILENAME_LITERAL_PASSWORD_RE.search(path.stem)
-    return match.group(1) if match else None
 
 
 def load_primary_aliases(project_registry_path: Path = PROJECT_REGISTRY_PATH) -> dict[str, str]:
