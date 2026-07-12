@@ -1,0 +1,539 @@
+{
+  "summary": {
+    "mean_score": 0.0,
+    "total": 30,
+    "label_counts": {
+      "Missing": 30
+    },
+    "elapsed_seconds": 6.6,
+    "generator_tokens": {
+      "input": 0,
+      "output": 0
+    },
+    "judge_tokens": {
+      "input": 0,
+      "output": 0
+    },
+    "models": {
+      "generator": "claude-sonnet-5",
+      "judge": "claude-sonnet-5"
+    }
+  },
+  "results": [
+    {
+      "question_id": "0",
+      "question": "青潮モビリティサービスの最終報告における、モビリティ需要の要因分析のページで、マーカーされている単語をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcPmPGvgA3mqAP5UzV'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "office_style"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "1",
+      "question": "KSSのfigure_06.pngにおいて、dayによる件数推移とあわせて表示されているTG平均が最も低い日は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcRpQttDkH4wPj9aqo'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "image_or_graph",
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "2",
+      "question": "恒一会 かえで総合病院の提案書内で、重視するとされている評価指標を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcPu5EJZLpwsKkk4SD'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "3",
+      "question": "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcPnNmD1MJQ2BK9iqZ'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "multi_hop",
+        "cross_project"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "4",
+      "question": "青嶺不動産アセットマネジメントの modeling.py において、前処理器の sparse_output が False になる model_type は何ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcQ8xgT3qKQVjjYXAk'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "5",
+      "question": "白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI化はどの分類に記載されていますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcYaDBhFntXV3tDtpp'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件と集計内容を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcW4A7JMreCBx5yUb7'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_state",
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "7",
+      "question": "恒一会 かえで総合病院のプロジェクトデータ（train.csv）において、disease=1の女性の中で、ALT_GPTの平均値が最も高い年齢は何歳ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcXcAiBHEXBGD13sZk'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcTDFh3XcUP6BnEg1D'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "contract_rule"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcT745K5kwJMnGt4xD'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "version_diff"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "10",
+      "question": "蒼樹会 みなみ野女性医療センターの最終報告書にて、影響度が最も高いとされている残余リスクを抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcVTC3YZbMjapYwjb7'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "11",
+      "question": "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcUYNpz63HgWtQFYBW'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_state"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "12",
+      "question": "京橋信用ソリューションズの契約金額（税込）はいくらですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcXC7dHjFAT3QgwKXF'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "contract_rule"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "13",
+      "question": "青葉与信マネジメントの分析対象データにおいて、term=3 years、grade=B1、purpose=credit_cardに該当するloan_amntの平均を算出してください。四捨五入して整数値で出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcYQYQe5bRYMDnDGf3'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "14",
+      "question": "青葉バイオメディカル機器案件において、鈴木 美咲さんはどの役割としてアサインされていますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcXg8yc5Kmu84oXjLr'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "15",
+      "question": "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcYTGqtbYnfnYR1xcY'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "ms_date_cross_project_list"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "16",
+      "question": "MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcZpNUvd4eRc7po6g8'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "ms_date_duration"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcZpdCwkNiJsaVDk5Y'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "18",
+      "question": "東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載されている章番号を数字で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcdLDBVM4vPMWqnaK1'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "19",
+      "question": "青嶺不動産アセットマネジメント案件で分析設計を担当する人の名前をフルネームで抽出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcfsWEojfFyw7e8CUM'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "20",
+      "question": "AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTca4WL37dPtUJu8FTR'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_state"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "21",
+      "question": "青葉バイオメディカル機器のtrain.xlsxのPivotシートにおいて、平均月収が最も高い層の抽出条件を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcgn5af496cRzZ1S6R'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_state",
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "22",
+      "question": "AOSHIOの NB01_eda.ipynbにおいて、観察結果サマリで出力されている「TGとの相関 上位5」の中で、相関係数が最も小さいカラム名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcdthR1BGD59LWbgaW'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTccydMtw2un4b6i1pu'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_state",
+        "office_style"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "24",
+      "question": "白峰信用リスク評価の 01_eda.ipynb にある特徴量相関ヒートマップの図で可視化されている特徴量のうち、classとの相関係数の絶対値が最も小さい特徴量名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcmvPbByxMsPr3cNko'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "image_or_graph"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "25",
+      "question": "東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcesyXLCPmEQSUcUte'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "office_style"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "26",
+      "question": "青葉バイオメディカル機器のtrain.csvにおいて、EducationFieldがMarketingかつMonthlyIncomeが10000より大きいデータを抽出し、Ageの平均値を計算してください。その平均値に最も近い年齢のidをすべて答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcjyonAbgz9UJhA5Vo'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "spreadsheet_calc"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTcgj6kyVQdrTuWMSGM'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "28",
+      "question": "蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように判定していますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTchNYdAxX89RZ2WfEg'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    },
+    {
+      "question_id": "29",
+      "question": "蒼樹会 みなみ野女性医療センターの契約書第8条において、本契約終了後に秘密保持義務が存続する期間は何年間ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "confidence": 0.0,
+      "was_gated": true,
+      "judge_label": "Missing",
+      "judge_score": 0.0,
+      "judge_reason": "question processing raised an exception: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CcwTciXFRt7U1TqoH8658'}",
+      "raw_answer": "",
+      "retrieved_sources": [],
+      "gate_reason": "exception",
+      "routing_tags": [
+        "text_only"
+      ],
+      "answer_path": "exception"
+    }
+  ]
+}
