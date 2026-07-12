@@ -192,9 +192,9 @@ def test_pipeline_expands_search_query_with_term_registry(tmp_path: Path) -> Non
     captured_queries: list[str] = []
     original_search = pipeline.retriever.search
 
-    def _spy_search(query: str, top_k: int = 5):
+    def _spy_search(query: str, top_k: int = 5, term_hints: list[str] | None = None):
         captured_queries.append(query)
-        return original_search(query, top_k=top_k)
+        return original_search(query, top_k=top_k, term_hints=term_hints)
 
     pipeline.retriever.search = _spy_search
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from src.retriever.question_file_scope import (
     extract_file_names,
     find_named_files,
+    find_stem_matches,
     matches_file_name,
 )
 
@@ -101,3 +102,87 @@ class TestFindNamedFiles:
 
     def test_no_known_names_returns_empty_list(self):
         assert find_named_files("見積もり一覧.xlsxの内容は？", []) == []
+
+
+class TestFindStemMatches:
+    """用語集展開語（例: "CT"→"契約書"）とファイルbasenameのstem（拡張子除去部）の
+    部分文字列照合。質問文そのものではなく展開語ヒントのリストを入力に取る。"""
+
+    def test_hint_matches_exact_stem(self):
+        assert find_stem_matches(["契約書"], ["契約書.docx", "会議録_2025-09-30.docx"]) == [
+            "契約書.docx"
+        ]
+
+    def test_hint_matches_stem_with_suffix(self):
+        # 「契約書_draft.docx」のstemは「契約書_draft」で「契約書」を部分文字列に含む
+        result = find_stem_matches(["契約書"], ["契約書_draft.docx", "提案書.pptx"])
+        assert result == ["契約書_draft.docx"]
+
+    def test_hint_shorter_than_stem_extension_still_matches(self):
+        # TX→"train.xlsx" のように展開語自体に拡張子が付く場合でも、
+        # stem「train」が展開語に部分文字列として含まれていれば一致する
+        result = find_stem_matches(["train.xlsx"], ["train.xlsx", "別紙.pdf"])
+        assert result == ["train.xlsx"]
+
+    def test_no_hints_returns_empty_list(self):
+        assert find_stem_matches([], ["契約書.docx"]) == []
+
+    def test_no_known_names_returns_empty_list(self):
+        assert find_stem_matches(["契約書"], []) == []
+
+    def test_hint_not_present_in_any_stem_returns_empty_list(self):
+        assert find_stem_matches(["決裁基準"], ["契約書.docx", "提案書.pptx"]) == []
+
+    def test_matches_multiple_files_of_same_type(self):
+        # 「提案書」は複数版（_v1/_v2/_final）すべてのstemに含まれる
+        known = ["提案書_v1.pptx", "提案書_v2.pptx", "提案書_final.pptx", "契約書.docx"]
+        assert find_stem_matches(["提案書"], known) == [
+            "提案書_v1.pptx",
+            "提案書_v2.pptx",
+            "提案書_final.pptx",
+        ]
+
+    def test_dedups_repeated_basenames(self):
+        known = ["契約書.docx", "契約書.docx"]
+        assert find_stem_matches(["契約書"], known) == ["契約書.docx"]
+
+    def test_ignores_blank_hints(self):
+        assert find_stem_matches(["", "  "], ["契約書.docx"]) == []
+
+    def test_ignores_hints_shorter_than_three_chars(self):
+        # term_registryの"R2"→"R2"や"RED"→"赤字"のような書式・統計用語（2文字）は、
+        # ファイル名の版数サフィックス（実データの"スケジュール_r2.xlsx"等）との
+        # 偶然一致リスクが高いため、文書種別を表さない短いhintとして除外する。
+        assert find_stem_matches(["R2", "赤字"], ["スケジュール_r2.xlsx", "契約書.docx"]) == []
+
+    def test_three_char_hint_still_matches(self):
+        assert find_stem_matches(["契約書"], ["契約書.docx"]) == ["契約書.docx"]
+
+    def test_filename_like_hint_requires_exact_stem_not_substring(self):
+        # term_registryの"EDA1"→"01_eda.ipynb"のような、拡張子付きの具体的な
+        # ファイル名そのものを指すhintは、実データで"eda.py"（stem="eda"）が
+        # 同一プロジェクトに実在するため部分文字列一致だと誤って両方ヒットする。
+        # 拡張子付きhintはstem完全一致のみを許可する。
+        result = find_stem_matches(["01_eda.ipynb"], ["01_eda.ipynb", "eda.py"])
+        assert result == ["01_eda.ipynb"]
+
+    def test_ascii_hint_requires_word_boundary_not_bare_substring(self):
+        # term_registry実在の"Lift"/"Gain"/"MAE"等のASCII英字hint（拡張子なし）は、
+        # 語境界の無いbare substring一致だと英単語の一部に偶然含まれて誤マッチする。
+        assert find_stem_matches(["Lift"], ["uplift_model.csv", "契約書.docx"]) == []
+        assert find_stem_matches(["Gain"], ["再検証_gainful.csv", "契約書.docx"]) == []
+        assert find_stem_matches(["MAE"], ["yamae_note.txt", "契約書.docx"]) == []
+
+    def test_ascii_hint_matches_at_word_boundary(self):
+        assert find_stem_matches(["Gain"], ["report_gain_v1.csv"]) == ["report_gain_v1.csv"]
+        assert find_stem_matches(["MAE"], ["MAE.csv"]) == ["MAE.csv"]
+
+    def test_japanese_hint_substring_containment_still_works(self):
+        # 日本語hint（拡張子なし・非ASCII）は既存どおり語境界チェック無しの
+        # 部分文字列一致を維持する（「契約書_draft」等の版違いを広く拾うため）。
+        assert find_stem_matches(["契約書"], ["契約書_draft.docx"]) == ["契約書_draft.docx"]
+
+    def test_normalizes_nfd_hint_and_known_name(self):
+        hint_nfd = unicodedata.normalize("NFD", "契約書")
+        name_nfd = unicodedata.normalize("NFD", "契約書.docx")
+        assert find_stem_matches([hint_nfd], [name_nfd]) == ["契約書.docx"]

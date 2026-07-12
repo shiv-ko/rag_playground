@@ -11,7 +11,11 @@ from pathlib import Path
 
 from src.indexer.keyword_store import KeywordStore
 from src.models import Document, ScoredDocument
-from src.retriever.question_file_scope import find_named_files, question_mentions_extension
+from src.retriever.question_file_scope import (
+    find_named_files,
+    find_stem_matches,
+    question_mentions_extension,
+)
 
 _CORPORATE_AFFIXES = ("株式会社", "医療法人社団", "有限会社", "合同会社")
 
@@ -77,18 +81,31 @@ class ProjectScopedRetriever:
                     return name
         return None
 
-    def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        term_hints: list[str] | None = None,
+    ) -> list[ScoredDocument]:
         project = self.detect_project(query)
         store = self._project_stores[project] if project is not None else self._global_store
-        if not question_mentions_extension(query):
+        mentions_extension = question_mentions_extension(query)
+        hints = [h for h in (term_hints or []) if h]
+        if not mentions_extension and not hints:
             return store.search(query, top_k)
 
-        # 名指しファイルのチャンクを優先する。候補を広めに取り、候補のbasename
-        # 集合を既知名として質問文と部分文字列照合する（find_named_files）。
-        # 一致ゼロなら従来結果と同一 — ハードフィルタにしない。
+        # 名指しファイル・用語集展開語（例: "CT"→"契約書"）に一致するファイルの
+        # チャンクを優先する。候補を広めに取り、候補のbasename集合と照合する
+        # （find_named_files: 質問文中の拡張子付きファイル名 / find_stem_matches:
+        # QueryExpanderが適用した展開語とstemの一致）。一致ゼロなら従来結果と
+        # 同一 — ハードフィルタにしない。
         candidates = store.search(query, top_k * 4)
         known_names = [c.document.source_path for c in candidates]
-        matched_basenames = set(find_named_files(query, known_names))
+        matched_basenames: set[str] = set()
+        if mentions_extension:
+            matched_basenames.update(find_named_files(query, known_names))
+        if hints:
+            matched_basenames.update(find_stem_matches(hints, known_names))
         if not matched_basenames:
             return candidates[:top_k]
 

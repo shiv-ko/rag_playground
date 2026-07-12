@@ -359,7 +359,10 @@ class Pipeline:
 
         if answer is None:
             search_query = self.query_expander.expand_terms(qa.question)
-            contexts = self.retriever.search(search_query, top_k=self.top_k)
+            term_hints = self.query_expander.applied_expansions(qa.question)
+            contexts = self.retriever.search(
+                search_query, top_k=self.top_k, term_hints=term_hints
+            )
             answer = self.generator.generate(qa.question, contexts)
         else:
             contexts = answer.source_docs
