@@ -208,7 +208,7 @@ class Pipeline:
         if project_name is None:
             return None
 
-        if self.structured_store is not None and ({"analysis_json", "analysis_code", "analysis_notebook"} & set(tags)):
+        if self.structured_store is not None and ({"analysis_json", "analysis_code", "analysis_notebook", "analysis_report"} & set(tags)):
             analysis_answer = self.analysis_answerer.answer(
                 qa.question, project_name, self.structured_store
             )

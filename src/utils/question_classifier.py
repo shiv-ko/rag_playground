@@ -109,6 +109,8 @@ def classify_question(question: str) -> list[str]:
         tags.append("analysis_code")
     if ".ipynb" in lower:
         tags.append("analysis_notebook")
+    if "f1" in lower and "accuracy" in lower and ("次ぐ" in question or "順位" in question):
+        tags.append("analysis_report")
     if not tags:
         tags.append("text_only")
     return tags

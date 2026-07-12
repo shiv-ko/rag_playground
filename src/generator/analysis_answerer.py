@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
 from src.models import Answer, Document, ScoredDocument
+from src.parsers.office_parser import OfficeParser
 from src.structured.artifact_store import StructuredArtifactStore
 from src.structured.analysis_data import correlation_ranking, resolve_analysis_inputs
 
@@ -46,8 +49,12 @@ class AnalysisAnswerer:
         self, question: str, project_name: str, store: StructuredArtifactStore
     ) -> Answer | None:
         records = store.analysis_records_for(project_name)
+        if "F1" in question and "Accuracy" in question and ("次ぐ" in question or "順位" in question):
+            return self._ranked_report_accuracy(question, project_name)
         if not records:
             return None
+        if "改善幅" in question and "Macro F1" in question and "詳細値" in question:
+            return self._detailed_metric_improvement(project_name, records)
         if "sparse_output" in question and "False" in question:
             return self._sparse_false(records)
         if "CAT" in question and "dtype" in question and ("ユニーク" in question or "nunique" in question):
@@ -61,6 +68,104 @@ class AnalysisAnswerer:
         if ".ipynb" in question and ("相関" in question or "ヒートマップ" in question):
             return self._notebook_correlation(question, project_name, store)
         return None
+
+    def _project_files(self, project_name: str, suffix: str) -> list[Path]:
+        if self.data_dir is None:
+            return []
+        normalized_project = unicodedata.normalize("NFC", project_name)
+        return sorted(
+            path for path in self.data_dir.rglob(f"*{suffix}")
+            if normalized_project in unicodedata.normalize("NFC", path.as_posix())
+        )
+
+    def _detailed_metric_improvement(self, project_name: str, records: list[dict]) -> Answer | None:
+        metrics = _json_records(records, "metrics.json")
+        final_values = [
+            (record.get("payload", {}).get("f1_macro"), record)
+            for record in metrics if record.get("payload", {}).get("f1_macro") is not None
+        ]
+        if len(final_values) != 1:
+            return None
+        report_matches: list[tuple[Decimal, Document]] = []
+        pattern = re.compile(r"Macro\s*F1(?:スコア)?\s*[:=]\s*(-?\d+\.\d{7,})", re.IGNORECASE)
+        parser = OfficeParser()
+        for path in self._project_files(project_name, ".docx"):
+            normalized_path = unicodedata.normalize("NFC", path.as_posix())
+            if "05.会議" not in normalized_path or "報告資料" not in normalized_path:
+                continue
+            documents = parser.parse(path)
+            values = {match.group(1) for document in documents for match in pattern.finditer(document.text)}
+            if len(values) == 1:
+                report_matches.append((Decimal(values.pop()), documents[0]))
+        if len(report_matches) != 1:
+            return None
+        try:
+            final_value = Decimal(str(final_values[0][0]))
+        except InvalidOperation:
+            return None
+        improvement = (final_value - report_matches[0][0]).quantize(
+            Decimal("0.000001"), rounding=ROUND_HALF_UP
+        )
+        metric_source = _source(final_values[0][1])
+        report_source = ScoredDocument(
+            document=report_matches[0][1], score=1.0, retrieval_method="structured"
+        )
+        return Answer(
+            text=format(improvement, ".6f"), confidence=0.95,
+            source_docs=[report_source, metric_source],
+        )
+
+    def _ranked_report_accuracy(self, question: str, project_name: str) -> Answer | None:
+        filename_match = re.search(r"([^\s、]+?\.pptx)", question, re.IGNORECASE)
+        model_match = re.search(
+            r"F1(?:スコア|\s*\(macro\))?.*?([A-Za-z][A-Za-z0-9_-]+)に次ぐ", question,
+            re.IGNORECASE,
+        )
+        if filename_match is None or model_match is None:
+            return None
+        wanted_filename = unicodedata.normalize("NFC", filename_match.group(1))
+        paths = [
+            path for path in self._project_files(project_name, ".pptx")
+            if wanted_filename.endswith(unicodedata.normalize("NFC", path.name))
+        ]
+        if len(paths) != 1:
+            return None
+        candidate_tables: list[tuple[list[dict[str, str]], Document]] = []
+        for document in OfficeParser().parse(paths[0]):
+            lines = [[cell.strip() for cell in line.split("|")] for line in document.text.splitlines()]
+            for index, header in enumerate(lines):
+                lowered = [cell.casefold() for cell in header]
+                model_index = next((i for i, value in enumerate(lowered) if "モデル" in value or "model" in value), None)
+                f1_index = next((i for i, value in enumerate(lowered) if "f1" in value), None)
+                accuracy_index = next((i for i, value in enumerate(lowered) if "accuracy" in value), None)
+                if None in (model_index, f1_index, accuracy_index):
+                    continue
+                rows: list[dict[str, str]] = []
+                for values in lines[index + 1:]:
+                    if len(values) != len(header):
+                        break
+                    try:
+                        Decimal(values[f1_index])
+                        Decimal(values[accuracy_index])
+                    except (InvalidOperation, IndexError):
+                        break
+                    rows.append({"model": values[model_index], "f1": values[f1_index], "accuracy": values[accuracy_index]})
+                if rows:
+                    candidate_tables.append((rows, document))
+        if len(candidate_tables) != 1:
+            return None
+        rows, document = candidate_tables[0]
+        ranked = sorted(rows, key=lambda row: Decimal(row["f1"]), reverse=True)
+        if len({row["f1"] for row in ranked}) != len(ranked):
+            return None
+        model = model_match.group(1).casefold()
+        positions = [index for index, row in enumerate(ranked) if row["model"].casefold() == model]
+        if len(positions) != 1 or positions[0] + 1 >= len(ranked):
+            return None
+        return Answer(
+            text=ranked[positions[0] + 1]["accuracy"], confidence=0.95,
+            source_docs=[ScoredDocument(document=document, score=1.0, retrieval_method="structured")],
+        )
 
     def _notebook_correlation(
         self, question: str, project_name: str, store: StructuredArtifactStore

@@ -171,3 +171,69 @@ def test_heatmap_spec_is_not_contaminated_by_other_correlation_cell(tmp_path: Pa
         "01_eda.ipynbの相関ヒートマップにある特徴量のうち、targetとの相関が最も小さい特徴量", "A社", _store(tmp_path, rows)
     )
     assert answer is not None and answer.text == "c"
+
+
+def test_detailed_metric_improvement_uses_decimal_and_two_sources(tmp_path: Path) -> None:
+    project = tmp_path / "A社"
+    report = project / "05.会議" / "報告資料"
+    report.mkdir(parents=True)
+    from docx import Document
+    doc = Document()
+    doc.add_paragraph("中間報告のMacro F1: 0.7319904178115971")
+    doc.save(report / "中間報告.docx")
+    store = _store(tmp_path, [
+        _row("json", {"f1_macro": 0.7422917255604067}, "A社/04.分析/analysis_outputs/metrics.json")
+    ])
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "中間報告資料のMacro F1詳細値とmetrics.jsonのMacro F1詳細値を用いて改善幅を小数第6位まで", "A社", store
+    )
+    assert answer is not None and answer.text == "0.010301"
+    assert len(answer.source_docs) == 2
+
+
+def test_detailed_metric_rejects_rounded_or_multiple_report_sources(tmp_path: Path) -> None:
+    from docx import Document
+    report = tmp_path / "A社" / "05.会議"
+    report.mkdir(parents=True)
+    doc = Document(); doc.add_paragraph("Macro F1: 0.732"); doc.save(report / "a.docx")
+    store = _store(tmp_path, [_row("json", {"f1_macro": 0.7422917255604067}, "metrics.json")])
+    answerer = AnalysisAnswerer(data_dir=tmp_path)
+    assert answerer.answer(
+        "中間報告のMacro F1詳細値とmetrics.jsonの詳細値による改善幅", "A社", store
+    ) is None
+    doc = Document(); doc.add_paragraph("Macro F1: 0.7319904178115971"); doc.save(report / "b.docx")
+    doc = Document(); doc.add_paragraph("Macro F1: 0.7300000000000000"); doc.save(report / "c.docx")
+    assert answerer.answer(
+        "中間報告のMacro F1詳細値とmetrics.jsonの詳細値による改善幅", "A社", store
+    ) is None
+
+
+def test_ranked_model_table_returns_accuracy_of_next_f1_row(tmp_path: Path) -> None:
+    from pptx import Presentation
+    from pptx.util import Inches
+    report = tmp_path / "A社" / "06.報告書"
+    report.mkdir(parents=True)
+    prs = Presentation(); slide = prs.slides.add_slide(prs.slide_layouts[6])
+    table = slide.shapes.add_table(4, 4, Inches(1), Inches(1), Inches(8), Inches(3)).table
+    rows = [
+        ["Rank", "モデル種別", "F1 (macro)", "Accuracy"],
+        ["1", "gradient_boosting", "0.72243", "0.89993"],
+        ["2", "random_forest", "0.71486", "0.90527"],
+        ["3", "linear", "0.70000", "0.88000"],
+    ]
+    for r, values in enumerate(rows):
+        for c, value in enumerate(values): table.cell(r, c).text = value
+    prs.save(report / "最終報告.pptx")
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "最終報告.pptxにおいて、F1スコアにてgradient_boostingに次ぐ順位のモデルのAccuracyはいくつですか", "A社", _store(tmp_path, [])
+    )
+    assert answer is not None and answer.text == "0.90527"
+
+
+def test_ranked_model_table_rejects_missing_boundaries_or_ambiguous_files(tmp_path: Path) -> None:
+    report = tmp_path / "A社" / "06.報告書"; report.mkdir(parents=True)
+    (report / "最終報告.pptx").write_text("not a pptx", encoding="utf-8")
+    answerer = AnalysisAnswerer(data_dir=tmp_path)
+    assert answerer.answer(
+        "最終報告.pptxのF1スコアでgradient_boostingに次ぐモデルのAccuracy", "A社", _store(tmp_path, [])
+    ) is None
