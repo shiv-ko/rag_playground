@@ -20,6 +20,7 @@ from src.generator.milestone_date_answerer import (
     MilestoneDurationAnswerer,
     MilestoneThresholdListAnswerer,
 )
+from src.generator.office_chart import OfficeChartAnswerer
 from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
 from src.models import Answer, CRAGLabel, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
@@ -115,6 +116,7 @@ class Pipeline:
         self.milestone_threshold_list_answerer = MilestoneThresholdListAnswerer(
             threshold=confidence_threshold
         )
+        self.office_chart_answerer = OfficeChartAnswerer(threshold=confidence_threshold)
 
     # ------------------------------------------------------------------ #
     # インデックス構築
@@ -201,6 +203,12 @@ class Pipeline:
 
         if project_name is None:
             return None
+
+        if "image_or_graph" in tags:
+            chart_answer = self.office_chart_answerer.answer(qa.question, project_name, self.data_dir)
+            if not chart_answer.was_gated:
+                return chart_answer, "structured:office_chart"
+            # 抽出できなければMissing固定にせず後続のパス（VLM等）へ委ねる
 
         if "spreadsheet_calc" in tags:
             df = self._load_train_csv(project_name)
@@ -318,6 +326,7 @@ class Pipeline:
                 "ms_date_cross_project_list",
                 "contract_rule",
                 "cross_project",
+                "image_or_graph",
             )
         ):
             structured_result = self._process_structured(qa, tags)
