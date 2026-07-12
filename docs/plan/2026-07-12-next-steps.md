@@ -21,9 +21,9 @@
 - [x] 未追跡の `predictions 2.csv` の生成元・用途を確認し、正式な`predictions.csv`との混同を解消する。（2026-07-12、`submission_20260704_phase1-2fix.zip`内predictions.csvと完全一致の古い残骸と判明、ユーザー確認の上削除）
 - [x] 現HEAD・実データを明示して `make_predictions.py --runs 3` 相当の安定化生成を行う。（2026-07-12、HEAD `7dc6f13`、回答28/Missing72。詳細は`docs/daily作業ログ/20260712_162501.md`）
 - [x] 診断監査で新規Incorrectリスク、構造化パスの発火、Missing理由を確認する。（2026-07-12、valid official mean 0.5333・新規Incorrectなし、test診断runで異常ルーティングなしを確認）
-- [x] `submission_20260712_phase4-imagegraph.zip` を作成して提出し、LBを`plan_0703.md`へ記録する。（2026-07-12、zip作成済み。**SIGNATEへの実アップロードとLB記録はユーザーが手動実施予定・未完了**）
+- [x] `submission_20260712_phase4-imagegraph.zip` を作成して提出し、LBを`plan_0703.md`へ記録する。（2026-07-12、ユーザーがSIGNATEへ手動提出。LB **0.1**（=3/30、前回5/30からnet -2/30）を`plan_0703.md` §1.1.1に記録済み）
 
-**完了条件**: 提出zip・生成条件・LB・前回提出との差分解釈が作業ログに残っている。（LB実測記録のみユーザー報告待ち）
+**完了条件**: 提出zip・生成条件・LB・前回提出との差分解釈が作業ログに残っている。→ **達成**（`docs/daily作業ログ/20260712_162501.md`）
 
 ## 2. Phase 4 analysis系ブロック（次の主投資）
 
