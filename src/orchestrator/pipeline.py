@@ -13,6 +13,7 @@ from pathlib import Path
 from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
 from src.generator.answer_generator import AnswerGenerator
+from src.generator.analysis_answerer import AnalysisAnswerer
 from src.generator.confidence_gate import MISSING_RESPONSE
 from src.generator.contract_calc import ContractCalcAnswerer
 from src.generator.enumeration_gate import is_enumeration_complete
@@ -104,6 +105,7 @@ class Pipeline:
         self.project_primary_aliases = project_primary_aliases or {}
         self.query_expander = QueryExpander(self.term_registry)
         self.generator = AnswerGenerator(threshold=confidence_threshold)
+        self.analysis_answerer = AnalysisAnswerer()
         self.judge = LocalJudge()
         self.structured_store = (
             StructuredArtifactStore.from_artifacts_dir(artifacts_dir) if artifacts_dir else None
@@ -205,6 +207,13 @@ class Pipeline:
 
         if project_name is None:
             return None
+
+        if self.structured_store is not None and ({"analysis_json", "analysis_code"} & set(tags)):
+            analysis_answer = self.analysis_answerer.answer(
+                qa.question, project_name, self.structured_store
+            )
+            if analysis_answer is not None:
+                return analysis_answer, "structured:analysis"
 
         if "image_or_graph" in tags:
             chart_answer = self.office_chart_answerer.answer(qa.question, project_name, self.data_dir)

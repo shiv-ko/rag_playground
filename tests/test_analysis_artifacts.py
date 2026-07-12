@@ -98,6 +98,7 @@ def test_python_ast_records_assignments_comparisons_and_call_keywords(tmp_path: 
     assert {item["target"]: item["value"] for item in payload["assignments"]} == {
         "LIMIT": 10,
         "cols": ["a", "b"],
+        "flag": {"expression": "kind != 'hist'"},
     }
     assert payload["comparisons"] == [
         {"left": "kind", "operators": ["NotEq"], "comparators": ["hist"]}
@@ -105,6 +106,7 @@ def test_python_ast_records_assignments_comparisons_and_call_keywords(tmp_path: 
     assert payload["calls"] == [
         {
             "function": "fit",
+            "args": [],
             "keywords": {"depth": 3, "random_state": {"name": "seed"}},
         }
     ]

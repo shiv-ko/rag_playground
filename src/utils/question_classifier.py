@@ -47,6 +47,8 @@ CONTRACT_RULE_KEYWORDS = (
 CROSS_PROJECT_KEYWORDS = (
     "消費税額の総額", "支払月", "精算総額", "提案時金額", "FR時",
 )
+ANALYSIS_JSON_KEYWORDS = ("metrics.json", "selected_columns", "model_params", "max_depth")
+ANALYSIS_CODE_KEYWORDS = ("modeling.py", "分析コード", "sparse_output", "n_estimators", "nunique")
 
 
 def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:
@@ -101,6 +103,10 @@ def classify_question(question: str) -> list[str]:
         tags.append("contract_rule")
     if any(k in question for k in CROSS_PROJECT_KEYWORDS):
         tags.append("cross_project")
+    if any(k.lower() in lower for k in ANALYSIS_JSON_KEYWORDS):
+        tags.append("analysis_json")
+    if any(k.lower() in lower for k in ANALYSIS_CODE_KEYWORDS):
+        tags.append("analysis_code")
     if not tags:
         tags.append("text_only")
     return tags

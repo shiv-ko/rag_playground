@@ -63,7 +63,7 @@ def _python_payload(source: str) -> dict[str, list[dict[str, Any]]]:
             if value is not None:
                 for candidate in targets:
                     name = _target(candidate)
-                    if name and isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Set, ast.Dict)):
+                    if name:
                         assignments.append({"target": name, "value": _expression(value)})
         elif isinstance(node, ast.Compare):
             comparisons.append(
@@ -75,10 +75,11 @@ def _python_payload(source: str) -> dict[str, list[dict[str, Any]]]:
                     "comparators": [_expression(item) for item in node.comparators],
                 }
             )
-        elif isinstance(node, ast.Call) and node.keywords:
+        elif isinstance(node, ast.Call):
             calls.append(
                 {
                     "function": ast.unparse(node.func),
+                    "args": [_expression(argument) for argument in node.args],
                     "keywords": {
                         keyword.arg or "**": _expression(keyword.value) for keyword in node.keywords
                     },
