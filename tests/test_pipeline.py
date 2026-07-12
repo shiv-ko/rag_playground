@@ -101,6 +101,24 @@ def test_pipeline_routes_analysis_json_before_normal_retrieval(tmp_path: Path, m
     assert result[1] == "structured:analysis"
 
 
+def test_process_one_routes_every_analysis_tag_without_calling_generator(tmp_path: Path, monkeypatch) -> None:
+    import json
+
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts = tmp_path / "artifacts"; artifacts.mkdir()
+    row = {"project_name": "A社", "kind": "json", "source_path": "metrics.json", "payload": {"model_params": {"max_depth": 7}}}
+    (artifacts / "analysis_records.jsonl").write_text(json.dumps(row), encoding="utf-8")
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts)
+    monkeypatch.setattr(pipeline, "_resolve_project_name", lambda _question: "A社")
+    monkeypatch.setattr(pipeline.generator, "generate", lambda *_args: (_ for _ in ()).throw(AssertionError("retrieval fallthrough")))
+
+    result = pipeline._process_one(QAPair("q", "max_depthはいくらですか"))
+
+    assert result.answer == "7"
+    assert result.answer_path == "structured:analysis"
+
+
 def test_e2e_stub(tmp_path: Path, sample_docs: list[Document], monkeypatch) -> None:
     """パイプライン全体が通ることを確認する（Anthropic APIはモック）。"""
     from unittest.mock import patch

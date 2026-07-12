@@ -53,6 +53,8 @@ class AnalysisAnswerer:
             return self._ranked_report_accuracy(question, project_name)
         if not records:
             return None
+        if "one-hot encoding" in question.casefold() and "カテゴリ" in question:
+            return self._one_hot_columns(project_name, records)
         if "改善幅" in question and "Macro F1" in question and "詳細値" in question:
             return self._detailed_metric_improvement(project_name, records)
         if "sparse_output" in question and "False" in question:
@@ -282,12 +284,78 @@ class AnalysisAnswerer:
         comparator = comparison["comparators"][0]
         if isinstance(comparator, dict) and "name" in comparator:
             comparator = comparator["name"]
+        if isinstance(comparator, str) and comparator == "categorical_unique_limit":
+            resolved_limit = self._effective_categorical_limit(records)
+            if resolved_limit is None:
+                return None
+            comparator = resolved_limit
         # features.pyの比較は高cardinality列を除外するif条件なので、CATとして残る条件は否定形。
         symbol = _INVERTED_COMPARISON_SYMBOLS[comparison["operators"][0]]
         ordered = [name for name in ("object", "string", "categorical") if name in dtype_names]
         return _answer(
             f"{'・'.join(ordered)}型で、かつ unique_count {symbol} {comparator} の列をCATと判定します。",
             [record],
+        )
+
+    @staticmethod
+    def _effective_categorical_limit(records: list[dict]) -> int | None:
+        configs = _json_records(records, "project_config.json")
+        if len(configs) != 1:
+            return None
+        payload = configs[0].get("payload", {})
+        override = payload.get("categorical_unique_limit_override")
+        configured = payload.get("feature_plan", {}).get("categorical_unique_limit")
+        value = override if override is not None else configured
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            return None
+        return value
+
+    def _one_hot_columns(self, project_name: str, records: list[dict]) -> Answer | None:
+        import pandas as pd
+
+        configs = _json_records(records, "project_config.json")
+        if len(configs) != 1 or self.data_dir is None:
+            return None
+        config = configs[0].get("payload", {})
+        if config.get("feature_plan", {}).get("categorical_encoding") != "one_hot":
+            return None
+        limit = self._effective_categorical_limit(records)
+        relative = config.get("data_csv")
+        target = config.get("target_column")
+        if limit is None or not isinstance(relative, str) or not isinstance(target, str):
+            return None
+        normalized_relative = unicodedata.normalize("NFC", relative.replace("\\", "/"))
+        candidates = [
+            path for path in self._project_files(project_name, Path(relative).suffix)
+            if path.name == Path(relative).name
+            and unicodedata.normalize("NFC", path.as_posix()).endswith(normalized_relative)
+        ]
+        if len(candidates) != 1:
+            return None
+        try:
+            separator = "\t" if candidates[0].suffix.casefold() == ".tsv" else ","
+            frame = pd.read_csv(candidates[0], sep=separator)
+        except (OSError, UnicodeError, pd.errors.ParserError):
+            return None
+        # build_preprocessorはboolを数値列（include=["number", "bool"]）へ振り分ける。
+        categorical = frame.select_dtypes(include=["object", "string", "category"]).columns
+        selected = [
+            str(column) for column in categorical
+            if column != target and frame[column].nunique(dropna=True) < limit
+        ]
+        if not selected:
+            return None
+        csv_source = ScoredDocument(
+            document=Document(
+                text=f"columns={list(frame.columns)}", source_path=candidates[0], location="header"
+            ),
+            score=1.0,
+            retrieval_method="structured",
+        )
+        return Answer(
+            text=f"閾値は{limit}未満です。対象列は{'、'.join(selected)}です。",
+            confidence=0.95,
+            source_docs=[_source(configs[0]), csv_source],
         )
 
     def _runtime_defaults(self, records: list[dict]) -> Answer | None:

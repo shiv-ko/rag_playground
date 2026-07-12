@@ -347,6 +347,10 @@ class Pipeline:
                 "contract_rule",
                 "cross_project",
                 "image_or_graph",
+                "analysis_json",
+                "analysis_code",
+                "analysis_notebook",
+                "analysis_report",
             )
         ):
             structured_result = self._process_structured(qa, tags)

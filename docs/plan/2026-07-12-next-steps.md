@@ -31,14 +31,16 @@
 
 **理由**: metrics.json、Notebook、Pythonコードという機械可読資産があり、VLMや自由生成より決定的な回答パスを作りやすい。
 
-- [ ] 実データ調査: 対象12問の根拠ファイル・既存parser/artifact・現在のrouting/gateを一覧化する。
-- [ ] Notebook画像問題は、VLMより先に元データ・セル出力・コードから再計算できるかPoCする。
-- [ ] `analysis_registry` の最小スキーマと生成手順を設計する。手編集せず再生成可能にする。
-- [ ] 問題型を、決定的抽出可能 / LLM補助が必要 / 能力外でMissing、に分類する。
-- [ ] 期待ゲインとIncorrectリスクを見積もり、TDDの実装計画を別文書にする。
-- [ ] 1タスク1変更・step-reviewで実装し、test診断runとvalid N=3＋official較正で採否を決める。
+- [x] 実データ調査: 対象12問の根拠ファイル・既存parser/artifact・現在のrouting/gateを一覧化する。（2026-07-12、実装計画 `docs/superpowers/plans/2026-07-12-phase4-analysis-block.md`）
+- [x] Notebook画像問題は、VLMより先に元データ・セル出力・コードから再計算できるかPoCする。（2026-07-12、valid Q22/Q24・test Q4を決定的に回収、test Q56は安全なMissing）
+- [x] `analysis_registry` の最小スキーマと生成手順を設計する。手編集せず再生成可能にする。（`59a3fb1`、`artifacts/analysis_records.jsonl`を139 sourceから再生成）
+- [x] 問題型を、決定的抽出可能 / LLM補助が必要 / 能力外でMissing、に分類する。（対象12問中11問が構造化回答、Q56のみ能力外）
+- [x] 期待ゲインとIncorrectリスクを見積もり、TDDの実装計画を別文書にする。（上記実装計画）
+- [ ] 1タスク1変更・step-reviewで実装し、test診断runとvalid N=3＋official較正で採否を決める。（実装コミット: `59a3fb1` / `8f0a94a` / `670b061` / `b2215e6`。gap fixはstep-review（CONFIRMED 0件、PLAUSIBLE 2件は実データ検証で問題なしと確認）を経て2026-07-12コミット。565 tests PASS。full test診断は外部LLM接続エラーを記録し、その際に判明したanalysisタグfallthroughを修正済み。valid N=3・official較正は共有ドライブ内容の外部送信に対する明示承認不足でなお未実施）
 
-**完了条件**: 対象問の過半をPerfect相当で回収し、新規official Incorrect 0。列挙問題は完全性を機械確認できなければMissing。
+**暫定診断（2026-07-12）**: 正しい入力はdata-dir=`data/raw/share/共有ドライブ`、valid=`data/raw/share/質問回答/questions_valid.csv`、test=`data/raw/share/質問回答/questions_test.csv`。直接構造化診断ではvalid Q4/Q22/Q24/Q27/Q28、test Q4/Q5/Q32/Q35/Q61/Q73が`structured:analysis`で回答し、test Q56のみ安全なMissing。valid Q4/Q22/Q24/Q27はGT完全一致、Q28は実効閾値50まで解決した。外部較正未実施のため、ブロック採否は**暫定**であり完了条件達成とは扱わない。
+
+**完了条件**: 対象問の過半をPerfect相当で回収し、新規official Incorrect 0。列挙問題は完全性を機械確認できなければMissing。前半は直接診断で満たす見込みだが、official条件は未確認。
 
 ## 3. パスワード保護ファイル（小工数候補）
 

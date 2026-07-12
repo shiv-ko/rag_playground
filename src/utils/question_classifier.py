@@ -48,7 +48,10 @@ CROSS_PROJECT_KEYWORDS = (
     "消費税額の総額", "支払月", "精算総額", "提案時金額", "FR時",
 )
 ANALYSIS_JSON_KEYWORDS = ("metrics.json", "selected_columns", "model_params", "max_depth")
-ANALYSIS_CODE_KEYWORDS = ("modeling.py", "分析コード", "sparse_output", "n_estimators", "nunique")
+ANALYSIS_CODE_KEYWORDS = (
+    "modeling.py", "分析コード", "sparse_output", "n_estimators", "nunique",
+    "one-hot encoding", "one hot encoding",
+)
 
 
 def _keyword_spans(text: str, keywords: tuple[str, ...]) -> list[tuple[int, int]]:

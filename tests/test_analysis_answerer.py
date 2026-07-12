@@ -37,17 +37,18 @@ def test_sparse_output_false_model_is_derived_from_comparison(tmp_path: Path) ->
 def test_cat_condition_reports_actual_dtype_candidates_and_operator(tmp_path: Path) -> None:
     payload = {
         "assignments": [],
-        "comparisons": [{"left": "unique_count", "operators": ["GtE"], "comparators": [{"name": "limit"}]}],
+        "comparisons": [{"left": "unique_count", "operators": ["GtE"], "comparators": [{"name": "categorical_unique_limit"}]}],
         "calls": [
             {"function": "pd.api.types.is_object_dtype", "args": [{"name": "series"}], "keywords": {}},
             {"function": "pd.api.types.is_string_dtype", "args": [{"name": "series"}], "keywords": {}},
             {"function": "pd.api.types.is_categorical_dtype", "args": [{"name": "series"}], "keywords": {}},
         ],
     }
-    store = _store(tmp_path, [_row("python", payload, "src/features.py")])
+    config = _row("json", {"feature_plan": {"categorical_unique_limit": 50}}, "configs/project_config.json")
+    store = _store(tmp_path, [_row("python", payload, "src/features.py"), config])
     answer = AnalysisAnswerer().answer("CATはdtypeとユニーク数の条件でどのように判定しますか", "A社", store)
     assert answer is not None
-    assert answer.text == "object・string・categorical型で、かつ unique_count < limit の列をCATと判定します。"
+    assert answer.text == "object・string・categorical型で、かつ unique_count < 50 の列をCATと判定します。"
 
 
 def test_runtime_model_defaults_merge_code_and_config(tmp_path: Path) -> None:
@@ -104,6 +105,28 @@ def test_classifier_adds_only_narrow_analysis_tags() -> None:
     assert "analysis_json" in classify_question("metrics.jsonのmodel_params.max_depthはいくらですか")
     assert "analysis_json" in classify_question("最良モデルのパラメータであるmax_depthはいくらですか")
     assert classify_question("分析結果について説明してください") == ["text_only"]
+    assert "analysis_code" in classify_question("実装設定のOne-Hot Encodingカテゴリ数閾値と対象カテゴリ列を答えてください")
+
+
+def test_one_hot_columns_use_effective_limit_and_complete_csv_scan(tmp_path: Path) -> None:
+    import pandas as pd
+
+    project = tmp_path / "A社" / "04.分析" / "analysis_project"
+    (project / "data").mkdir(parents=True)
+    pd.DataFrame({
+        "small": ["a", "b", "a"], "boolean": [True, False, True],
+        "numeric": [1, 2, 3], "target": [0, 1, 0],
+    }).to_csv(project / "data/train.csv", index=False)
+    rows = [_row("json", {
+        "data_csv": "data/train.csv", "target_column": "target",
+        "categorical_unique_limit_override": 3,
+        "feature_plan": {"categorical_encoding": "one_hot", "categorical_unique_limit": 50},
+    }, "A社/04.分析/analysis_project/configs/project_config.json")]
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "実装設定のOne-Hot Encodingカテゴリ数閾値を確認し、その条件で対象となるカテゴリ列をすべて答えてください", "A社", _store(tmp_path, rows)
+    )
+    assert answer is not None
+    assert answer.text == "閾値は3未満です。対象列はsmallです。"
 
 
 def test_notebook_text_output_top_n_smallest_is_verified_against_csv(tmp_path: Path) -> None:
