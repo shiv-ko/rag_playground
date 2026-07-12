@@ -80,3 +80,35 @@ class TestVLMImageAnswererCallConstruction:
 
         assert result.was_gated is True
         MockAnthropic.return_value.messages.create.assert_not_called()
+
+    def test_non_json_response_is_gated_gracefully(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        image_path = tmp_path / "figure_06.png"
+        image_path.write_bytes(_PNG_1PX)
+
+        fake_content = type("C", (), {"text": "申し訳ありませんが、画像を読み取れませんでした。"})()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        answerer = VLMImageAnswerer()
+        with patch("src.generator.vlm_answerer.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            result = answerer.answer("質問", image_path)
+
+        assert result.was_gated is True
+
+    def test_null_confidence_in_response_is_gated_not_crashed(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        image_path = tmp_path / "figure_06.png"
+        image_path.write_bytes(_PNG_1PX)
+
+        fake_content = type("C", (), {
+            "text": '{"answer": "20\\u65e5", "confidence": null, "reasoning": "r"}'
+        })()
+        fake_response = type("R", (), {"content": [fake_content]})()
+
+        answerer = VLMImageAnswerer()
+        with patch("src.generator.vlm_answerer.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = fake_response
+            result = answerer.answer("質問", image_path)
+
+        assert result.was_gated is True

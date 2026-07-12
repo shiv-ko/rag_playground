@@ -107,7 +107,7 @@ class VLMImageAnswerer:
                     float(data.get("confidence", 0.0)),
                     str(data.get("reasoning", "")),
                 )
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass
         return raw, 0.0, ""
 
