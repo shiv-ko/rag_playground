@@ -107,6 +107,8 @@ def classify_question(question: str) -> list[str]:
         tags.append("analysis_json")
     if any(k.lower() in lower for k in ANALYSIS_CODE_KEYWORDS):
         tags.append("analysis_code")
+    if ".ipynb" in lower:
+        tags.append("analysis_notebook")
     if not tags:
         tags.append("text_only")
     return tags

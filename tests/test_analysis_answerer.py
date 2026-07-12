@@ -104,3 +104,70 @@ def test_classifier_adds_only_narrow_analysis_tags() -> None:
     assert "analysis_json" in classify_question("metrics.jsonのmodel_params.max_depthはいくらですか")
     assert "analysis_json" in classify_question("最良モデルのパラメータであるmax_depthはいくらですか")
     assert classify_question("分析結果について説明してください") == ["text_only"]
+
+
+def test_notebook_text_output_top_n_smallest_is_verified_against_csv(tmp_path: Path) -> None:
+    import pandas as pd
+
+    project_dir = tmp_path / "A社" / "04.分析" / "analysis_project"
+    (project_dir / "data").mkdir(parents=True)
+    pd.DataFrame({"target": [1, 2, 3, 4, 5], "a": [1, 2, 3, 4, 5], "b": [2, 3, 4, 6, 8], "c": [5, 4, 3, 2, 1]}).to_csv(project_dir / "data/train.csv", index=False)
+    rows = [
+        _row("json", {"data_csv": "data/train.csv", "target_column": "target"}, "A社/04.分析/analysis_project/configs/project_config.json"),
+        _row("notebook", {"cells": [{"cell_number": 1, "cell_type": "code", "source": "corr_s.abs().sort_values(ascending=False).head(3)", "outputs": [{"output_type": "stream", "text": "目的変数との相関 上位3\na  1.000000\nc  1.000000\nb  0.984798\nName: target, dtype: float64\n"}]}]}, "A社/04.分析/analysis_project/notebooks/01_eda.ipynb"),
+    ]
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "NB01_eda.ipynbの相関 上位3の中で相関係数が最も小さいカラム名", "A社", _store(tmp_path, rows)
+    )
+    assert answer is not None and answer.text == "b"
+
+
+def test_notebook_source_recomputes_heatmap_top_n_smallest(tmp_path: Path) -> None:
+    import pandas as pd
+
+    project_dir = tmp_path / "A社" / "04.分析" / "analysis_project"
+    (project_dir / "data").mkdir(parents=True)
+    pd.DataFrame({"target": [1, 2, 3, 4, 5], "a": [1, 2, 3, 4, 5], "b": [2, 3, 4, 6, 8], "c": [5, 4, 3, 2, 1]}).to_csv(project_dir / "data/train.csv", index=False)
+    rows = [
+        _row("json", {"data_csv": "data/train.csv", "target_column": "target"}, "A社/04.分析/analysis_project/configs/project_config.json"),
+        _row("notebook", {"cells": [{"cell_number": 1, "cell_type": "code", "source": "target_corr_abs = frame.corrwith(frame[target]).abs().sort_values(ascending=False)\ntop_cols = target_corr_abs.head(3).index.tolist()\nsns.heatmap(frame[top_cols].corr())", "outputs": []}]}, "A社/04.分析/analysis_project/notebooks/01_eda.ipynb"),
+    ]
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "01_eda.ipynbの特徴量相関ヒートマップで可視化された特徴量のうち、targetとの相関係数の絶対値が最も小さい特徴量", "A社", _store(tmp_path, rows)
+    )
+    assert answer is not None and answer.text == "b"
+
+
+def test_notebook_correlation_returns_none_for_tie_or_axis_ticks(tmp_path: Path) -> None:
+    import pandas as pd
+
+    project_dir = tmp_path / "A社" / "04.分析" / "analysis_project"
+    (project_dir / "data").mkdir(parents=True)
+    pd.DataFrame({"target": [1, 2, 3], "a": [1, 2, 3], "b": [3, 2, 1]}).to_csv(project_dir / "data/train.csv", index=False)
+    rows = [
+        _row("json", {"data_csv": "data/train.csv", "target_column": "target"}, "A社/04.分析/analysis_project/configs/project_config.json"),
+        _row("notebook", {"cells": [{"cell_number": 1, "cell_type": "code", "source": "corr.abs().sort_values(ascending=False).head(2)", "outputs": []}]}, "A社/04.分析/analysis_project/notebooks/01_eda.ipynb"),
+    ]
+    answerer = AnalysisAnswerer(data_dir=tmp_path)
+    store = _store(tmp_path, rows)
+    assert answerer.answer("01_eda.ipynbで目的変数との相関が最も高い特徴量", "A社", store) is None
+    assert answerer.answer("01_eda.ipynbのy軸目盛りの最大値", "A社", store) is None
+
+
+def test_heatmap_spec_is_not_contaminated_by_other_correlation_cell(tmp_path: Path) -> None:
+    import pandas as pd
+
+    project_dir = tmp_path / "A社" / "04.分析" / "analysis_project"
+    (project_dir / "data").mkdir(parents=True)
+    pd.DataFrame({"target": [1, 2, 3, 4, 5], "a": [1, 2, 3, 4, 5], "b": [1, 1, 2, 2, 3], "c": [5, 3, 4, 1, 2]}).to_csv(project_dir / "data/train.csv", index=False)
+    rows = [
+        _row("json", {"data_csv": "data/train.csv", "target_column": "target"}, "A社/04.分析/analysis_project/configs/project_config.json"),
+        _row("notebook", {"cells": [
+            {"cell_number": 1, "cell_type": "code", "source": "corr = frame.corr()\nsns.heatmap(corr)", "outputs": []},
+            {"cell_number": 2, "cell_type": "code", "source": "corr_s.abs().sort_values(ascending=False).head(1)", "outputs": [{"output_type": "stream", "text": "目的変数との相関 上位1\na 1.0"}]},
+        ]}, "A社/04.分析/analysis_project/notebooks/01_eda.ipynb"),
+    ]
+    answer = AnalysisAnswerer(data_dir=tmp_path).answer(
+        "01_eda.ipynbの相関ヒートマップにある特徴量のうち、targetとの相関が最も小さい特徴量", "A社", _store(tmp_path, rows)
+    )
+    assert answer is not None and answer.text == "c"

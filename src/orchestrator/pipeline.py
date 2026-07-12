@@ -105,7 +105,7 @@ class Pipeline:
         self.project_primary_aliases = project_primary_aliases or {}
         self.query_expander = QueryExpander(self.term_registry)
         self.generator = AnswerGenerator(threshold=confidence_threshold)
-        self.analysis_answerer = AnalysisAnswerer()
+        self.analysis_answerer = AnalysisAnswerer(data_dir=data_dir)
         self.judge = LocalJudge()
         self.structured_store = (
             StructuredArtifactStore.from_artifacts_dir(artifacts_dir) if artifacts_dir else None
@@ -208,7 +208,7 @@ class Pipeline:
         if project_name is None:
             return None
 
-        if self.structured_store is not None and ({"analysis_json", "analysis_code"} & set(tags)):
+        if self.structured_store is not None and ({"analysis_json", "analysis_code", "analysis_notebook"} & set(tags)):
             analysis_answer = self.analysis_answerer.answer(
                 qa.question, project_name, self.structured_store
             )

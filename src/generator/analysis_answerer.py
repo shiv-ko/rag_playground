@@ -7,6 +7,7 @@ from typing import Any
 
 from src.models import Answer, Document, ScoredDocument
 from src.structured.artifact_store import StructuredArtifactStore
+from src.structured.analysis_data import correlation_ranking, resolve_analysis_inputs
 
 _COMPARISON_SYMBOLS = {"Lt": "<", "LtE": "<=", "Gt": ">", "GtE": ">=", "Eq": "==", "NotEq": "!="}
 _INVERTED_COMPARISON_SYMBOLS = {"Lt": ">=", "LtE": ">", "Gt": "<=", "GtE": "<", "Eq": "!=", "NotEq": "=="}
@@ -38,6 +39,9 @@ def _python_records(records: list[dict]) -> list[dict]:
 
 
 class AnalysisAnswerer:
+    def __init__(self, data_dir: Path | None = None) -> None:
+        self.data_dir = data_dir
+
     def answer(
         self, question: str, project_name: str, store: StructuredArtifactStore
     ) -> Answer | None:
@@ -54,7 +58,86 @@ class AnalysisAnswerer:
             return self._metrics_path(records, ("model_params", "max_depth"))
         if "selected_columns" in question and ("交互作用" in question or "__x__" in question):
             return self._interaction_columns(records)
+        if ".ipynb" in question and ("相関" in question or "ヒートマップ" in question):
+            return self._notebook_correlation(question, project_name, store)
         return None
+
+    def _notebook_correlation(
+        self, question: str, project_name: str, store: StructuredArtifactStore
+    ) -> Answer | None:
+        if self.data_dir is None or "目盛り" in question or "y軸" in question:
+            return None
+        hint = re.search(r"(?:NB)?\d+[_A-Za-z0-9-]*\.ipynb", question, re.IGNORECASE)
+        if hint is None:
+            return None
+        inputs = resolve_analysis_inputs(self.data_dir, project_name, store, hint.group())
+        if inputs is None:
+            return None
+        cells = inputs.notebook_record.get("payload", {}).get("cells", [])
+        correlation_cells = [cell for cell in cells if "corr" in cell.get("source", "").casefold()]
+        if "ヒートマップ" in question:
+            relevant = [cell for cell in correlation_cells if "heatmap" in cell.get("source", "").casefold()]
+        elif "出力" in question:
+            relevant = [
+                cell for cell in correlation_cells
+                if "相関" in self._cell_output_text(cell)
+            ]
+        else:
+            relevant = [
+                cell for cell in correlation_cells
+                if "目的変数" in self._cell_output_text(cell) and "相関" in self._cell_output_text(cell)
+            ]
+            if not relevant and len(correlation_cells) == 1:
+                relevant = correlation_cells
+        if not relevant:
+            return None
+        source = "\n".join(cell.get("source", "") for cell in relevant)
+        absolute = "絶対値" in question or bool(re.search(r"corr[^\n]*\.abs\(\)", source))
+        ranking = correlation_ranking(inputs.frame, inputs.target, absolute=absolute)
+        if ranking.empty:
+            return None
+        top_match = re.search(r"上位\s*(\d+)", question)
+        if top_match is None:
+            top_match = re.search(r"\.head\(\s*(\d+)\s*\)", source)
+        top_n = int(top_match.group(1)) if top_match else None
+        candidates = ranking.head(top_n) if top_n is not None else ranking
+        if candidates.empty:
+            return None
+        wants_smallest = "最も小さい" in question
+        position = -1 if wants_smallest else 0
+        selected_name = str(candidates.index[position])
+        selected_value = float(candidates.iloc[position])
+        neighbor = -2 if wants_smallest else 1
+        if len(candidates) > 1 and abs(float(candidates.iloc[neighbor]) - selected_value) <= 1e-12:
+            return None
+        output_values = self._notebook_output_values(relevant) if "出力" in question else {}
+        if output_values and selected_name in output_values:
+            output_value = abs(output_values[selected_name]) if absolute else output_values[selected_name]
+            if abs(output_value - selected_value) > 1e-5:
+                return None
+        elif output_values and top_n is not None:
+            return None
+        return _answer(selected_name, [inputs.notebook_record, inputs.config_record])
+
+    @staticmethod
+    def _cell_output_text(cell: dict) -> str:
+        return "\n".join(
+            str(output.get("text") or output.get("text/plain") or "")
+            for output in cell.get("outputs", [])
+        )
+
+    @staticmethod
+    def _notebook_output_values(cells: list[dict]) -> dict[str, float]:
+        values: dict[str, float] = {}
+        pattern = re.compile(r"^\s*(\S(?:.*?\S)?)\s+(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*$")
+        for cell in cells:
+            for output in cell.get("outputs", []):
+                text = output.get("text") or output.get("text/plain") or ""
+                for line in str(text).splitlines():
+                    match = pattern.match(line)
+                    if match and not match.group(1).casefold().startswith(("name:", "dtype:")):
+                        values[match.group(1)] = float(match.group(2))
+        return values
 
     def _sparse_false(self, records: list[dict]) -> Answer | None:
         matches: list[tuple[str, dict]] = []
