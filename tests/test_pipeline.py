@@ -1077,3 +1077,55 @@ def test_pipeline_chart_extraction_failure_falls_back_to_capability_block(tmp_pa
 
     assert result.answer_path == "retrieval"
     assert result.judge_label == "" or True  # judge無効化時はスキップされるため形状のみ確認
+
+
+def test_pipeline_routes_standalone_image_question_to_vlm_answerer(tmp_path: Path, monkeypatch) -> None:
+    """独立画像ファイルを参照する質問（image_or_graphタグ、チャート番号なし）はVLMImageAnswererへ渡る。
+    実APIは呼ばず、VLMImageAnswerer._call_vlmを差し替えて検証する。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    # プロジェクト名検出（ProjectScopedRetriever.detect_project）はparsers.dispatcher.
+    # _extract_metadataの"プロジェクト"ディレクトリ規約（実データのdata/raw/.../プロジェクト/
+    # <project_name>/...と同じ構造）に依存するため、テストのディレクトリ構成もそれに合わせる
+    # （test_pipeline_routes_chart_question_to_office_chart_answererと同じ理由）。
+    project_dir = tmp_path / "プロジェクト" / "京橋信用ソリューションズ株式会社"
+    project_dir.mkdir(parents=True)
+    figures_dir = project_dir / "04.分析" / "figures"
+    figures_dir.mkdir(parents=True)
+    (figures_dir / "figure_06.png").write_bytes(
+        bytes.fromhex(
+            "89504e470d0a1a0a0000000d49484452000000010000000108020000009077"
+            "53de0000000c4944415408d763f8ffff3f0005fe02fea739669f0000000049454e44ae426082"
+        )
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+
+    def _boom(question, contexts):
+        raise AssertionError("独立画像の質問は通常のgenerate()を使ってはいけない")
+
+    pipeline.generator.generate = _boom
+    pipeline.vlm_answerer._call_vlm = lambda question, image_b64, media_type: (
+        '{"answer": "20\\u65e5", "confidence": 0.85, "reasoning": "r"}'
+    )
+
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="京橋信用ソリューションズのfigure_06.pngにおいて、件数が最も高いのは何日ですか。",
+    ))
+
+    assert result.answer_path == "structured:vlm_image"
+    assert result.answer == "20日"
+
+
+def test_image_keyword_kashika_is_tagged_image_or_graph() -> None:
+    """『可視化』というキーワードだけの質問もimage_or_graphタグが付く
+    （test idx66型: 従来はキーワード漏れでtext_onlyのまま通常LLM生成に流れていた）。"""
+    from src.utils.question_classifier import classify_question
+
+    tags = classify_question("京橋信用ソリューションズのEDAの日付分析の可視化において、件数が最も高いのは何日ですか。")
+
+    assert "image_or_graph" in tags

@@ -22,6 +22,7 @@ from src.generator.milestone_date_answerer import (
 )
 from src.generator.office_chart import OfficeChartAnswerer
 from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
+from src.generator.vlm_answerer import VLMImageAnswerer, find_referenced_image
 from src.models import Answer, CRAGLabel, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
@@ -117,6 +118,7 @@ class Pipeline:
             threshold=confidence_threshold
         )
         self.office_chart_answerer = OfficeChartAnswerer(threshold=confidence_threshold)
+        self.vlm_answerer = VLMImageAnswerer(threshold=confidence_threshold)
 
     # ------------------------------------------------------------------ #
     # インデックス構築
@@ -209,6 +211,15 @@ class Pipeline:
             if not chart_answer.was_gated:
                 return chart_answer, "structured:office_chart"
             # 抽出できなければMissing固定にせず後続のパス（VLM等）へ委ねる
+
+        if "image_or_graph" in tags:
+            image_path = find_referenced_image(qa.question, project_name, self.data_dir)
+            if image_path is not None:
+                vlm_answer = self.vlm_answerer.answer(qa.question, image_path)
+                if not vlm_answer.was_gated:
+                    return vlm_answer, "structured:vlm_image"
+            # 画像が見つからない・VLMが確信を持てない場合はMissing固定にせず
+            # 既存のimage_or_graph能力ブロック（安全側のMissing）へ委ねる
 
         if "spreadsheet_calc" in tags:
             df = self._load_train_csv(project_name)
