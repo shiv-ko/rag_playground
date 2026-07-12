@@ -17,6 +17,7 @@ _ARTIFACT_FILES = {
     "train_xlsx_pivot_aggregates": "train_xlsx_pivot_aggregates.jsonl",
     "version_diff_pairs": "version_diff_poc.jsonl",
     "contracts": "contracts.jsonl",
+    "analysis_records": "analysis_records.jsonl",
 }
 
 
@@ -96,3 +97,9 @@ class StructuredArtifactStore:
         for project_rows in self._data.get("contracts", {}).values():
             rows.extend(project_rows)
         return rows
+
+    def analysis_records_for(self, project_name: str, kind: str | None = None) -> list[dict]:
+        rows = self._get("analysis_records", project_name)
+        if kind is None:
+            return rows
+        return [row for row in rows if row.get("kind") == kind]
