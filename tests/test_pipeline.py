@@ -45,6 +45,30 @@ def test_hybrid_retriever(sample_docs: list[Document]) -> None:
     assert len(results) > 0
 
 
+def test_hybrid_retriever_surfaces_doc_that_loses_on_keyword_alone(sample_docs: list[Document]) -> None:
+    """BM25単体では上位に来ない文書でも、ベクトル側で強く一致していればRRFで浮上することを確認する。"""
+    from src.indexer.embedder import Embedder
+    import numpy as np
+
+    class _VectorFavoringEmbedder:
+        """"Model X"を含む文書だけがクエリと強く一致するベクトルを返すフェイク。"""
+
+        def embed_documents(self, texts: list[str]) -> np.ndarray:
+            return np.array(
+                [[1.0, 0.0] if "Model X" in t else [0.0, 1.0] for t in texts],
+                dtype=np.float32,
+            )
+
+        def embed_query(self, text: str) -> np.ndarray:
+            return np.array([1.0, 0.0], dtype=np.float32)
+
+    retriever = HybridRetriever(embedder=_VectorFavoringEmbedder())
+    retriever.add(sample_docs)
+    # クエリはキーワード的には宿泊費関連の文書に近いが、ベクトル側はModel X文書を最優先する
+    results = retriever.search("何かのバッテリー時間について教えてください", top_k=1)
+    assert "Model X" in results[0].document.text
+
+
 def test_confidence_gate() -> None:
     gate = ConfidenceGate(threshold=0.4)
     assert gate.should_answer(0.8)

@@ -1,22 +1,22 @@
-"""ベクトル検索とキーワード検索を統合するHybridRetriever + 簡易re-ranking。"""
+"""ベクトル検索とキーワード検索をReciprocal Rank Fusion(RRF)で統合するHybridRetriever。"""
 from __future__ import annotations
 
+from src.indexer.embedder import Embedder
 from src.indexer.keyword_store import KeywordStore
 from src.indexer.vector_store import VectorStore
 from src.models import Document, ScoredDocument
+
+_RRF_K = 60  # Cormack et al. (2009) の標準値。文献値をそのまま使い、valid過適合の対象にしない。
 
 
 class HybridRetriever:
     def __init__(
         self,
-        vector_weight: float = 0.6,
-        keyword_weight: float = 0.4,
+        embedder: Embedder | None = None,
         rerank_top_n: int = 3,
     ) -> None:
-        self.vector_store = VectorStore()
+        self.vector_store = VectorStore(embedder=embedder)
         self.keyword_store = KeywordStore()
-        self.vector_weight = vector_weight
-        self.keyword_weight = keyword_weight
         self.rerank_top_n = rerank_top_n
 
     def add(self, documents: list[Document]) -> None:
@@ -28,43 +28,27 @@ class HybridRetriever:
         self.keyword_store.clear()
 
     def search(self, query: str, top_k: int = 5) -> list[ScoredDocument]:
-        fetch_k = top_k * 3  # re-ranking前に多めに取る
-
+        fetch_k = max(top_k * 6, 30)
         vec_results = self.vector_store.search(query, fetch_k)
         kw_results = self.keyword_store.search(query, fetch_k)
+        fused = _reciprocal_rank_fusion([vec_results, kw_results])
+        return fused[:top_k]
 
-        # 各ストアのスコアを0-1正規化してから重み付き合算
-        vec_scores = _normalize({r.document.text: r.score for r in vec_results})
-        kw_scores = _normalize({r.document.text: r.score for r in kw_results})
 
-        # doc.textをキーにして統合
-        merged: dict[str, ScoredDocument] = {}
-        for r in vec_results:
+def _reciprocal_rank_fusion(
+    result_lists: list[list[ScoredDocument]], k: int = _RRF_K
+) -> list[ScoredDocument]:
+    scores: dict[int, float] = {}
+    doc_by_key: dict[int, ScoredDocument] = {}
+    for results in result_lists:
+        for rank, r in enumerate(results, start=1):
             key = id(r.document)
-            merged[key] = ScoredDocument(
-                document=r.document,
-                score=vec_scores.get(r.document.text, 0) * self.vector_weight,
-                retrieval_method="hybrid",
-            )
-        for r in kw_results:
-            key = id(r.document)
-            if key in merged:
-                merged[key].score += kw_scores.get(r.document.text, 0) * self.keyword_weight
-            else:
-                merged[key] = ScoredDocument(
-                    document=r.document,
-                    score=kw_scores.get(r.document.text, 0) * self.keyword_weight,
-                    retrieval_method="hybrid",
-                )
-
-        ranked = sorted(merged.values(), key=lambda x: x.score, reverse=True)
-        return ranked[:top_k]
-
-
-def _normalize(scores: dict[str, float]) -> dict[str, float]:
-    if not scores:
-        return {}
-    max_s = max(scores.values())
-    min_s = min(scores.values())
-    span = max_s - min_s or 1.0
-    return {k: (v - min_s) / span for k, v in scores.items()}
+            scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+            if key not in doc_by_key:
+                doc_by_key[key] = r
+    fused = [
+        ScoredDocument(document=doc_by_key[key].document, score=score, retrieval_method="hybrid")
+        for key, score in scores.items()
+    ]
+    fused.sort(key=lambda x: x.score, reverse=True)
+    return fused

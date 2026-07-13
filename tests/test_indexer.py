@@ -335,29 +335,3 @@ class TestHybridRetriever:
         results = retriever.search("宿泊費", top_k=5)
 
         assert results == []
-
-    def test_vector_only_weight_matches_vector_store_top_result(
-        self, tmp_docs: list[Document]
-    ) -> None:
-        """vector_weight=1.0, keyword_weight=0.0 で VectorStore と同等の結果になる。
-
-        正規化によりスコア値は異なるが、上位ドキュメントの順序が一致することを確認する。
-        """
-        query = "宿泊費の上限"
-
-        retriever = HybridRetriever(vector_weight=1.0, keyword_weight=0.0)
-        retriever.add(tmp_docs)
-        hybrid_results = retriever.search(query, top_k=3)
-
-        vector_store = VectorStore()
-        vector_store.add(tmp_docs)
-        vector_results = vector_store.search(query, top_k=3)
-
-        assert len(hybrid_results) > 0
-        assert len(vector_results) > 0
-        assert hybrid_results[0].document.text == vector_results[0].document.text, (
-            f"vector_weight=1.0 のとき HybridRetriever の先頭ドキュメントが "
-            f"VectorStore の先頭ドキュメントと一致するべき。\n"
-            f"  hybrid[0]: {hybrid_results[0].document.text!r}\n"
-            f"  vector[0]: {vector_results[0].document.text!r}"
-        )
