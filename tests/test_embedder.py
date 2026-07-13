@@ -81,3 +81,66 @@ def test_japanese_embedder_lazy_loads_model_once():
 
     # _load_model()が_modelを上書きしていない（既にセット済みならそのまま使う）ことを確認
     assert embedder._model is fake
+
+
+from src.indexer.embedder import CachedEmbedder
+
+
+class _CountingEmbedder:
+    """embed_documentsの呼び出し回数と実際に埋め込んだテキストを記録するフェイク。"""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def embed_documents(self, texts: list[str]) -> np.ndarray:
+        self.calls.append(list(texts))
+        return np.array([[float(len(t)), 0.0] for t in texts], dtype=np.float32)
+
+    def embed_query(self, text: str) -> np.ndarray:
+        return np.array([float(len(text)), 0.0], dtype=np.float32)
+
+
+def test_cached_embedder_dedupes_repeated_texts_within_session():
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner)
+
+    cached.embed_documents(["共通文書A", "固有文書1"])
+    cached.embed_documents(["共通文書A", "固有文書2"])  # "共通文書A"は既にキャッシュ済み
+
+    # 2回目の呼び出しでは新規分（"固有文書2"）のみinner側に渡る
+    assert inner.calls[0] == ["共通文書A", "固有文書1"]
+    assert inner.calls[1] == ["固有文書2"]
+
+
+def test_cached_embedder_returns_correct_vectors_in_order():
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner)
+
+    vecs1 = cached.embed_documents(["共通文書A", "固有文書1"])
+    vecs2 = cached.embed_documents(["固有文書2", "共通文書A"])  # 順序が変わっても正しく揃う
+
+    assert vecs2[0][0] == float(len("固有文書2"))
+    assert vecs2[1][0] == vecs1[0][0]  # "共通文書A"は同じベクトル
+
+
+def test_cached_embedder_persists_to_disk(tmp_path):
+    cache_path = tmp_path / "emb_cache.pkl"
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner, cache_path=cache_path)
+    cached.embed_documents(["文書A"])
+    cached.flush()
+
+    assert cache_path.exists()
+
+    # 新しいCachedEmbedderインスタンスがディスクキャッシュを読み込み、再計算しない
+    inner2 = _CountingEmbedder()
+    cached2 = CachedEmbedder(inner2, cache_path=cache_path)
+    cached2.embed_documents(["文書A"])
+    assert inner2.calls == []  # 全てキャッシュヒットのためinner2は一度も呼ばれない
+
+
+def test_cached_embedder_embed_query_passthrough():
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner)
+    result = cached.embed_query("質問文")
+    assert result[0] == float(len("質問文"))

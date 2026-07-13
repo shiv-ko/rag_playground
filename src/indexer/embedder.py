@@ -1,7 +1,10 @@
 """埋め込みベクトル生成の抽象化。本番差し替えポイント: 埋め込みモデルをここで差し替える。"""
 from __future__ import annotations
 
+import hashlib
 import math
+import pickle
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -63,3 +66,41 @@ class JapaneseEmbedder:
         model = self._load_model()
         vec = model.encode(_QUERY_PREFIX + text, normalize_embeddings=True)
         return np.asarray(vec, dtype=np.float32)
+
+
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+
+
+class CachedEmbedder:
+    """テキストのSHA256ハッシュをキーに埋め込みをキャッシュするラッパー。
+    同一テキストが複数プロジェクトストアに重複追加されても埋め込み計算を1回で済ませる
+    （社内共通文書が全プロジェクトストアへ複製される既存設計のため重要）。"""
+
+    def __init__(self, inner: Embedder, cache_path: Path | None = None) -> None:
+        self._inner = inner
+        self._cache_path = cache_path
+        self._cache: dict[str, np.ndarray] = {}
+        if cache_path is not None and cache_path.exists():
+            self._cache = pickle.loads(cache_path.read_bytes())
+
+    def embed_documents(self, texts: list[str]) -> np.ndarray:
+        hashes = [_hash_text(t) for t in texts]
+        missing_positions = [i for i, h in enumerate(hashes) if h not in self._cache]
+        if missing_positions:
+            missing_texts = [texts[i] for i in missing_positions]
+            new_vecs = self._inner.embed_documents(missing_texts)
+            for i, vec in zip(missing_positions, new_vecs):
+                self._cache[hashes[i]] = np.asarray(vec, dtype=np.float32)
+        return np.stack([self._cache[h] for h in hashes])
+
+    def embed_query(self, text: str) -> np.ndarray:
+        return self._inner.embed_query(text)
+
+    def flush(self) -> None:
+        if self._cache_path is None:
+            return
+        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._cache_path.with_suffix(self._cache_path.suffix + ".tmp")
+        tmp_path.write_bytes(pickle.dumps(self._cache))
+        tmp_path.replace(self._cache_path)
