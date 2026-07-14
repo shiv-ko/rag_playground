@@ -45,9 +45,24 @@ def test_hybrid_retriever(sample_docs: list[Document]) -> None:
     assert len(results) > 0
 
 
-def test_hybrid_retriever_surfaces_doc_that_loses_on_keyword_alone(sample_docs: list[Document]) -> None:
-    """BM25単体では上位に来ない文書でも、ベクトル側で強く一致していればRRFで浮上することを確認する。"""
-    from src.indexer.embedder import Embedder
+def test_hybrid_retriever_surfaces_doc_that_loses_on_keyword_alone() -> None:
+    """キーワード検索単体では1位に来ない文書でも、ベクトル検索で最上位ならRRF融合後に浮上することを確認する。
+
+    sample_docsは使わない: そのフィクスチャの"Model Xのバッテリーは18時間持続します。"は
+    「バッテリー時間」を問うクエリとCJKバイグラム（バッ/ッテ/テリ/リー/時間 等）を直接共有し、
+    キーワード検索単体でも1位（score 0.44、次点0.017）になってしまうため、
+    RRF固有のクロスリスト順位融合を検証できない（レビュー指摘で実測判明）。
+    そのためこのテストではsample_docsを使わず、ローカルな文書セットとクエリを用意する。
+
+    実測（このテストの文書・クエリで KeywordStore.search を直接呼んだ結果）:
+      1位 0.1584 "宿泊費は15,000円まで精算できます。東京は20,000円まで。"
+      2位 0.0447 "Model Xの説明書には注意事項があります。"  <- 対象文書。1位の約1/3.5で明確に劣後
+      3位 0.0441 "会議室の予約はカレンダーシステムから行います。"
+      4位 0.0193 "健康診断は年に一度、指定病院で受診します。"
+    つまり対象文書はキーワード単体では1位を取れない。一方ベクトル側は
+    _VectorFavoringEmbedder により対象文書のみクエリと完全一致（内積1.0）、他は0.0。
+    この2リストをRRF融合すると対象文書が1位に浮上する（実測 0.032522 vs 次点0.032018）。
+    """
     import numpy as np
 
     class _VectorFavoringEmbedder:
@@ -62,10 +77,20 @@ def test_hybrid_retriever_surfaces_doc_that_loses_on_keyword_alone(sample_docs: 
         def embed_query(self, text: str) -> np.ndarray:
             return np.array([1.0, 0.0], dtype=np.float32)
 
+    tmp_dir = Path("/tmp")
+    docs = [
+        Document(text="Model Xの説明書には注意事項があります。", source_path=tmp_dir / "target.txt"),
+        Document(text="会議室の予約はカレンダーシステムから行います。", source_path=tmp_dir / "f1.txt"),
+        Document(text="健康診断は年に一度、指定病院で受診します。", source_path=tmp_dir / "f2.txt"),
+        Document(
+            text="宿泊費は15,000円まで精算できます。東京は20,000円まで。",
+            source_path=tmp_dir / "kwwinner.txt",
+        ),
+    ]
+
     retriever = HybridRetriever(embedder=_VectorFavoringEmbedder())
-    retriever.add(sample_docs)
-    # クエリはキーワード的には宿泊費関連の文書に近いが、ベクトル側はModel X文書を最優先する
-    results = retriever.search("何かのバッテリー時間について教えてください", top_k=1)
+    retriever.add(docs)
+    results = retriever.search("宿泊費の上限について教えてください", top_k=1)
     assert "Model X" in results[0].document.text
 
 
