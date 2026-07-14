@@ -9,7 +9,9 @@ from __future__ import annotations
 import unicodedata
 from pathlib import Path
 
+from src.indexer.embedder import Embedder
 from src.indexer.keyword_store import KeywordStore
+from src.retriever.hybrid_retriever import HybridRetriever
 from src.models import Document, ScoredDocument
 from src.retriever.question_file_scope import (
     find_named_files,
@@ -33,16 +35,27 @@ def _normalize_project_name(name: str) -> str:
 class ProjectScopedRetriever:
     """
     add() は全ドキュメントを1回でまとめて渡す想定（Pipeline.build_indexの使い方と一致）。
+    embedderを渡すとBM25+ベクトルのハイブリッド検索になる（未指定時は既存のBM25単体のまま）。
     """
 
-    def __init__(self, project_aliases: dict[str, list[str]] | None = None) -> None:
-        self._global_store = KeywordStore()
-        self._project_stores: dict[str, KeywordStore] = {}
+    def __init__(
+        self,
+        project_aliases: dict[str, list[str]] | None = None,
+        embedder: Embedder | None = None,
+    ) -> None:
+        self._embedder = embedder
+        self._global_store = self._make_store()
+        self._project_stores: dict[str, KeywordStore | HybridRetriever] = {}
         self._project_names: list[str] = []
         self._aliases_by_normalized_name: dict[str, list[str]] = {
             _normalize_project_name(name): aliases
             for name, aliases in (project_aliases or {}).items()
         }
+
+    def _make_store(self) -> KeywordStore | HybridRetriever:
+        if self._embedder is not None:
+            return HybridRetriever(embedder=self._embedder)
+        return KeywordStore()
 
     def add(self, documents: list[Document]) -> None:
         self._global_store.add(documents)
@@ -56,7 +69,7 @@ class ProjectScopedRetriever:
 
         for project, docs in by_project.items():
             if project not in self._project_stores:
-                self._project_stores[project] = KeywordStore()
+                self._project_stores[project] = self._make_store()
                 self._project_names.append(project)
             self._project_stores[project].add(docs)
             if internal_docs:

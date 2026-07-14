@@ -91,3 +91,32 @@ def test_search_prioritizes_file_name_containing_particle_kana():
     ])
     results = retriever.search("A社の見積もり一覧.xlsxのスケジュールでタスクの進捗は？", top_k=1)
     assert results[0].document.source_path.name == "見積もり一覧.xlsx"
+
+
+def test_search_uses_hybrid_retriever_when_embedder_given():
+    import numpy as np
+    from src.indexer.embedder import Embedder
+
+    class _StubEmbedder:
+        def embed_documents(self, texts: list[str]) -> np.ndarray:
+            return np.zeros((len(texts), 2), dtype=np.float32)
+
+        def embed_query(self, text: str) -> np.ndarray:
+            return np.zeros(2, dtype=np.float32)
+
+    retriever = ProjectScopedRetriever(embedder=_StubEmbedder())
+    retriever.add([_doc("スケジュール タスク 進捗", "data/A社/02.計画/計画.xlsx")])
+
+    from src.retriever.hybrid_retriever import HybridRetriever
+    assert isinstance(retriever._global_store, HybridRetriever)
+
+    results = retriever.search("A社のスケジュールでタスクの進捗は？", top_k=1)
+    assert len(results) == 1
+
+
+def test_search_without_embedder_still_uses_keyword_store():
+    from src.indexer.keyword_store import KeywordStore
+
+    retriever = ProjectScopedRetriever()
+    retriever.add([_doc("スケジュール タスク 進捗", "data/A社/02.計画/計画.xlsx")])
+    assert isinstance(retriever._global_store, KeywordStore)
