@@ -33,6 +33,8 @@ def main() -> None:
     parser.add_argument("--no-cache", action="store_true", help="パース結果キャッシュを使わない")
     parser.add_argument("--no-judge", action="store_true",
                         help="judgeを実行しない（GTのないtest質問の診断run用。gate_reason等は保存される）")
+    parser.add_argument("--hybrid-search", action="store_true",
+                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（要 pip install -e '.[embeddings]'）")
     args = parser.parse_args()
 
     logger = setup_logging()
@@ -84,6 +86,7 @@ def main() -> None:
         # 質問CSVの置き場（質問回答/）はコーパスから除外する — valid CSVは正解列を
         # 含むため、取り込むと検索経由の正解リークになる（20260705の事故）
         exclude_dirs=[args.questions.parent],
+        use_hybrid_search=args.hybrid_search,
     )
 
     pipeline.build_index()

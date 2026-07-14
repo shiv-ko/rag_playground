@@ -123,6 +123,26 @@ def test_pipeline_uses_project_scoped_retriever(tmp_path: Path) -> None:
     assert isinstance(pipeline.retriever, ProjectScopedRetriever)
 
 
+def test_pipeline_hybrid_search_flag_wires_embedder(tmp_path: Path) -> None:
+    """use_hybrid_search=Trueの場合、retrieverの内部ストアがHybridRetrieverになる。"""
+    from src.orchestrator.pipeline import Pipeline
+    from src.retriever.hybrid_retriever import HybridRetriever
+
+    pipeline = Pipeline(data_dir=tmp_path, use_hybrid_search=True)
+    assert pipeline.retriever._embedder is not None
+    pipeline.retriever.add([])  # 空addでも_global_storeの型は初期化時点で決まる
+    assert isinstance(pipeline.retriever._global_store, HybridRetriever)
+
+
+def test_pipeline_default_no_hybrid_search(tmp_path: Path) -> None:
+    from src.orchestrator.pipeline import Pipeline
+    from src.indexer.keyword_store import KeywordStore
+
+    pipeline = Pipeline(data_dir=tmp_path)
+    assert pipeline.retriever._embedder is None
+    assert isinstance(pipeline.retriever._global_store, KeywordStore)
+
+
 def test_pipeline_routes_analysis_json_before_normal_retrieval(tmp_path: Path, monkeypatch) -> None:
     import json
 

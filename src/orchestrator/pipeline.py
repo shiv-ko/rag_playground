@@ -88,6 +88,7 @@ class Pipeline:
         artifacts_dir: Path | None = None,
         cache_dir: Path | None = None,
         exclude_dirs: list[Path] | None = None,
+        use_hybrid_search: bool = False,
     ) -> None:
         self.data_dir = data_dir
         self.max_concurrent = max_concurrent
@@ -99,7 +100,12 @@ class Pipeline:
         self.logger = setup_logging()
 
         self.dispatcher = ParserDispatcher()
-        self.retriever = ProjectScopedRetriever(project_aliases=project_aliases)
+        self.embedder = None
+        if use_hybrid_search:
+            from src.indexer.embedder import CachedEmbedder, JapaneseEmbedder
+            cache_path = (cache_dir / "embeddings_ruri-base.pkl") if cache_dir is not None else None
+            self.embedder = CachedEmbedder(JapaneseEmbedder(), cache_path=cache_path)
+        self.retriever = ProjectScopedRetriever(project_aliases=project_aliases, embedder=self.embedder)
         self.project_aliases = project_aliases or {}
         self.term_registry = term_registry or []
         self.project_primary_aliases = project_primary_aliases or {}
@@ -135,6 +141,8 @@ class Pipeline:
             docs = self.dispatcher.parse_directory(self.data_dir, exclude_dirs=self.exclude_dirs)
         self.logger.info(f"  {len(docs)} チャンク取得")
         self.retriever.add(docs)
+        if self.embedder is not None:
+            self.embedder.flush()
         self.logger.info("インデックス構築完了")
 
     # ------------------------------------------------------------------ #

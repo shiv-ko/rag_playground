@@ -37,6 +37,8 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.4)
     parser.add_argument("--runs", type=int, default=1,
                         help="提出用回答生成を複数回実行し、N>1なら正規化多数決で安定化する")
+    parser.add_argument("--hybrid-search", action="store_true",
+                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（要 pip install -e '.[embeddings]'）")
     parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
                         help="レジストリJSON・構造化artifactsのディレクトリ")
     args = parser.parse_args()
@@ -72,6 +74,7 @@ def main() -> None:
         artifacts_dir=args.artifacts_dir,
         # 質問CSVの置き場（質問回答/）はコーパスから除外する（run_pipeline.pyと同一規則）
         exclude_dirs=[args.questions.parent],
+        use_hybrid_search=args.hybrid_search,
     )
     pipeline.build_index()
     if args.runs == 1:
