@@ -33,8 +33,10 @@ def main() -> None:
     parser.add_argument("--no-cache", action="store_true", help="パース結果キャッシュを使わない")
     parser.add_argument("--no-judge", action="store_true",
                         help="judgeを実行しない（GTのないtest質問の診断run用。gate_reason等は保存される）")
-    parser.add_argument("--hybrid-search", action="store_true",
-                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--hybrid-search", dest="hybrid_search", action="store_true", default=True,
+                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（デフォルト。要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--no-hybrid-search", dest="hybrid_search", action="store_false",
+                        help="BM25単体検索に戻す")
     args = parser.parse_args()
 
     logger = setup_logging()

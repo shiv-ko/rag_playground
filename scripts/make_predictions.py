@@ -37,8 +37,10 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.4)
     parser.add_argument("--runs", type=int, default=1,
                         help="提出用回答生成を複数回実行し、N>1なら正規化多数決で安定化する")
-    parser.add_argument("--hybrid-search", action="store_true",
-                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--hybrid-search", dest="hybrid_search", action="store_true", default=True,
+                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（デフォルト。要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--no-hybrid-search", dest="hybrid_search", action="store_false",
+                        help="BM25単体検索に戻す")
     parser.add_argument("--artifacts-dir", type=Path, default=ROOT / "artifacts",
                         help="レジストリJSON・構造化artifactsのディレクトリ")
     args = parser.parse_args()

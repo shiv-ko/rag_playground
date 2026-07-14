@@ -35,8 +35,10 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=ROOT / "experiments")
     parser.add_argument("--no-cache", action="store_true",
                         help="パースキャッシュを使わず、現在のparser/chunkerで再パースする")
-    parser.add_argument("--hybrid-search", action="store_true",
-                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--hybrid-search", dest="hybrid_search", action="store_true", default=True,
+                        help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（デフォルト。要 pip install -e '.[embeddings]'）")
+    parser.add_argument("--no-hybrid-search", dest="hybrid_search", action="store_false",
+                        help="BM25単体検索に戻す")
     parser.add_argument("--exclude-dir", type=Path, action="append", default=None,
                         help="コーパスから除外するディレクトリ（複数指定可）。"
                              "評価用質問CSVの置き場（質問回答/等）をdata-dir配下に含む場合は必須 — "
