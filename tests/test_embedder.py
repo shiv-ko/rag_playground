@@ -83,6 +83,48 @@ def test_japanese_embedder_lazy_loads_model_once():
     assert embedder._model is fake
 
 
+class _ConcurrencyTrackingSTModel:
+    """encode()呼び出しの重なり（同時実行数）を記録するフェイク。
+    実際のsentence-transformers（PyTorch MPSバックエンド）はスレッドセーフでなく、
+    並行呼び出しでセグフォルトすることが実データ検証で確認された（Task 8）。
+    このフェイクはGPU実行を模倣せず、encode()呼び出し区間の重なりだけを検出する。"""
+
+    def __init__(self) -> None:
+        import threading
+        self._lock = threading.Lock()
+        self._active = 0
+        self.max_concurrent_calls = 0
+
+    def encode(self, texts, batch_size=None, normalize_embeddings=None):
+        import time
+        with self._lock:
+            self._active += 1
+            self.max_concurrent_calls = max(self.max_concurrent_calls, self._active)
+        time.sleep(0.05)
+        with self._lock:
+            self._active -= 1
+        is_batch = isinstance(texts, list)
+        n = len(texts) if is_batch else 1
+        vecs = np.tile(np.array([1.0, 0.0], dtype=np.float32), (n, 1))
+        return vecs if is_batch else vecs[0]
+
+
+def test_japanese_embedder_serializes_concurrent_embed_query_calls():
+    """複数スレッドから同時にembed_query()を呼んでも、モデル呼び出しは1回ずつ直列化される
+    （MPSバックエンドの並行呼び出しセグフォルトを防ぐため）。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    embedder = JapaneseEmbedder()
+    fake = _ConcurrencyTrackingSTModel()
+    embedder._model = fake
+
+    queries = [f"質問{i}" for i in range(8)]
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        list(ex.map(embedder.embed_query, queries))
+
+    assert fake.max_concurrent_calls == 1
+
+
 from src.indexer.embedder import CachedEmbedder
 
 

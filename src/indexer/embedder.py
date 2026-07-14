@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import math
 import pickle
+import threading
 from pathlib import Path
 from typing import Protocol
 
@@ -49,22 +50,31 @@ class JapaneseEmbedder:
         self.model_name = model_name
         self.batch_size = batch_size
         self._model = None
+        # PyTorchのMPS(Metal)バックエンドはスレッドセーフでなく、複数スレッドから
+        # model.encode()を同時に呼ぶとセグフォルトする（実データ検証で確認、Task 8）。
+        # Pipeline.run()はmax_concurrent本のスレッドから並行してembed_query()を呼ぶため、
+        # モデル呼び出し自体をこのロックで直列化する。
+        self._lock = threading.Lock()
 
     def _load_model(self):
+        # ロード自体もMPS上のモデル構築を伴うため、encode()と同じロックで直列化する
+        # （ロード未完了の間に複数スレッドが同時にSentenceTransformer()を構築するとMPSが壊れる）。
         if self._model is None:
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer(self.model_name)
         return self._model
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
-        model = self._load_model()
         prefixed = [_DOC_PREFIX + t for t in texts]
-        vecs = model.encode(prefixed, batch_size=self.batch_size, normalize_embeddings=True)
+        with self._lock:
+            model = self._load_model()
+            vecs = model.encode(prefixed, batch_size=self.batch_size, normalize_embeddings=True)
         return np.asarray(vecs, dtype=np.float32)
 
     def embed_query(self, text: str) -> np.ndarray:
-        model = self._load_model()
-        vec = model.encode(_QUERY_PREFIX + text, normalize_embeddings=True)
+        with self._lock:
+            model = self._load_model()
+            vec = model.encode(_QUERY_PREFIX + text, normalize_embeddings=True)
         return np.asarray(vec, dtype=np.float32)
 
 
