@@ -1,0 +1,539 @@
+{
+  "summary": {
+    "recall": 0.7931034482758621,
+    "measurable": 29,
+    "total": 30,
+    "by_type": {
+      "analysis_metrics": {
+        "hit": 1,
+        "measurable": 1
+      },
+      "code_static": {
+        "hit": 1,
+        "measurable": 2
+      },
+      "contract_rule": {
+        "hit": 3,
+        "measurable": 3
+      },
+      "image_graph": {
+        "hit": 1,
+        "measurable": 1
+      },
+      "internal_terms": {
+        "hit": 2,
+        "measurable": 4
+      },
+      "list_extraction": {
+        "hit": 1,
+        "measurable": 2
+      },
+      "notebook_output": {
+        "hit": 2,
+        "measurable": 2
+      },
+      "office_style": {
+        "hit": 2,
+        "measurable": 3
+      },
+      "single_text": {
+        "hit": 4,
+        "measurable": 4
+      },
+      "spreadsheet_calc": {
+        "hit": 3,
+        "measurable": 3
+      },
+      "spreadsheet_state": {
+        "hit": 2,
+        "measurable": 3
+      },
+      "version_diff": {
+        "hit": 1,
+        "measurable": 1
+      }
+    }
+  },
+  "records": [
+    {
+      "question_id": "0",
+      "primary_type": "office_style",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/会議録/会議録_2025-08-26.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/01.契約/契約書.docx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "1",
+      "primary_type": "image_graph",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/04.分析/analysis_project/reports/figures/missing_rate_top20.png",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/05.会議/報告資料/報告資料_2025-10-01.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb"
+      ],
+      "candidate_count": 26,
+      "reason": ""
+    },
+    {
+      "question_id": "2",
+      "primary_type": "single_text",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/会議録/会議録_2025-09-16.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/会議録/会議録_2025-09-02.docx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "3",
+      "primary_type": "cross_project",
+      "measurable": false,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/00.提案/提案書_v2.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/00.提案/提案書_v1.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/00.提案/提案書_v3.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書old.pptx"
+      ],
+      "candidate_count": 0,
+      "reason": "案件もセクションも機械特定できない（cross_project等）"
+    },
+    {
+      "question_id": "4",
+      "primary_type": "code_static",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx"
+      ],
+      "candidate_count": 27,
+      "reason": ""
+    },
+    {
+      "question_id": "5",
+      "primary_type": "single_text",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/06.報告書/白峰信用リスク評価株式会社_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書old.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書old.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/00.提案/提案書.pptx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "6",
+      "primary_type": "spreadsheet_state",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/03.データ/train.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/03.データ/train.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/06.報告書/医療法人社団 恒一会 かえで総合病院_最終報告_old.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/06.報告書/医療法人社団 恒一会 かえで総合病院_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/03.データ/カラム説明.md"
+      ],
+      "candidate_count": 3,
+      "reason": ""
+    },
+    {
+      "question_id": "7",
+      "primary_type": "spreadsheet_calc",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/03.データ/カラム説明.md",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/04.分析/analysis_project/data/カラム説明.md",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/03.データ/train.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/04.分析/analysis_outputs/metrics.json",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/00.提案/提案書.pptx"
+      ],
+      "candidate_count": 3,
+      "reason": ""
+    },
+    {
+      "question_id": "8",
+      "primary_type": "contract_rule",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 2,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/社内管理/データアステル社内管理_決裁基準.md",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/02.計画/スケジュール.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/06.報告書/医療法人社団 蒼泉会 ひがし丘総合病院_最終報告.pdf"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "9",
+      "primary_type": "version_diff",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/05.会議/会議録/会議録_2025-09-16.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/06.報告書/株式会社青嶺不動産アセットマネジメント_最終報告.pptx"
+      ],
+      "candidate_count": 3,
+      "reason": ""
+    },
+    {
+      "question_id": "10",
+      "primary_type": "list_extraction",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "11",
+      "primary_type": "spreadsheet_state",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/06.報告書/株式会社東都人材プラットフォーム_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/04.分析/analysis_project/data/カラム説明.md"
+      ],
+      "candidate_count": 3,
+      "reason": ""
+    },
+    {
+      "question_id": "12",
+      "primary_type": "contract_rule",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "13",
+      "primary_type": "spreadsheet_calc",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/03.データ/train.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-09.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/03.データ/train.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-09.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/03.データ/train.xlsx"
+      ],
+      "candidate_count": 52,
+      "reason": ""
+    },
+    {
+      "question_id": "14",
+      "primary_type": "single_text",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/会議録/会議録_2025-07-11.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/06.報告書/株式会社青葉バイオメディカル機器_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書_draft.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/05.会議/会議録/会議録_2025-07-25.docx"
+      ],
+      "candidate_count": 85,
+      "reason": ""
+    },
+    {
+      "question_id": "15",
+      "primary_type": "internal_terms",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/02.計画/スケジュール_r2.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/06.報告書/白峰信用リスク評価株式会社_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 恒一会 かえで総合病院/05.会議/報告資料/報告資料_2025-09-16.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/02.計画/スケジュール.xlsx"
+      ],
+      "candidate_count": 54,
+      "reason": ""
+    },
+    {
+      "question_id": "16",
+      "primary_type": "internal_terms",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/糖尿病統計情報.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/04.分析/analysis_project/reports/figures/missing_rate_top20.png",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/00.提案/糖尿病統計情報.docx"
+      ],
+      "candidate_count": 2,
+      "reason": ""
+    },
+    {
+      "question_id": "17",
+      "primary_type": "single_text",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_v1.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/京橋信用ソリューションズ株式会社/00.提案/提案書_final.pptx"
+      ],
+      "candidate_count": 38,
+      "reason": ""
+    },
+    {
+      "question_id": "18",
+      "primary_type": "internal_terms",
+      "measurable": true,
+      "hit": false,
+      "first_hit_rank": 0,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/04.分析/analysis_project/data/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/03.データ/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/03.データ/train.csv"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "19",
+      "primary_type": "list_extraction",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/00.提案/old/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/06.報告書/株式会社青嶺不動産アセットマネジメント_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青嶺不動産アセットマネジメント/01.契約/契約書.docx"
+      ],
+      "candidate_count": 42,
+      "reason": ""
+    },
+    {
+      "question_id": "20",
+      "primary_type": "internal_terms",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/02.計画/スケジュール.xlsx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-09.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-29.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/05.会議/報告資料/報告資料_2025-04-09.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/青葉与信マネジメント株式会社/00.提案/提案書_v1.pptx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    },
+    {
+      "question_id": "21",
+      "primary_type": "spreadsheet_state",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 2,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/04.分析/analysis_project/data/カラム説明.md",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/03.データ/カラム説明.md",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/04.分析/analysis_project/data/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/06.報告書/株式会社青葉バイオメディカル機器_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/03.データ/train.csv"
+      ],
+      "candidate_count": 6,
+      "reason": ""
+    },
+    {
+      "question_id": "22",
+      "primary_type": "notebook_output",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb"
+      ],
+      "candidate_count": 54,
+      "reason": ""
+    },
+    {
+      "question_id": "23",
+      "primary_type": "office_style",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/05.会議/報告資料/報告資料_2025-08-06.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青潮モビリティサービス/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/社内管理/データアステル社内規定_パスワード導出規則.docx"
+      ],
+      "candidate_count": 83,
+      "reason": ""
+    },
+    {
+      "question_id": "24",
+      "primary_type": "notebook_output",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb",
+        "data/raw/share/共有ドライブ/プロジェクト/白峰信用リスク評価株式会社/04.分析/analysis_project/notebooks/01_eda.ipynb"
+      ],
+      "candidate_count": 27,
+      "reason": ""
+    },
+    {
+      "question_id": "25",
+      "primary_type": "office_style",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/06.報告書/株式会社東都人材プラットフォーム_最終報告.pptx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/データサイエンティスト調査.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社東都人材プラットフォーム/00.提案/提案書.pptx"
+      ],
+      "candidate_count": 3,
+      "reason": ""
+    },
+    {
+      "question_id": "26",
+      "primary_type": "spreadsheet_calc",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/03.データ/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/04.分析/analysis_project/data/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/04.分析/analysis_project/data/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/03.データ/train.csv",
+        "data/raw/share/共有ドライブ/プロジェクト/株式会社青葉バイオメディカル機器/03.データ/train.xlsx"
+      ],
+      "candidate_count": 6,
+      "reason": ""
+    },
+    {
+      "question_id": "27",
+      "primary_type": "analysis_metrics",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/会議録/会議録_2025-08-05.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/06.報告書/医療法人社団 蒼泉会 ひがし丘総合病院_最終報告.pdf",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/会議録/会議録_2025-08-05.docx"
+      ],
+      "candidate_count": 30,
+      "reason": ""
+    },
+    {
+      "question_id": "28",
+      "primary_type": "code_static",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 5,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/会議録/会議録_2025-08-05.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/05.会議/報告資料/報告資料_2025-07-22.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼泉会 ひがし丘総合病院/04.分析/analysis_project/notebooks/01_eda.ipynb"
+      ],
+      "candidate_count": 25,
+      "reason": ""
+    },
+    {
+      "question_id": "29",
+      "primary_type": "contract_rule",
+      "measurable": true,
+      "hit": true,
+      "first_hit_rank": 1,
+      "retrieved": [
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx",
+        "data/raw/share/共有ドライブ/プロジェクト/医療法人社団 蒼樹会 みなみ野女性医療センター/01.契約/契約書.docx"
+      ],
+      "candidate_count": 1,
+      "reason": ""
+    }
+  ]
+}
