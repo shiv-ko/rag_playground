@@ -93,6 +93,95 @@ def test_search_prioritizes_file_name_containing_particle_kana():
     assert results[0].document.source_path.name == "見積もり一覧.xlsx"
 
 
+def test_search_prioritizes_extensionless_named_stem_outside_normal_candidate_pool():
+    retriever = ProjectScopedRetriever()
+    distractors = [
+        _doc("pdays -1 値 意味 分析 " * 3, f"data/A社/分析_{i}.md")
+        for i in range(8)
+    ]
+    target = _doc("未連絡", "data/A社/03.データ/カラム説明.md")
+    retriever.add(distractors + [target])
+
+    results = retriever.search(
+        "A社のカラム説明において、pdaysの-1は何を表す？", top_k=1
+    )
+
+    assert results[0].document.source_path.name == "カラム説明.md"
+
+
+def test_search_extensionless_stem_keeps_same_named_files_in_detected_project_only():
+    retriever = ProjectScopedRetriever()
+    retriever.add([
+        _doc("第一の定義", "data/A社/03.データ/用語説明.md"),
+        _doc("第二の定義", "data/A社/04.分析/用語説明.md"),
+        _doc("値 定義 意味", "data/B社/03.データ/用語説明.md", project="B社"),
+    ])
+
+    results = retriever.search("A社の用語説明において定義は？", top_k=2)
+
+    assert len(results) == 2
+    assert all(r.document.source_path.name == "用語説明.md" for r in results)
+    assert all(r.document.metadata.get("project") == "A社" for r in results)
+
+
+def test_search_extensionless_stem_does_not_boost_partial_or_short_matches():
+    retriever = ProjectScopedRetriever()
+    retriever.add([
+        _doc("無関係", "data/A社/説明.md"),
+        _doc("無関係", "data/A社/表.md"),
+        _doc("カラム 説明 値 定義", "data/A社/検索結果.md"),
+    ])
+
+    partial = retriever.search("A社のカラム説明において値は？", top_k=1)
+    short = retriever.search("A社の表においてカラムの値は？", top_k=1)
+
+    assert partial[0].document.source_path.name == "検索結果.md"
+    assert short[0].document.source_path.name == "検索結果.md"
+
+
+def test_search_extensionless_stem_works_with_hybrid_store():
+    import numpy as np
+
+    class _DistractorFavoringEmbedder:
+        def embed_documents(self, texts: list[str]) -> np.ndarray:
+            return np.asarray([[1.0] if "無関係" in text else [0.0] for text in texts])
+
+        def embed_query(self, text: str) -> np.ndarray:
+            return np.asarray([1.0])
+
+    retriever = ProjectScopedRetriever(embedder=_DistractorFavoringEmbedder())
+    retriever.add([
+        _doc("無関係 カラム 値", "data/A社/提案書.md"),
+        _doc("未連絡", "data/A社/カラム説明.md"),
+    ])
+
+    results = retriever.search("A社のカラム説明において値は？", top_k=1)
+
+    assert results[0].document.source_path.name == "カラム説明.md"
+
+
+def test_search_checks_each_source_path_once_for_extensionless_stem(monkeypatch):
+    seen_names: list[object] = []
+
+    def capture_names(question, known_names):
+        seen_names.extend(known_names)
+        return []
+
+    monkeypatch.setattr(
+        "src.retriever.project_scoped_retriever.find_question_stem_matches",
+        capture_names,
+    )
+    retriever = ProjectScopedRetriever()
+    retriever.add([
+        _doc("チャンク1", "data/A社/同じファイル.md"),
+        _doc("チャンク2", "data/A社/同じファイル.md"),
+    ])
+
+    retriever.search("A社の質問", top_k=1)
+
+    assert [Path(str(name)).name for name in seen_names] == ["同じファイル.md"]
+
+
 def test_search_uses_hybrid_retriever_when_embedder_given():
     import numpy as np
     from src.indexer.embedder import Embedder

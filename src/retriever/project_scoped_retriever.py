@@ -15,6 +15,7 @@ from src.retriever.hybrid_retriever import HybridRetriever
 from src.models import Document, ScoredDocument
 from src.retriever.question_file_scope import (
     find_named_files,
+    find_question_stem_matches,
     find_stem_matches,
     question_mentions_extension,
 )
@@ -45,7 +46,11 @@ class ProjectScopedRetriever:
     ) -> None:
         self._embedder = embedder
         self._global_store = self._make_store()
+        self._global_documents: list[Document] = []
+        self._global_source_paths: list[Path] = []
         self._project_stores: dict[str, KeywordStore | HybridRetriever] = {}
+        self._project_documents: dict[str, list[Document]] = {}
+        self._project_source_paths: dict[str, list[Path]] = {}
         self._project_names: list[str] = []
         self._aliases_by_normalized_name: dict[str, list[str]] = {
             _normalize_project_name(name): aliases
@@ -59,6 +64,8 @@ class ProjectScopedRetriever:
 
     def add(self, documents: list[Document]) -> None:
         self._global_store.add(documents)
+        self._global_documents.extend(documents)
+        self._global_source_paths = _unique_source_paths(self._global_documents)
 
         internal_docs = [d for d in documents if d.metadata.get("is_internal")]
         by_project: dict[str, list[Document]] = {}
@@ -70,14 +77,25 @@ class ProjectScopedRetriever:
         for project, docs in by_project.items():
             if project not in self._project_stores:
                 self._project_stores[project] = self._make_store()
+                self._project_documents[project] = []
+                self._project_source_paths[project] = []
                 self._project_names.append(project)
             self._project_stores[project].add(docs)
+            self._project_documents[project].extend(docs)
             if internal_docs:
                 self._project_stores[project].add(internal_docs)
+                self._project_documents[project].extend(internal_docs)
+            self._project_source_paths[project] = _unique_source_paths(
+                self._project_documents[project]
+            )
 
     def clear(self) -> None:
         self._global_store.clear()
+        self._global_documents = []
+        self._global_source_paths = []
         self._project_stores = {}
+        self._project_documents = {}
+        self._project_source_paths = {}
         self._project_names = []
 
     def detect_project(self, query: str) -> str | None:
@@ -102,29 +120,63 @@ class ProjectScopedRetriever:
     ) -> list[ScoredDocument]:
         project = self.detect_project(query)
         store = self._project_stores[project] if project is not None else self._global_store
+        scope_documents = (
+            self._project_documents[project]
+            if project is not None
+            else self._global_documents
+        )
+        scope_source_paths = (
+            self._project_source_paths[project]
+            if project is not None
+            else self._global_source_paths
+        )
         mentions_extension = question_mentions_extension(query)
         hints = [h for h in (term_hints or []) if h]
-        if not mentions_extension and not hints:
-            return store.search(query, top_k)
 
-        # 名指しファイル・用語集展開語（例: "CT"→"契約書"）に一致するファイルの
-        # チャンクを優先する。候補を広めに取り、候補のbasename集合と照合する
-        # （find_named_files: 質問文中の拡張子付きファイル名 / find_stem_matches:
-        # QueryExpanderが適用した展開語とstemの一致）。一致ゼロなら従来結果と
-        # 同一 — ハードフィルタにしない。
-        candidates = store.search(query, top_k * 4)
-        known_names = [c.document.source_path for c in candidates]
+        # 名指しファイル・質問中の拡張子なしstem・用語集展開語
+        # （例: "CT"→"契約書"）に一致するファイルのチャンクを優先する。
+        # 通常のtop_k候補外にある名指しファイルも検出できるよう、検出済み
+        # project（未検出時は全体）の全source_pathと照合する。
+        known_names = scope_source_paths
         matched_basenames: set[str] = set()
         if mentions_extension:
             matched_basenames.update(find_named_files(query, known_names))
+        matched_basenames.update(find_question_stem_matches(query, known_names))
         if hints:
             matched_basenames.update(find_stem_matches(hints, known_names))
         if not matched_basenames:
-            return candidates[:top_k]
+            return store.search(query, top_k)
+
+        # 一致時だけ通常より広めの候補を取得する。
+        # BM25はscore=0のチャンクを返さないため、名指しsourceのみ
+        # 後段で補完し、本文にquery語がなくても根拠候補から落とさない。
+        candidates = store.search(query, top_k * 4)
 
         matched: list[ScoredDocument] = []
         others: list[ScoredDocument] = []
+        seen_document_ids: set[int] = set()
         for c in candidates:
             basename = unicodedata.normalize("NFC", Path(str(c.document.source_path)).name)
             (matched if basename in matched_basenames else others).append(c)
+            seen_document_ids.add(id(c.document))
+        for document in scope_documents:
+            basename = unicodedata.normalize("NFC", Path(str(document.source_path)).name)
+            if basename in matched_basenames and id(document) not in seen_document_ids:
+                matched.append(
+                    ScoredDocument(
+                        document=document,
+                        score=0.0,
+                        retrieval_method="named_file",
+                    )
+                )
         return (matched + others)[:top_k]
+
+
+def _unique_source_paths(documents: list[Document]) -> list[Path]:
+    """同一ファイル由来の複数チャンクを、NFCを考慮して1パスにまとめる。"""
+    paths: dict[str, Path] = {}
+    for document in documents:
+        path = Path(str(document.source_path))
+        key = unicodedata.normalize("NFC", str(path)).casefold()
+        paths.setdefault(key, path)
+    return list(paths.values())

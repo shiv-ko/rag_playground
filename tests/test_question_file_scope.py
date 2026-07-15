@@ -7,6 +7,7 @@ from pathlib import Path
 from src.retriever.question_file_scope import (
     extract_file_names,
     find_named_files,
+    find_question_stem_matches,
     find_stem_matches,
     matches_file_name,
 )
@@ -186,3 +187,33 @@ class TestFindStemMatches:
         hint_nfd = unicodedata.normalize("NFD", "契約書")
         name_nfd = unicodedata.normalize("NFD", "契約書.docx")
         assert find_stem_matches([hint_nfd], [name_nfd]) == ["契約書.docx"]
+
+
+class TestFindQuestionStemMatches:
+    """質問文に拡張子なしで明示された、実在ファイルのstemとの照合。"""
+
+    def test_matches_extensionless_stem_and_normalizes_nfd(self):
+        question = unicodedata.normalize("NFD", "A社のカラム説明において値は？")
+        known = [unicodedata.normalize("NFD", "data/A社/カラム説明.md")]
+        assert find_question_stem_matches(question, known) == ["カラム説明.md"]
+
+    def test_matches_stem_followed_by_kara_or_yori(self):
+        known = ["カラム説明.md"]
+        assert find_question_stem_matches("カラム説明から値を答えて", known) == [
+            "カラム説明.md"
+        ]
+        assert find_question_stem_matches("カラム説明より値を答えて", known) == [
+            "カラム説明.md"
+        ]
+
+    def test_ignores_short_stem_even_when_independently_mentioned(self):
+        assert find_question_stem_matches("A社の表において値は？", ["表.md"]) == []
+
+    def test_does_not_match_stem_inside_longer_word(self):
+        assert find_question_stem_matches("カラム説明において値は？", ["説明.md"]) == []
+
+    def test_prefers_longest_stem_at_same_occurrence(self):
+        known = ["説明.md", "カラム説明.md"]
+        assert find_question_stem_matches("カラム説明において値は？", known) == [
+            "カラム説明.md"
+        ]

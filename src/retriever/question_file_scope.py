@@ -110,6 +110,66 @@ def find_named_files(question: str, known_names: Iterable[str | Path]) -> list[s
     return [ordered_basenames[key] for key in kept_keys]
 
 
+_JAPANESE_STEM_BOUNDARY_CHARS = frozenset("のにでとはをがもやへかよ")
+
+
+def _is_stem_boundary(question: str, index: int) -> bool:
+    """stemの前後が、文字列の端または単語の境界かを返す。"""
+    if index < 0 or index >= len(question):
+        return True
+    char = question[index]
+    return not (char.isalnum() or char == "_") or char in _JAPANESE_STEM_BOUNDARY_CHARS
+
+
+def find_question_stem_matches(
+    question: str, known_names: Iterable[str | Path]
+) -> list[str]:
+    """質問文に拡張子なしで明示された既知ファイルのstemを返す。
+
+    ファイル一覧から得たstemだけをNFC+casefoldで質問と照合する。
+    2文字以下のstemは一般語や版数との偶然一致が多いため除外し、
+    前後に単語境界がある出現のみを許可する。同じ出現位置で複数のstemが
+    一致する場合は最長のものだけを残す。
+    """
+    question_norm = unicodedata.normalize("NFC", question).casefold()
+    ordered_basenames: dict[str, str] = {}
+    stem_by_key: dict[str, str] = {}
+    for name in known_names:
+        basename_nfc = unicodedata.normalize("NFC", Path(str(name)).name)
+        key = basename_nfc.casefold()
+        stem = Path(basename_nfc).stem.casefold().strip()
+        if not key or key in ordered_basenames or len(stem) < 3:
+            continue
+        ordered_basenames[key] = basename_nfc
+        stem_by_key[key] = stem
+
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for key, stem in stem_by_key.items():
+        occurrences = [
+            (match.start(), match.end())
+            for match in re.finditer(re.escape(stem), question_norm)
+            if _is_stem_boundary(question_norm, match.start() - 1)
+            and _is_stem_boundary(question_norm, match.end())
+        ]
+        if occurrences:
+            spans[key] = occurrences
+
+    kept_keys: list[str] = []
+    for key, occurrences in spans.items():
+        longer_spans = [
+            span
+            for other, other_occurrences in spans.items()
+            if other != key and len(stem_by_key[other]) > len(stem_by_key[key])
+            for span in other_occurrences
+        ]
+        if any(
+            not any(o_start <= start and end <= o_end for o_start, o_end in longer_spans)
+            for start, end in occurrences
+        ):
+            kept_keys.append(key)
+    return [ordered_basenames[key] for key in kept_keys]
+
+
 _HINT_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,5}$")
 _ASCII_ALNUM_RE = re.compile(r"^[A-Za-z0-9]+$")
 
