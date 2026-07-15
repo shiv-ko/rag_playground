@@ -705,6 +705,135 @@ def test_pipeline_falls_through_to_state_when_calc_has_no_train_csv(tmp_path: Pa
     assert result.answer == "30代"
 
 
+def test_pipeline_spreadsheet_state_returns_complete_condition_and_aggregation(tmp_path: Path) -> None:
+    """抽出条件と集計内容の両方を求めるPivot質問は、artifactに両方が揃う場合に
+    LLMの出力揺れを介さず完全な回答を返す。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "train_xlsx_pivot_aggregates.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/train.xlsx",
+            "project_name": "テスト社",
+            "file_name": "train.xlsx",
+            "sheet_name": "Pivot",
+            "pivot_table_name": "PivotTable1",
+            "data_field_name": "平均 / Sales",
+            "data_field_source": "Sales",
+            "subtotal": "average",
+            "argmax_labels": {"Region": "東", "Category": "A"},
+            "argmax_value": 123.0,
+            "argmin_labels": {"Region": "西", "Category": "B"},
+            "argmin_value": 45.0,
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator.generate = lambda q, c: (_ for _ in ()).throw(
+        AssertionError("完全なPivot集計はLLMに委ねない")
+    )
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsx内のPivotTableでSalesの平均が最も高いものの抽出条件と集計内容を答えてください。",
+    ))
+
+    assert result.answer_path == "structured:spreadsheet_state"
+    assert "Region = 東、Category = A" in result.answer
+    assert "平均 / Sales" in result.answer
+    assert "123.0" in result.answer
+    assert not result.was_gated
+
+
+def test_pipeline_spreadsheet_state_gates_incomplete_condition_and_aggregation(tmp_path: Path) -> None:
+    """抽出条件と集計内容の両方を求めるPivot質問で集計値が欠ける場合は、
+    部分回答をLLMに生成させず安全側のMissingにする。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "train_xlsx_pivot_aggregates.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/train.xlsx",
+            "project_name": "テスト社",
+            "file_name": "train.xlsx",
+            "sheet_name": "Pivot",
+            "pivot_table_name": "PivotTable1",
+            "data_field_name": "平均 / Sales",
+            "data_field_source": "Sales",
+            "subtotal": "average",
+            "argmax_labels": {"Region": "東"},
+            "argmax_value": None,
+            "argmin_labels": {"Region": "西"},
+            "argmin_value": 45.0,
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator.generate = lambda q, c: (_ for _ in ()).throw(
+        AssertionError("不完全なPivot集計はLLMに委ねない")
+    )
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsx内のPivotTableでSalesの平均が最も高いものの抽出条件と集計内容を答えてください。",
+    ))
+
+    assert result.answer_path == "structured:spreadsheet_state"
+    assert result.was_gated
+    assert result.gate_reason == "spreadsheet_state_incomplete"
+
+
+def test_pipeline_non_pivot_aggregate_condition_and_aggregation_still_uses_generator(
+    tmp_path: Path,
+) -> None:
+    """抽出条件・集計内容とPivotシート名が共起しても、最上級集計ではない
+    ハイライト質問はPivot専用完全性ゲートでMissing固定しない。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "train_xlsx_highlight_blocks.jsonl").write_text(
+        json.dumps({
+            "source_path": "data/raw/x/train.xlsx",
+            "project_name": "テスト社",
+            "sheet_name": "Pivot",
+            "range": "F22",
+            "fill_color_name": "yellow",
+            "first_value": "35.95",
+            "column_header": {"cell": "F3", "value": "平均 / bmi", "formula": None},
+            "same_row_values": [{"cell": "E22", "value": "39", "formula": None}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator._call_llm = lambda q, c: json.dumps({
+        "answer": "抽出条件は39、集計内容はbmiの平均35.95です。",
+        "confidence": 0.9,
+        "citation": "列見出し: 平均 / bmi (F3)",
+        "reasoning": "構造化コンテキストに基づく",
+    }, ensure_ascii=False)
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxのPivotシートで黄色ハイライトされたセルの抽出条件と集計内容を答えてください。",
+    ))
+
+    assert result.answer_path == "structured:spreadsheet_state"
+    assert not result.was_gated
+    assert "bmiの平均35.95" in result.answer
+
+
 def test_pipeline_falls_back_to_search_when_calc_answer_is_gated(tmp_path: Path) -> None:
     """spreadsheet_calcパスがspecを解釈できずゲートした場合、Missing固定にせず
     通常のBM25検索パスへフォールバックする。"""

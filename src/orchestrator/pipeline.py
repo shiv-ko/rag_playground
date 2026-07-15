@@ -49,6 +49,65 @@ def is_style_extraction_request(question: str) -> bool:
     return bool(_STYLE_EXTRACTION_INTENT.search(unicodedata.normalize("NFC", question)))
 
 
+def _requests_pivot_condition_and_aggregation(question: str) -> bool:
+    normalized = unicodedata.normalize("NFC", question)
+    has_superlative = any(
+        term in normalized
+        for term in ("最も高い", "最も多い", "最大", "最も低い", "最も少ない", "最小")
+    )
+    return (
+        ("pivot" in normalized.casefold() or "ピボット" in normalized)
+        and has_superlative
+        and "抽出条件" in normalized
+        and "集計内容" in normalized
+    )
+
+
+def _has_pivot_aggregate_context(contexts: list[ScoredDocument]) -> bool:
+    return any(
+        "_pivot_" in context.document.location
+        and re.search(r"^集計:\s*.+$", context.document.text, re.MULTILINE)
+        for context in contexts
+    )
+
+
+def _direct_pivot_condition_and_aggregation_answer(
+    question: str, contexts: list[ScoredDocument]
+) -> Answer | None:
+    """機械抽出済みPivot集計から、条件・集計内容が完全な場合だけ直答する。"""
+    want_max = any(term in question for term in ("最も高い", "最も多い", "最大"))
+    want_min = any(term in question for term in ("最も低い", "最も少ない", "最小"))
+    if want_max == want_min:
+        return None
+    direction = "最大" if want_max else "最小"
+
+    answers: list[str] = []
+    for context in contexts:
+        text = context.document.text
+        aggregate = re.search(r"^集計:\s*(.+?)（[^）]+）$", text, re.MULTILINE)
+        group = re.search(
+            rf"^{direction}のグループ:\s*(.+?)（値:\s*(.+?)）$", text, re.MULTILINE
+        )
+        if not aggregate or not group:
+            continue
+        labels, value = group.group(1).strip(), group.group(2).strip()
+        if not labels or not value or value.casefold() in {"none", "null", "nan"}:
+            continue
+        answers.append(
+            f"抽出条件: {labels}、集計内容: {aggregate.group(1).strip()} = {value}"
+        )
+
+    if len(answers) != 1:
+        return None
+    return Answer(
+        text=answers[0],
+        confidence=0.95,
+        source_docs=contexts,
+        was_gated=False,
+        raw_text=answers[0],
+    )
+
+
 @dataclass
 class QAPair:
     question_id: str
@@ -297,6 +356,21 @@ class Pipeline:
             direct = self._direct_office_style_answer(contexts)
             if direct is not None:
                 return direct, "structured:office_style"
+        if (
+            used_tag == "spreadsheet_state"
+            and _requests_pivot_condition_and_aggregation(qa.question)
+        ):
+            direct = _direct_pivot_condition_and_aggregation_answer(qa.question, contexts)
+            if direct is not None:
+                return direct, "structured:spreadsheet_state"
+            if _has_pivot_aggregate_context(contexts):
+                return Answer(
+                    text=MISSING_RESPONSE,
+                    confidence=0.0,
+                    source_docs=contexts,
+                    was_gated=True,
+                    gate_reason="spreadsheet_state_incomplete",
+                ), "structured:spreadsheet_state"
         return self.generator.generate(qa.question, contexts), f"structured:{used_tag}"
 
     def _direct_office_style_answer(self, contexts: list[ScoredDocument]) -> Answer | None:
