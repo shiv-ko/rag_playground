@@ -8,8 +8,7 @@
 
 ## 次に行うこと
 
-- [ ] ユーザーが社内文書・valid質問の生成/judge API送信を明示承認した場合のみ、`q17_filescope_valid_r1〜r3`を実行する。
-- [ ] N=3完了後、r1をofficial較正し、Q17のPerfect/Incorrectと新規Incorrectの有無で採否を確定する。
+- [x] ユーザ承認後、`q17_filescope_valid_r1〜r3`を実行。local mean 0.6167 / 0.6333 / 0.6167、Q17は3run共通で「未連絡」。（2026-07-16）
+- [x] r1をofficial較正。official mean **0.8000**、Q17はPerfect、直前ハイブリッド版0.7333から+0.0667。official Incorrectは既知Q6のみで新規0。**採用確定**。（2026-07-16）
 - [ ] 採用確定後、test predictions.csvをN=3で再生成し、提出物を作る。
 - [ ] API送信を承認しない場合は、検索recall改善までを根拠に実装を維持し、Phase 5のローカル作業へ進む。
-
