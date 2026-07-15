@@ -37,6 +37,8 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.4)
     parser.add_argument("--runs", type=int, default=1,
                         help="提出用回答生成を複数回実行し、N>1なら正規化多数決で安定化する")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="パース・埋め込みキャッシュを使わず再計算する")
     parser.add_argument("--hybrid-search", dest="hybrid_search", action="store_true", default=True,
                         help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（デフォルト。要 pip install -e '.[embeddings]'）")
     parser.add_argument("--no-hybrid-search", dest="hybrid_search", action="store_false",
@@ -74,6 +76,7 @@ def main() -> None:
         project_primary_aliases=project_primary_aliases,
         term_registry=term_registry,
         artifacts_dir=args.artifacts_dir,
+        cache_dir=None if args.no_cache else ROOT / ".cache",
         # 質問CSVの置き場（質問回答/）はコーパスから除外する（run_pipeline.pyと同一規則）
         exclude_dirs=[args.questions.parent],
         use_hybrid_search=args.hybrid_search,
