@@ -10,9 +10,9 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from src.models import CRAGLabel
+from src.models import CRAGLabel, JudgeResult
 
 LABELS = tuple(label.value for label in CRAGLabel)
 _FILE_RE = re.compile(r"judge_calibration_(\d+)\.json$")
@@ -80,6 +80,21 @@ class RegressionMetrics:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class RejudgeResult:
+    rows: tuple[dict[str, Any], ...]
+    metrics: RegressionMetrics
+
+
+class JudgeScorer(Protocol):
+    def score(
+        self,
+        question: str,
+        generated_answer: str,
+        reference_or_context: str,
+    ) -> JudgeResult: ...
 
 
 def _normalise(value: str) -> str:
@@ -242,4 +257,32 @@ def evaluate_regression(
         ),
         mean_absolute_error=absolute_errors / total if total else 0.0,
         confusion_matrix=matrix,
+    )
+
+
+def rejudge_regression(
+    rows: Sequence[RegressionRecord], judge: JudgeScorer
+) -> RejudgeResult:
+    """固定回帰レコードをjudgeで再採点し、新ラベル基準の指標を返す。"""
+    rejudged: list[dict[str, Any]] = []
+    metric_rows: list[dict[str, str]] = []
+    for row in rows:
+        judged = judge.score(
+            question=row.question,
+            generated_answer=row.answer,
+            reference_or_context=row.ground_truth,
+        )
+        payload = row.to_dict()
+        payload["new_local_label"] = judged.label.value
+        payload["new_local_reason"] = judged.reason
+        rejudged.append(payload)
+        metric_rows.append(
+            {
+                "local_label": judged.label.value,
+                "official_label": row.official_label,
+            }
+        )
+    return RejudgeResult(
+        rows=tuple(rejudged),
+        metrics=evaluate_regression(metric_rows),
     )

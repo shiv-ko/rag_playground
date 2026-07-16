@@ -6,9 +6,12 @@ from pathlib import Path
 import pytest
 
 from src.evaluator.judge_regression import (
+    RegressionRecord,
     build_regression_dataset,
     evaluate_regression,
+    rejudge_regression,
 )
+from src.models import CRAGLabel, JudgeResult
 
 
 def _write_calibration(
@@ -145,3 +148,48 @@ def test_rejects_unknown_crag_label(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="official_label"):
         build_regression_dataset(tmp_path, dev_file_count=1, holdout_file_count=0)
+
+
+def test_rejudge_regression_uses_ground_truth_and_new_labels_for_metrics() -> None:
+    records = (
+        RegressionRecord(
+            question_id="1", question="q1", answer="a1", ground_truth="gt1",
+            local_label="Missing", official_label="Perfect",
+            official_labels=("Perfect",), official_label_unstable=False,
+            duplicate_count=1, source_files=("dev1.json",),
+        ),
+        RegressionRecord(
+            question_id="2", question="q2", answer="a2", ground_truth="gt2",
+            local_label="Missing", official_label="Incorrect",
+            official_labels=("Incorrect",), official_label_unstable=False,
+            duplicate_count=1, source_files=("dev2.json",),
+        ),
+    )
+
+    class FakeJudge:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str]] = []
+
+        def score(
+            self, question: str, generated_answer: str, reference_or_context: str
+        ) -> JudgeResult:
+            self.calls.append((question, generated_answer, reference_or_context))
+            label = (
+                CRAGLabel.PERFECT
+                if generated_answer == "a1"
+                else CRAGLabel.INCORRECT
+            )
+            return JudgeResult(label=label, reason=f"reason-{generated_answer}")
+
+    judge = FakeJudge()
+    result = rejudge_regression(records, judge)
+
+    assert judge.calls == [("q1", "a1", "gt1"), ("q2", "a2", "gt2")]
+    assert [row["new_local_label"] for row in result.rows] == ["Perfect", "Incorrect"]
+    assert [row["new_local_reason"] for row in result.rows] == [
+        "reason-a1",
+        "reason-a2",
+    ]
+    assert result.metrics.agreement == pytest.approx(1.0)
+    assert result.metrics.incorrect_recall == pytest.approx(1.0)
+    assert result.metrics.mean_absolute_error == pytest.approx(0.0)
