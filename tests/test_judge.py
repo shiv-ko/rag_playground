@@ -248,6 +248,13 @@ class TestLocalJudgeScore:
         assert "比較基準で裏付けられない事実主張" in judge.prompt
         assert "Perfectにしない" in judge.prompt
 
+    def test_score_prompt_prioritizes_literal_mismatch_over_acceptable(self) -> None:
+        judge = RecordingJudge('{"label": "Incorrect", "reason": "言い換え"}')
+
+        judge.score("短い値を答える質問", "意味が近い別表現", "基準値")
+
+        assert "ルール4を優先し、Acceptableにしない" in judge.prompt
+
     def test_score_returns_perfect_when_llm_says_perfect(self) -> None:
         judge = FakeJudge('{"label": "Perfect", "reason": "非常に正確"}')
         result = judge.score(
