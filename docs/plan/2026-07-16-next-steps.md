@@ -44,9 +44,10 @@
 
 ### 3. 3時間制限の本番実測（ハード制約を先に確認）
 
-- [ ] hybrid検索ONで、test 100問のcold cache単発 / warm cache単発 / 標準提出手順N=3全体を実測する。
-- [ ] parsing・indexing・generation・多数決/出力の区間別時間と、キャッシュ・モデル名・実行条件を記録する。
-- [ ] 採用条件: N=3全体が3時間以内。安全余裕として2時間以内を目標とし、超える場合は精度を変えないキャッシュ・並列化から改善する。
+- [x] hybrid検索ONでtest 100問を実測。coldはindexだけで3時間33分を超えたためgenerationを中止、warm単発は3分9.47秒、標準N=3は7分25.50秒。（2026-07-16）
+- [x] 区間別実測: cold parse 14秒 / embedding index 3時間32分49秒。warm index 66秒 / generation 120.5秒。N=3はindex 65秒 / run約121秒・125秒・約135秒（多数決/出力込み）。（2026-07-16）
+- [x] 条件記録: macOS 26.5.2 arm64、hybrid ON、`cl-nagoya/ruri-base`、generator `claude-sonnet-5`、top-k 5、concurrent 5、threshold 0.4、test 100問。（2026-07-16）
+- [ ] 採用条件: warm N=3は3時間/2時間目標を大幅クリア。一方、未知データを想定したcold indexがgeneration前に3時間超過したため未達。再現性検証より先に、埋め込み初回構築の高速化または再利用可能な事前キャッシュ設計を行う。
 
 ### 4. 再現性検証
 
