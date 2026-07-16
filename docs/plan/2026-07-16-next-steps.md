@@ -11,8 +11,7 @@
 - [x] ユーザ承認後、`q17_filescope_valid_r1〜r3`を実行。local mean 0.6167 / 0.6333 / 0.6167、Q17は3run共通で「未連絡」。（2026-07-16）
 - [x] r1をofficial較正。official mean **0.8000**、Q17はPerfect、直前ハイブリッド版0.7333から+0.0667。official Incorrectは既知Q6のみで新規0。**採用確定**。（2026-07-16）
 - [x] test predictions.csvをN=3で再生成し、`submission_20260716_q17-filescope3run.zip`を作成・形式検証。（2026-07-16、`2615251`で提出生成の埋め込みキャッシュ配線漏れも修正）
-- [ ] `submission_20260716_q17-filescope3run.zip`をSIGNATEに手動提出し、LBを記録する。
-- [ ] API送信を承認しない場合は、検索recall改善までを根拠に実装を維持し、Phase 5のローカル作業へ進む。
+- [x] `submission_20260716_q17-filescope3run.zip`をSIGNATEに提出。LB **0.23333333333333334（=7/30）**、前回0.2から+1/30で過去最高更新。（2026-07-16）
 
 ## 較正結果からの新規発見（2026-07-16、`judge_calibration_1784145455.json`）
 
@@ -24,11 +23,11 @@
 
 判断原則は strategy.md（守り先行 / 該当問数×改善確率×得点差 / 1実験1変更）に従う。
 
-### 1. 【最優先・残タスク】提出物の作成
+### 1. 【完了】提出物の作成・LB確認
 
-- [ ] `make_predictions.py --runs 3` でtest predictions.csvを再生成し、前回提出とのdiffで「新規の危険な誤答パターンがない」ことを確認する。
-- [ ] `submission_20260716_q17filescope3run.zip` を作成する（SIGNATE提出はユーザー判断）。
-- [ ] LB結果を `plan_0703.md` §1.1.1に記録する。
+- [x] `make_predictions.py --runs 3` でtest predictions.csvを再生成し、前回提出とのdiff 9問を確認。
+- [x] `submission_20260716_q17-filescope3run.zip` を作成・提出。
+- [x] LB **0.23333333333333334（=7/30）**を `plan_0703.md` §1.1.1に記録。
 
 **期待値**: testにもQ17類似の「拡張子なし名指しファイル」問があればLB +1/30以上。valid officialは0.7333→0.8000で過去最高。
 
