@@ -174,6 +174,22 @@ class TestLocalJudgeScore:
         assert "具体的な回答がある場合はMissingにしない" in judge.prompt
         assert "比較基準に照らして誤りならIncorrect" in judge.prompt
 
+    def test_score_prompt_requires_literal_value_for_short_answer(self) -> None:
+        judge = RecordingJudge('{"label": "Incorrect", "reason": "言い換え"}')
+
+        judge.score("短い値を答える質問", "意味が近い別表現", "基準値")
+
+        assert "比較基準の主要な文字列・数値をそのまま保持" in judge.prompt
+        assert "含まない同義の言い換えだけならIncorrect" in judge.prompt
+
+    def test_score_prompt_penalizes_unsupported_extra_claims(self) -> None:
+        judge = RecordingJudge('{"label": "Acceptable", "reason": "余分"}')
+
+        judge.score("短い値を答える質問", "基準値と長い説明", "基準値")
+
+        assert "比較基準で裏付けられない事実主張" in judge.prompt
+        assert "Perfectにしない" in judge.prompt
+
     def test_score_returns_perfect_when_llm_says_perfect(self) -> None:
         judge = FakeJudge('{"label": "Perfect", "reason": "非常に正確"}')
         result = judge.score(
