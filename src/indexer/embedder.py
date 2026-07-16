@@ -111,6 +111,15 @@ class CachedEmbedder:
                 self._cache[text_hash] = np.asarray(vec, dtype=np.float32)
         return np.stack([self._cache[h] for h in hashes])
 
+    def pending_texts(self, texts: list[str]) -> list[str]:
+        """キャッシュ未登録のユニークテキストを入力順で返す（encode所要時間見積もり用）。"""
+        pending: dict[str, str] = {}
+        for text in texts:
+            text_hash = _hash_text(text)
+            if text_hash not in self._cache and text_hash not in pending:
+                pending[text_hash] = text
+        return list(pending.values())
+
     def embed_query(self, text: str) -> np.ndarray:
         return self._inner.embed_query(text)
 

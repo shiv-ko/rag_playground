@@ -143,6 +143,121 @@ def test_pipeline_default_no_hybrid_search(tmp_path: Path) -> None:
     assert isinstance(pipeline.retriever._global_store, KeywordStore)
 
 
+def test_pipeline_build_index_falls_back_to_bm25_when_embedding_over_budget(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """embedding見積もりが予算超過なら、build_indexはBM25単体retrieverへ退避する
+    （cold indexが3時間制限を超えて全問スコア喪失になるのを防ぐ）。"""
+    from src.indexer.embedding_budget import EmbeddingBudgetDecision
+    from src.indexer.keyword_store import KeywordStore
+    from src.orchestrator.pipeline import Pipeline
+
+    monkeypatch.setattr(
+        "src.indexer.embedding_budget.evaluate_embedding_budget",
+        lambda embedder, texts, **kwargs: EmbeddingBudgetDecision(
+            use_vectors=False,
+            pending_count=len(texts),
+            estimated_seconds=99999.0,
+            reason="estimated_over_budget",
+        ),
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, use_hybrid_search=True)
+    (tmp_path / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+    pipeline.build_index()
+
+    assert pipeline.embedder is None
+    assert isinstance(pipeline.retriever._global_store, KeywordStore)
+    # 退避後もBM25で検索できる（インデックスは失われない）
+    results = pipeline.retriever.search("宿泊費の上限", top_k=3)
+    assert any("15,000円" in r.document.text for r in results)
+
+
+def test_pipeline_build_index_flushes_probe_cache_before_bm25_fallback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """退避時もプローブで計算済みのembeddingはディスクキャッシュへ永続化する
+    （リトライ時に高コストなprobe計算をやり直さないため）。"""
+    import numpy as np
+
+    from src.indexer.embedder import CachedEmbedder
+    from src.indexer.embedding_budget import EmbeddingBudgetDecision
+    from src.orchestrator.pipeline import Pipeline
+    from src.retriever.project_scoped_retriever import ProjectScopedRetriever
+
+    class _FakeEmbedder:
+        def embed_documents(self, texts):
+            return np.zeros((len(texts), 2), dtype=np.float32)
+
+        def embed_query(self, text):
+            return np.zeros(2, dtype=np.float32)
+
+    def _probing_evaluate(embedder, texts, **kwargs):
+        embedder.embed_documents(texts[:1])  # 実際のprobeと同様にキャッシュへ書き込む
+        return EmbeddingBudgetDecision(
+            use_vectors=False,
+            pending_count=len(texts),
+            estimated_seconds=99999.0,
+            reason="estimated_over_budget",
+        )
+
+    monkeypatch.setattr(
+        "src.indexer.embedding_budget.evaluate_embedding_budget", _probing_evaluate
+    )
+
+    cache_path = tmp_path / "cache" / "emb.pkl"
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, use_hybrid_search=True)
+    pipeline.embedder = CachedEmbedder(_FakeEmbedder(), cache_path=cache_path)
+    pipeline.retriever = ProjectScopedRetriever(embedder=pipeline.embedder)
+
+    (tmp_path / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+    pipeline.build_index()
+
+    assert pipeline.embedder is None
+    assert cache_path.exists()
+
+
+def test_pipeline_build_index_keeps_hybrid_when_within_budget(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """予算内ならハイブリッド検索を維持する。"""
+    import numpy as np
+
+    from src.indexer.embedder import CachedEmbedder
+    from src.indexer.embedding_budget import EmbeddingBudgetDecision
+    from src.orchestrator.pipeline import Pipeline
+    from src.retriever.hybrid_retriever import HybridRetriever
+    from src.retriever.project_scoped_retriever import ProjectScopedRetriever
+
+    monkeypatch.setattr(
+        "src.indexer.embedding_budget.evaluate_embedding_budget",
+        lambda embedder, texts, **kwargs: EmbeddingBudgetDecision(
+            use_vectors=True,
+            pending_count=len(texts),
+            estimated_seconds=1.0,
+            reason="within_budget",
+        ),
+    )
+
+    class _FakeEmbedder:
+        def embed_documents(self, texts):
+            return np.zeros((len(texts), 2), dtype=np.float32)
+
+        def embed_query(self, text):
+            return np.zeros(2, dtype=np.float32)
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, use_hybrid_search=True)
+    # 実モデルをロードしないようフェイクに差し替え、retrieverも同じembedderで再構築する
+    pipeline.embedder = CachedEmbedder(_FakeEmbedder())
+    pipeline.retriever = ProjectScopedRetriever(embedder=pipeline.embedder)
+
+    (tmp_path / "a.txt").write_text("宿泊費の上限は15,000円です。", encoding="utf-8")
+    pipeline.build_index()
+
+    assert pipeline.embedder is not None
+    assert isinstance(pipeline.retriever._global_store, HybridRetriever)
+
+
 def test_pipeline_routes_analysis_json_before_normal_retrieval(tmp_path: Path, monkeypatch) -> None:
     import json
 

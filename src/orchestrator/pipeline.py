@@ -197,6 +197,26 @@ class Pipeline:
         else:
             docs = self.dispatcher.parse_directory(self.data_dir, exclude_dirs=self.exclude_dirs)
         self.logger.info(f"  {len(docs)} チャンク取得")
+        if self.embedder is not None:
+            from src.indexer import embedding_budget
+
+            decision = embedding_budget.evaluate_embedding_budget(
+                self.embedder, [d.text for d in docs]
+            )
+            if not decision.use_vectors:
+                # embeddingは途中で安全に中断できないため、encode開始前に退避する
+                # （cold indexが本番3時間制限を超えると全問スコア喪失になる）。
+                self.logger.warning(
+                    "embedding時間予算の見積もり超過のためBM25単体検索へ退避: "
+                    f"未処理={decision.pending_count}件, "
+                    f"推定={decision.estimated_seconds}秒, 理由={decision.reason}"
+                )
+                # probeで計算済みのembeddingはリトライ時に再利用できるよう永続化してから破棄する
+                self.embedder.flush()
+                self.embedder = None
+                self.retriever = ProjectScopedRetriever(
+                    project_aliases=self.project_aliases, embedder=None
+                )
         self.retriever.add(docs)
         if self.embedder is not None:
             self.embedder.flush()

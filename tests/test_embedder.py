@@ -191,6 +191,17 @@ def test_cached_embedder_persists_to_disk(tmp_path):
     assert inner2.calls == []  # 全てキャッシュヒットのためinner2は一度も呼ばれない
 
 
+def test_cached_embedder_pending_texts_excludes_cached_and_duplicates():
+    """pending_texts()はキャッシュ未登録のユニークテキストのみを入力順で返す。"""
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner)
+    cached.embed_documents(["文書A"])
+
+    pending = cached.pending_texts(["文書A", "文書B", "文書B", "文書C"])
+
+    assert pending == ["文書B", "文書C"]
+
+
 def test_cached_embedder_embed_query_passthrough():
     inner = _CountingEmbedder()
     cached = CachedEmbedder(inner)
