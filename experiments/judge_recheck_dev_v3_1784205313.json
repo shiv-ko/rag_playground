@@ -1,0 +1,1092 @@
+{
+  "schema_version": 1,
+  "split": "dev",
+  "source_files": [
+    "judge_calibration_1783125320.json",
+    "judge_calibration_1783140909.json",
+    "judge_calibration_1783143105.json",
+    "judge_calibration_1783159723.json",
+    "judge_calibration_1783163986.json",
+    "judge_calibration_1783169170.json",
+    "judge_calibration_1783177178.json",
+    "judge_calibration_1783182281.json",
+    "judge_calibration_1783236763.json",
+    "judge_calibration_1783293004.json",
+    "judge_calibration_1783341078.json",
+    "judge_calibration_1783520472.json",
+    "judge_calibration_1783521863.json",
+    "judge_calibration_1783603984.json",
+    "judge_calibration_1783777064.json"
+  ],
+  "metrics": {
+    "total": 40,
+    "agreement": 0.775,
+    "incorrect_recall": 0.25,
+    "mean_absolute_error": 0.3,
+    "confusion_matrix": {
+      "Perfect": {
+        "Perfect": 12,
+        "Acceptable": 1,
+        "Missing": 1,
+        "Incorrect": 2
+      },
+      "Acceptable": {
+        "Perfect": 0,
+        "Acceptable": 0,
+        "Missing": 0,
+        "Incorrect": 3
+      },
+      "Missing": {
+        "Perfect": 1,
+        "Acceptable": 0,
+        "Missing": 17,
+        "Incorrect": 1
+      },
+      "Incorrect": {
+        "Perfect": 0,
+        "Acceptable": 0,
+        "Missing": 0,
+        "Incorrect": 2
+      }
+    }
+  },
+  "stable_metrics": {
+    "total": 38,
+    "agreement": 0.8157894736842105,
+    "incorrect_recall": 0.2857142857142857,
+    "mean_absolute_error": 0.23684210526315788,
+    "confusion_matrix": {
+      "Perfect": {
+        "Perfect": 12,
+        "Acceptable": 1,
+        "Missing": 0,
+        "Incorrect": 1
+      },
+      "Acceptable": {
+        "Perfect": 0,
+        "Acceptable": 0,
+        "Missing": 0,
+        "Incorrect": 3
+      },
+      "Missing": {
+        "Perfect": 1,
+        "Acceptable": 0,
+        "Missing": 17,
+        "Incorrect": 1
+      },
+      "Incorrect": {
+        "Perfect": 0,
+        "Acceptable": 0,
+        "Missing": 0,
+        "Incorrect": 2
+      }
+    }
+  },
+  "unstable_count": 2,
+  "rows": [
+    {
+      "question_id": "1",
+      "question": "KSSのfigure_06.pngにおいて、dayによる件数推移とあわせて表示されているTG平均が最も低い日は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "20日",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 15,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が見つからないとしており、具体的な回答が提供されていないためMissingと判定する。"
+    },
+    {
+      "question_id": "4",
+      "question": "青嶺不動産アセットマネジメントの modeling.py において、前処理器の sparse_output が False になる model_type は何ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "hist_gradient_boosting",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 15,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が具体的な情報を提示せず、わからないと回答拒否しているため、正解であるhist_gradient_boostingへの言及がない。"
+    },
+    {
+      "question_id": "5",
+      "question": "白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI化はどの分類に記載されていますか。",
+      "answer": "「対象外（契約明記）」の分類に記載されています。API化は「本番システム実装 / API化」として、外部データ取得や監視基盤構築とともに契約上の対象外項目に挙げられています。",
+      "ground_truth": "対象外（契約明記）",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "判定解析エラー"
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件を教えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Gender=Male、disease=1、Age=68で抽出されたデータに対する平均 / ALP",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 3,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わからないという回答拒否に該当するため。"
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "見込工数170時間の4分の3は127.5時間です。工数丸め単位は30分のため127.5時間（=127時間30分）はそのまま計上可能で、実績工数127.5時間×時間単価25,000円＝税抜3,187,500円、消費税10%で318,750円、税込3,506,250円となります。見込金額（税込）4,675,000円との差額は、4,675,000円－3,506,250円＝1,168,750円少なくなります。",
+      "ground_truth": "1,168,750円",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "最終的な差額が正解の1,168,750円と完全に一致しており、計算過程も整合的で虚偽情報は見当たらない。"
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "QAレビューア：池田 直哉 → 小林 直樹",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 10,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答は具体的な変更箇所を示さず、情報が見つからなかったという回答拒否に留まっている。比較基準では『QAレビューア：池田 直哉→小林 直樹』という具体的な変更内容が示されているが、生成回答はこれに全く言及していない。"
+    },
+    {
+      "question_id": "11",
+      "question": "東都人材プラットフォームのtrain.xlsxにおいて、trainシートでフィルターで抽出されている条件を教えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Gender=Male、Country=India、target=2",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 3,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わかりませんという趣旨の回答拒否となっているため。"
+    },
+    {
+      "question_id": "12",
+      "question": "京橋信用ソリューションズの契約金額（税込）はいくらですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "5,775,000円",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 12,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が見つからないという具体的な回答拒否であり、正解の情報も含まれていないためMissingと判定する。"
+    },
+    {
+      "question_id": "15",
+      "question": "中間報告会または中間レビューが2025年7月1日以前に実施された案件を、主略称ですべて挙げてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "MINAMINO、SHR、AYM",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 11,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が具体的な情報を提供せず、正解であるMINAMINO、SHR、AYMを挙げていない。回答拒否に該当するためMissingと判定。"
+    },
+    {
+      "question_id": "16",
+      "question": "MINAMINOのPLにおいて、M01当日を1日目として数えた場合、M01の日からFR実施までの日数は何日ですか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "43日",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 10,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わからないという回答拒否に該当するため。"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "pdaysの値-1は「前回未接触」を示す特別値として扱われています。",
+      "ground_truth": "未連絡",
+      "local_label": "Missing",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "判定解析エラー"
+    },
+    {
+      "question_id": "18",
+      "question": "東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載されている章番号を数字で答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "3",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が具体的な情報を示さず「見つけることができませんでした」としており、正解の「3」が示されていないため、具体的な回答がないMissingに該当する。"
+    },
+    {
+      "question_id": "20",
+      "question": "AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。",
+      "answer": "探索的分析・仮説整理フェーズに一致するタスクIDは、T09、T10、T11、T12の4つです。",
+      "ground_truth": "T09、T10、T11、T12",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "比較基準のタスクID(T09、T10、T11、T12)すべてを正確に含んでおり、虚偽の情報も含まれていない。"
+    },
+    {
+      "question_id": "21",
+      "question": "青葉バイオメディカル機器のtrain.xlsxのPivotシートにおいて、平均月収が最も高い層の抽出条件を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Attrition = No、Gender = Female、MaritalStatus = Single、EducationField = Human Resources",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 7,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わかりませんという趣旨の回答拒否となっているため。"
+    },
+    {
+      "question_id": "22",
+      "question": "AOSHIOの NB01_eda.ipynbにおいて、観察結果サマリで出力されている「TGとの相関 上位5」の中で、相関係数が最も小さいカラム名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "season",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 15,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わかりませんという回答拒否のため。"
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "見込金額（税込）: 4,675,000 JPY",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 2,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答は具体的な内容を示さず、資料から回答を見つけられなかったとしており、比較基準にある「見込金額（税込）: 4,675,000 JPY」という具体的情報を提供していないため、Missingと判定した。"
+    },
+    {
+      "question_id": "24",
+      "question": "白峰信用リスク評価の 01_eda.ipynb にある特徴量相関ヒートマップの図で可視化されている特徴量のうち、classとの相関係数の絶対値が最も小さい特徴量名を答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "Attr7",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 15,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が具体的な特徴量名を示さず、情報が見つからないとして回答を拒否しているため、Missingと判定される。"
+    },
+    {
+      "question_id": "25",
+      "question": "東都人材プラットフォームの提案書P7において、赤で強調されている箇所の文字列を抜き出してください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "1. データ理解・EDA",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 5,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が「見つけることができませんでした」という具体的回答なしの内容であり、正解の文字列「1. データ理解・EDA」を提示していないため、Missingと判定する。"
+    },
+    {
+      "question_id": "26",
+      "question": "青葉バイオメディカル機器のtrain.csvにおいて、EducationFieldがMarketingかつMonthlyIncomeが10000より大きいデータを抽出し、Ageの平均値を計算してください。その平均値に最も近い年齢のidをすべて答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "train_0077、train_0216、train_0242、train_0722",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 5,
+      "source_files": [
+        "judge_calibration_1783125320.json",
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わからないという回答拒否となっているため。"
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "中間報告のMacro F1: 0.7319904178115971、最終分析出力(metrics.json相当)のMacro F1: 0.7422917255604067。改善幅は 0.7422917255604067 − 0.7319904178115971 = 0.010301（小数第6位まで）です。",
+      "ground_truth": "0.010301",
+      "local_label": "Missing",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "改善幅0.010301が比較基準と完全一致しており、計算過程も示されているため正確な回答と判断できる。"
+    },
+    {
+      "question_id": "28",
+      "question": "蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように判定していますか。",
+      "answer": "参考文書に含まれる分析コード（01_eda.ipynb）では、CAT（カテゴリ列）は dtype のみで判定されており、ユニーク数による条件は使用されていません。具体的には、各列の dtype が 'object' または 'category' である場合にカテゴリ列として分類しています。ユニーク数（nunique）は別途『列ごとのユニーク数』として表示されるのみで、CAT判定の条件には組み込まれていません。",
+      "ground_truth": "object、string、categoricaldtype の列を候補とし、欠損を除いたユニーク数が50未満ならカテゴリ特徴量として採用している。",
+      "local_label": "Incorrect",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Incorrect",
+      "new_local_reason": "正解では object/string/categorical dtype かつユニーク数50未満という条件でCATを判定しているが、生成された回答はユニーク数の条件は使用されていないと明確に否定しており、比較基準と矛盾する誤った内容になっている。"
+    },
+    {
+      "question_id": "29",
+      "question": "蒼樹会 みなみ野女性医療センターの契約書第8条において、本契約終了後に秘密保持義務が存続する期間は何年間ですか。",
+      "answer": "第8条(秘密保持)の規定は、本契約終了後3年間存続します。",
+      "ground_truth": "3年間",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783125320.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "比較基準の「3年間」を正確に含んでおり、質問内容にも合致する回答である。"
+    },
+    {
+      "question_id": "5",
+      "question": "白峰信用リスク評価の最終報告書において、「プロジェクト目的とスコープ」内でAPI化はどの分類に記載されていますか。",
+      "answer": "「対象外（契約明記）」に記載されています。",
+      "ground_truth": "対象外（契約明記）",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "生成された回答は比較基準の文字列「対象外（契約明記）」を正確に含んでおり、質問に対して正確に回答している。"
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "最終請求金額（税込）は見込金額（税込）より1,168,750円少なくなります。\n\n計算根拠：見込工数170時間の4分の3は127.5時間（30分単位のため端数切り上げ不要）。実績工数127.5時間×時間単価25,000円＝税抜3,187,500円、消費税10%＝318,750円、税込3,506,250円となります。見込金額（税込）4,675,000円との差額は4,675,000円－3,506,250円＝1,168,750円です。",
+      "ground_truth": "1,168,750円",
+      "local_label": "Missing",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "最終回答の差額1,168,750円が比較基準と完全一致しており、計算過程も整合的で虚偽情報は含まれない。"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "pdays=-1は「前回未接触」を示す特別値です。乙はこれを前回未接触を表すフラグとして扱い、数値とフラグの両面から有効性を検証しています。",
+      "ground_truth": "未連絡",
+      "local_label": "Missing",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Acceptable",
+      "new_local_reason": "正解は「未連絡」であり、生成された回答の「前回未接触」は同義の言い換えで意味的には一致している。ただし基準の主要語句「未連絡」をそのまま保持していない点と、乙の検証方法についての追加説明が比較基準では裏付けられない情報である点が軽微な不完全さとなる。"
+    },
+    {
+      "question_id": "18",
+      "question": "東都のCTにおいて、全14章のうち「本業務の対象データ、前提および制約」が記載されている章番号を数字で答えてください。",
+      "answer": "3章です。「3. 業務範囲」の中で本業務の内容を列挙した後、続けて「本業務の対象データ、前提および制約は以下のとおりとする。」と記載されており、これは第3章「業務範囲」に含まれる内容です。",
+      "ground_truth": "3",
+      "local_label": "Perfect",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "回答は正解である「3」を明確に含んでおり、章番号を正しく答えている。追加の説明は文書内の記載として妥当であり、虚偽情報とは判断できない。"
+    },
+    {
+      "question_id": "20",
+      "question": "AYMのPLにおいて、探索的分析・仮説整理フェーズに一致するタスクIDをすべて挙げてください。",
+      "answer": "T09、T10、T11、T12の4つです。",
+      "ground_truth": "T09、T10、T11、T12",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "比較基準のタスクID T09、T10、T11、T12がすべて正確に含まれており、追加情報も誤りではない。"
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "改善幅は約0.010301です（0.7422917255604067 − 0.7319904178115971 ＝ 0.0103013077488096）。",
+      "ground_truth": "0.010301",
+      "local_label": "Missing",
+      "official_label": "Acceptable",
+      "official_labels": [
+        "Acceptable"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783140909.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "改善幅0.010301という主要な数値が正解と完全一致しており、小数第6位まで正しく回答されている。追加の計算過程も整合的で誤りがない。"
+    },
+    {
+      "question_id": "28",
+      "question": "蒼泉会の分析コードにおいて、CATは dtype とユニーク数の条件でどのように判定していますか。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "object、string、categoricaldtype の列を候補とし、欠損を除いたユニーク数が50未満ならカテゴリ特徴量として採用している。",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 14,
+      "source_files": [
+        "judge_calibration_1783140909.json",
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json",
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "回答が「見つけることができませんでした」という具体的内容のない回答拒否のため、Missingに該当する。"
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "見込金額（税込）, :,  4,675,000 JPY",
+      "ground_truth": "見込金額（税込）: 4,675,000 JPY",
+      "local_label": "Missing",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect",
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 2,
+      "source_files": [
+        "judge_calibration_1783143105.json",
+        "judge_calibration_1783163986.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "生成された回答は比較基準と同じ内容(見込金額（税込）: 4,675,000 JPY)を含んでおり、区切り文字の表記が異なるだけで実質的に完全一致している。"
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件を教えてください。",
+      "answer": "Gender=Male, disease=1, Age=68",
+      "ground_truth": "Gender=Male、disease=1、Age=68で抽出されたデータに対する平均 / ALP",
+      "local_label": "Perfect",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect",
+        "Incorrect",
+        "Missing",
+        "Incorrect"
+      ],
+      "official_label_unstable": true,
+      "duplicate_count": 4,
+      "source_files": [
+        "judge_calibration_1783159723.json",
+        "judge_calibration_1783163986.json",
+        "judge_calibration_1783169170.json",
+        "judge_calibration_1783177178.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "比較基準の抽出条件（Gender=Male、disease=1、Age=68）と完全に一致している。"
+    },
+    {
+      "question_id": "23",
+      "question": "AOSHIOのM02資料（docx）において、黄色でハイライトされている部分をすべて抜き出してください。",
+      "answer": "見込金額（税込）,:, 4,675,000 JPY",
+      "ground_truth": "見込金額（税込）: 4,675,000 JPY",
+      "local_label": "Acceptable",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783159723.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "生成された回答は句読点の区切り方に多少の違いはあるものの、比較基準の文字列「見込金額(税込): 4,675,000 JPY」の内容をそのまま保持しており、実質的に完全一致している。"
+    },
+    {
+      "question_id": "6",
+      "question": "恒一会 かえで総合病院のtrain.xlsx内の PivotTable で集計されている表から、ALPの平均が最も高いものの抽出条件を教えてください。",
+      "answer": "Gender = Male、disease = 1、Age = 68",
+      "ground_truth": "Gender=Male、disease=1、Age=68で抽出されたデータに対する平均 / ALP",
+      "local_label": "Perfect",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Incorrect",
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": true,
+      "duplicate_count": 7,
+      "source_files": [
+        "judge_calibration_1783182281.json",
+        "judge_calibration_1783236763.json",
+        "judge_calibration_1783293004.json",
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "正解と同じ抽出条件(Gender=Male、disease=1、Age=68)を正確に提示している。"
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "QAレビューア担当者:池田 直哉 → 小林 直樹",
+      "ground_truth": "QAレビューア：池田 直哉 → 小林 直樹",
+      "local_label": "Acceptable",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect",
+        "Perfect",
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 3,
+      "source_files": [
+        "judge_calibration_1783341078.json",
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "「QAレビューア」を「QAレビューア担当者」と表記した点は軽微な言い換えだが、変更前後の内容（池田 直哉 → 小林 直樹）は比較基準と完全に一致しており、実質的な誤りはないためPerfectと判定した。"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "前回未接触(未連絡)を示す特別値",
+      "ground_truth": "未連絡",
+      "local_label": "Perfect",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783520472.json"
+      ],
+      "new_local_label": "Acceptable",
+      "new_local_reason": "正解の「未連絡」という主要語句を含んでおり、意味的にも一致しているが、「前回未接触」「特別値」という説明を追加している点で軽微な補足が加わっているためPerfectではなくAcceptableとする。"
+    },
+    {
+      "question_id": "27",
+      "question": "蒼泉会 ひがし丘総合病院案件において、中間報告資料に記載されたMacro F1スコアの詳細値と、最終分析出力metrics.jsonに記録されているMacro F1スコアの詳細値を用いて、改善幅を小数第6位まで答えてください。",
+      "answer": "提供された資料からは、ご質問に対する回答を見つけることができませんでした。",
+      "ground_truth": "0.010301",
+      "local_label": "Missing",
+      "official_label": "Missing",
+      "official_labels": [
+        "Missing",
+        "Missing",
+        "Missing",
+        "Missing"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 4,
+      "source_files": [
+        "judge_calibration_1783520472.json",
+        "judge_calibration_1783521863.json",
+        "judge_calibration_1783603984.json",
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Missing",
+      "new_local_reason": "具体的な回答がなく、わかりませんという趣旨の回答であるため、Missingと判定する。"
+    },
+    {
+      "question_id": "8",
+      "question": "蒼泉会 ひがし丘総合病院の契約条件において、仮に実績工数が見込工数の4分の3だった場合、最終請求金額（税込）は見込金額（税込）よりいくら少なくなりますか。",
+      "answer": "¥1,168,750",
+      "ground_truth": "1,168,750円",
+      "local_label": "Perfect",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783521863.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "比較基準の1,168,750円と表記形式(¥)が異なるだけで、数値は完全に一致している。"
+    },
+    {
+      "question_id": "3",
+      "question": "全案件で支払った税込金額をもとに、消費税額の総額を計算してください。",
+      "answer": "2,045,000円",
+      "ground_truth": "4,394,250円",
+      "local_label": "Incorrect",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783603984.json"
+      ],
+      "new_local_label": "Incorrect",
+      "new_local_reason": "正解の4,394,250円と生成された回答の2,045,000円が大きく異なり、数値が一致しないため誤りと判断される。"
+    },
+    {
+      "question_id": "9",
+      "question": "青嶺不動産アセットマネジメントの提案書について、oldフォルダ内の旧版と提案フォルダ直下の最新版を比較し、変更された箇所を変更前と変更後で答えてください。",
+      "answer": "QAレビューア担当者:池田 直哉→小林 直樹",
+      "ground_truth": "QAレビューア：池田 直哉 → 小林 直樹",
+      "local_label": "Acceptable",
+      "official_label": "Perfect",
+      "official_labels": [
+        "Perfect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783603984.json"
+      ],
+      "new_local_label": "Perfect",
+      "new_local_reason": "QAレビューアの担当者が池田直哉から小林直樹に変更されたという内容が正確に一致しており、表記の軽微な違い(「担当者」の追加、矢印記号)以外は主要な文字列・数値がそのまま保持されている。"
+    },
+    {
+      "question_id": "17",
+      "question": "京橋信用ソリューションズのカラム説明において、カラム名pdaysの値-1は何を表していますか。",
+      "answer": "前回未接触（顧客に一度も接触していないこと）を示す特別値",
+      "ground_truth": "未連絡",
+      "local_label": "Missing",
+      "official_label": "Incorrect",
+      "official_labels": [
+        "Incorrect"
+      ],
+      "official_label_unstable": false,
+      "duplicate_count": 1,
+      "source_files": [
+        "judge_calibration_1783777064.json"
+      ],
+      "new_local_label": "Acceptable",
+      "new_local_reason": "正解「未連絡」と概ね同義の内容（未接触・未連絡を意味する特別値）を示しており、意味的に一致しているが、比較基準の「未連絡」という表現をそのまま保持せず言い換えているため、完全一致とは言えずAcceptableとする。"
+    }
+  ]
+}

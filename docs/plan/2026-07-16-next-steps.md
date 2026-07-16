@@ -57,10 +57,12 @@
 
 ### 5. local judge較正の改善（実験サイクルの意思決定品質）
 
-- [ ] `judge_calibration_*.json` 20件を「質問×回答×GT」で重複除去し、official判定の回帰データを作る。これは評価専用とし、回答生成コードからは参照しない。
-- [ ] 古い15較正を開発セット、直近5較正をholdoutとして固定し、holdoutを見ながらプロンプト調整しない。officialの同一回答への判定ゆらぎは別途フラグ化する。
-- [ ] GT完全一致をMissing/Incorrectにする誤判定を中心にlocal judgeプロンプトを改善する。API不要のオフライン分析から着手する。
-- [ ] 採用条件: holdout agreement 85%以上に加え、official Incorrectの再現率、mean絶対誤差、混同行列が現行より悪化しない。改善後は前向きにのみ適用する。
+- [x] `judge_calibration_*.json` を「質問×回答×GT」で重複除去し、official判定の回帰データを作成（`cb88bb4`、`build_regression_dataset`）。評価専用、回答生成コードから未参照。
+- [x] 固定dev/holdoutを`FIXED_DEV_FILE_NAMES`/`FIXED_HOLDOUT_FILE_NAMES`で分離し、holdoutを見ずにdevだけでプロンプト調整。officialの同一回答への判定ゆらぎは`official_label_unstable`でフラグ化・`stable_metrics`から除外（`e958100`）。（2026-07-16）
+- [x] 解析エラー時の1回再試行を実装（`17ce9fc`）。dev stable agreementは81.6%（v3）で85%未達。
+- [x] 誤判定7件中3件が同一パターン（Q17「pdays=-1→未連絡」への同義言い換えをAcceptable誤判定）と特定。ルール4（短答の言い換えはIncorrect）とルール5（軽微な不完全さはAcceptable）の衝突が原因と判明。
+- [x] ルール6追加でルール4を優先するようプロンプト修正（`3413b52`、TDD・step-review済み、669 tests pass）。dev再判定でstable agreement **89.5%**（v4/v5で完全再現、ノイズでないことを確認）。採用条件クリア。（2026-07-16）
+- [x] 採用条件を確認: holdout stable agreement **89.7%**（39件中35件一致）、Incorrect recall 0.333、MAE 0.103。dev改善前のbaseline（agreement 0.816未満、recall 0.286、MAE 0.237）より全指標が改善しており悪化なし。（2026-07-16、`judge_recheck_holdout_1784206351.json`）
 
 ### 6. confidence thresholdのタイプ別探索
 
