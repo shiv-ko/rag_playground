@@ -1,4 +1,5 @@
 """固定judge回帰データを現在のLocalJudgeで再評価してJSON保存する。"""
+
 from __future__ import annotations
 
 import argparse
@@ -45,6 +46,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         "split": args.split,
         "source_files": [path.name for path in source_files],
         "metrics": result.metrics.to_dict(),
+        "stable_metrics": result.stable_metrics.to_dict(),
+        "unstable_count": result.unstable_count,
         "rows": list(result.rows),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -54,13 +57,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     metrics = result.metrics
     recall = (
-        "N/A"
-        if metrics.incorrect_recall is None
-        else f"{metrics.incorrect_recall:.3f}"
+        "N/A" if metrics.incorrect_recall is None else f"{metrics.incorrect_recall:.3f}"
     )
     print(
         f"{args.split}: n={metrics.total}, agreement={metrics.agreement:.3f}, "
         f"Incorrect recall={recall}, MAE={metrics.mean_absolute_error:.3f}"
+    )
+    stable = result.stable_metrics
+    stable_recall = (
+        "N/A" if stable.incorrect_recall is None else f"{stable.incorrect_recall:.3f}"
+    )
+    print(
+        f"stable only: n={stable.total}, agreement={stable.agreement:.3f}, "
+        f"Incorrect recall={stable_recall}, MAE={stable.mean_absolute_error:.3f}, "
+        f"unstable={result.unstable_count}"
     )
     print(f"saved: {args.output}")
 

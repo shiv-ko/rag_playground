@@ -1,4 +1,5 @@
 """judge較正JSON群から固定dev/holdout回帰データと指標を作る。"""
+
 from __future__ import annotations
 
 import argparse
@@ -15,14 +16,17 @@ from src.evaluator.judge_regression import (  # noqa: E402
     FIXED_HOLDOUT_FILE_NAMES,
     RegressionDataset,
     build_regression_dataset,
-    evaluate_regression,
+    evaluate_regression_summary,
 )
 
 
 def _split_payload(rows: tuple[Any, ...]) -> dict[str, Any]:
+    evaluation = evaluate_regression_summary(rows)
     return {
-        "metrics": evaluate_regression(rows).to_dict(),
-        "official_unstable_count": sum(row.official_label_unstable for row in rows),
+        "metrics": evaluation.metrics.to_dict(),
+        "stable_metrics": evaluation.stable_metrics.to_dict(),
+        "unstable_count": evaluation.unstable_count,
+        "official_unstable_count": evaluation.unstable_count,
         "rows": [row.to_dict() for row in rows],
     }
 
@@ -51,6 +55,14 @@ def _print_metrics(name: str, split: dict[str, Any]) -> None:
     print("  confusion matrix (local -> official):")
     for local, counts in metrics["confusion_matrix"].items():
         print(f"    {local}: {counts}")
+    stable = split["stable_metrics"]
+    stable_recall = stable["incorrect_recall"]
+    stable_recall_text = "N/A" if stable_recall is None else f"{stable_recall:.3f}"
+    print(
+        f"  stable only: n={stable['total']}, agreement={stable['agreement']:.3f}, "
+        f"Incorrect recall={stable_recall_text}, "
+        f"MAE={stable['mean_absolute_error']:.3f}"
+    )
 
 
 def main() -> None:

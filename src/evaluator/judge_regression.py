@@ -2,6 +2,7 @@
 
 回答生成パイプラインから独立した評価専用モジュールである。
 """
+
 from __future__ import annotations
 
 import json
@@ -83,9 +84,18 @@ class RegressionMetrics:
 
 
 @dataclass(frozen=True)
+class RegressionEvaluation:
+    metrics: RegressionMetrics
+    stable_metrics: RegressionMetrics
+    unstable_count: int
+
+
+@dataclass(frozen=True)
 class RejudgeResult:
     rows: tuple[dict[str, Any], ...]
     metrics: RegressionMetrics
+    stable_metrics: RegressionMetrics
+    unstable_count: int
 
 
 class JudgeScorer(Protocol):
@@ -260,6 +270,29 @@ def evaluate_regression(
     )
 
 
+def evaluate_regression_summary(
+    rows: Sequence[RegressionRecord | Mapping[str, Any]],
+) -> RegressionEvaluation:
+    """全行とofficial labelが安定した行を分けて評価する。
+
+    旧形式のmappingに揺らぎフラグがない場合はstableとして扱う。
+    """
+    stable_rows = tuple(
+        row
+        for row in rows
+        if not (
+            row.official_label_unstable
+            if isinstance(row, RegressionRecord)
+            else bool(row.get("official_label_unstable", False))
+        )
+    )
+    return RegressionEvaluation(
+        metrics=evaluate_regression(rows),
+        stable_metrics=evaluate_regression(stable_rows),
+        unstable_count=len(rows) - len(stable_rows),
+    )
+
+
 def rejudge_regression(
     rows: Sequence[RegressionRecord], judge: JudgeScorer
 ) -> RejudgeResult:
@@ -280,9 +313,13 @@ def rejudge_regression(
             {
                 "local_label": judged.label.value,
                 "official_label": row.official_label,
+                "official_label_unstable": row.official_label_unstable,
             }
         )
+    evaluation = evaluate_regression_summary(metric_rows)
     return RejudgeResult(
         rows=tuple(rejudged),
-        metrics=evaluate_regression(metric_rows),
+        metrics=evaluation.metrics,
+        stable_metrics=evaluation.stable_metrics,
+        unstable_count=evaluation.unstable_count,
     )

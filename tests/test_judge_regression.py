@@ -9,6 +9,7 @@ from src.evaluator.judge_regression import (
     RegressionRecord,
     build_regression_dataset,
     evaluate_regression,
+    evaluate_regression_summary,
     rejudge_regression,
 )
 from src.models import CRAGLabel, JudgeResult
@@ -137,6 +138,31 @@ def test_evaluate_regression_calculates_required_metrics() -> None:
     assert metrics.confusion_matrix["Incorrect"]["Missing"] == 1
 
 
+def test_summary_excludes_unstable_rows_from_stable_metrics() -> None:
+    rows = [
+        {**_row(local="Perfect", official="Perfect"), "official_label_unstable": False},
+        {
+            **_row(question="q2", local="Perfect", official="Incorrect"),
+            "official_label_unstable": True,
+        },
+    ]
+
+    summary = evaluate_regression_summary(rows)
+
+    assert summary.metrics.total == 2
+    assert summary.metrics.agreement == pytest.approx(0.5)
+    assert summary.stable_metrics.total == 1
+    assert summary.stable_metrics.agreement == pytest.approx(1.0)
+    assert summary.unstable_count == 1
+
+
+def test_summary_treats_missing_instability_flag_as_stable() -> None:
+    summary = evaluate_regression_summary([_row()])
+
+    assert summary.stable_metrics.total == 1
+    assert summary.unstable_count == 0
+
+
 def test_incorrect_recall_is_none_when_official_has_no_incorrect() -> None:
     metrics = evaluate_regression([_row()])
 
@@ -153,16 +179,28 @@ def test_rejects_unknown_crag_label(tmp_path: Path) -> None:
 def test_rejudge_regression_uses_ground_truth_and_new_labels_for_metrics() -> None:
     records = (
         RegressionRecord(
-            question_id="1", question="q1", answer="a1", ground_truth="gt1",
-            local_label="Missing", official_label="Perfect",
-            official_labels=("Perfect",), official_label_unstable=False,
-            duplicate_count=1, source_files=("dev1.json",),
+            question_id="1",
+            question="q1",
+            answer="a1",
+            ground_truth="gt1",
+            local_label="Missing",
+            official_label="Perfect",
+            official_labels=("Perfect",),
+            official_label_unstable=False,
+            duplicate_count=1,
+            source_files=("dev1.json",),
         ),
         RegressionRecord(
-            question_id="2", question="q2", answer="a2", ground_truth="gt2",
-            local_label="Missing", official_label="Incorrect",
-            official_labels=("Incorrect",), official_label_unstable=False,
-            duplicate_count=1, source_files=("dev2.json",),
+            question_id="2",
+            question="q2",
+            answer="a2",
+            ground_truth="gt2",
+            local_label="Missing",
+            official_label="Incorrect",
+            official_labels=("Perfect", "Incorrect"),
+            official_label_unstable=True,
+            duplicate_count=1,
+            source_files=("dev2.json",),
         ),
     )
 
@@ -175,9 +213,7 @@ def test_rejudge_regression_uses_ground_truth_and_new_labels_for_metrics() -> No
         ) -> JudgeResult:
             self.calls.append((question, generated_answer, reference_or_context))
             label = (
-                CRAGLabel.PERFECT
-                if generated_answer == "a1"
-                else CRAGLabel.INCORRECT
+                CRAGLabel.PERFECT if generated_answer == "a1" else CRAGLabel.INCORRECT
             )
             return JudgeResult(label=label, reason=f"reason-{generated_answer}")
 
@@ -193,3 +229,6 @@ def test_rejudge_regression_uses_ground_truth_and_new_labels_for_metrics() -> No
     assert result.metrics.agreement == pytest.approx(1.0)
     assert result.metrics.incorrect_recall == pytest.approx(1.0)
     assert result.metrics.mean_absolute_error == pytest.approx(0.0)
+    assert result.stable_metrics.total == 1
+    assert result.stable_metrics.agreement == pytest.approx(1.0)
+    assert result.unstable_count == 1

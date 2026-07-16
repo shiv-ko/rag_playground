@@ -34,6 +34,7 @@ def test_main_scores_only_selected_split_with_fake_judge(
     expected_split: str,
 ) -> None:
     def record(answer: str, official: str) -> RegressionRecord:
+        unstable = answer == "holdout-answer"
         return RegressionRecord(
             question_id=answer,
             question=f"question-{answer}",
@@ -41,8 +42,8 @@ def test_main_scores_only_selected_split_with_fake_judge(
             ground_truth=f"truth-{answer}",
             local_label="Missing",
             official_label=official,
-            official_labels=(official,),
-            official_label_unstable=False,
+            official_labels=(("Perfect", official) if unstable else (official,)),
+            official_label_unstable=unstable,
             duplicate_count=1,
             source_files=(f"{answer}.json",),
         )
@@ -84,6 +85,11 @@ def test_main_scores_only_selected_split_with_fake_judge(
     assert payload["split"] == expected_split
     assert payload["rows"][0]["new_local_label"] in {"Perfect", "Incorrect"}
     assert set(payload["metrics"]) == {
-        "total", "agreement", "incorrect_recall", "mean_absolute_error",
+        "total",
+        "agreement",
+        "incorrect_recall",
+        "mean_absolute_error",
         "confusion_matrix",
     }
+    assert set(payload["stable_metrics"]) == set(payload["metrics"])
+    assert payload["unstable_count"] == (1 if expected_split == "holdout" else 0)
