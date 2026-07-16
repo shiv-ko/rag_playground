@@ -96,12 +96,19 @@ class CachedEmbedder:
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         hashes = [_hash_text(t) for t in texts]
-        missing_positions = [i for i, h in enumerate(hashes) if h not in self._cache]
-        if missing_positions:
-            missing_texts = [texts[i] for i in missing_positions]
+        # 1回のadd()内にも同一テキストが多数含まれる。キャッシュ判定だけでは、
+        # 呼び出し開始時点で未登録の重複をすべてモデルへ渡してしまうため、
+        # 入力順を保ったままハッシュ単位で一意化してから埋め込む。
+        missing_by_hash: dict[str, str] = {}
+        for text, text_hash in zip(texts, hashes):
+            if text_hash not in self._cache and text_hash not in missing_by_hash:
+                missing_by_hash[text_hash] = text
+        if missing_by_hash:
+            missing_hashes = list(missing_by_hash)
+            missing_texts = [missing_by_hash[h] for h in missing_hashes]
             new_vecs = self._inner.embed_documents(missing_texts)
-            for i, vec in zip(missing_positions, new_vecs):
-                self._cache[hashes[i]] = np.asarray(vec, dtype=np.float32)
+            for text_hash, vec in zip(missing_hashes, new_vecs):
+                self._cache[text_hash] = np.asarray(vec, dtype=np.float32)
         return np.stack([self._cache[h] for h in hashes])
 
     def embed_query(self, text: str) -> np.ndarray:

@@ -154,6 +154,16 @@ def test_cached_embedder_dedupes_repeated_texts_within_session():
     assert inner.calls[1] == ["固有文書2"]
 
 
+def test_cached_embedder_dedupes_repeated_texts_within_single_batch():
+    inner = _CountingEmbedder()
+    cached = CachedEmbedder(inner)
+
+    vecs = cached.embed_documents(["共通文書", "固有文書", "共通文書"])
+
+    assert inner.calls == [["共通文書", "固有文書"]]
+    assert np.array_equal(vecs[0], vecs[2])
+
+
 def test_cached_embedder_returns_correct_vectors_in_order():
     inner = _CountingEmbedder()
     cached = CachedEmbedder(inner)
