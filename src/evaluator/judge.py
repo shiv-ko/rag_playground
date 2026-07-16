@@ -44,6 +44,7 @@ JUDGE_PROMPT_TEMPLATE = """\
 上記を評価し、以下のJSON形式で出力してください:
 {{"label": "Perfect|Acceptable|Missing|Incorrect", "reason": "判定理由"}}
 """
+PARSE_ERROR_REASON = "判定解析エラー"
 
 
 class LocalJudge:
@@ -68,8 +69,10 @@ class LocalJudge:
             reference=reference_or_context[:2000],
             generated_answer=generated_answer,
         )
-        raw = self._call_llm(prompt)
-        return self._parse(raw)
+        result, parsed = self._parse_with_status(self._call_llm(prompt))
+        if parsed:
+            return result
+        return self._parse(self._call_llm(prompt))
 
     def _get_client(self) -> Anthropic:
         if self._client is None:
@@ -91,13 +94,19 @@ class LocalJudge:
         return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     def _parse(self, raw: str) -> JudgeResult:
+        return self._parse_with_status(raw)[0]
+
+    def _parse_with_status(self, raw: str) -> tuple[JudgeResult, bool]:
         try:
             m = re.search(r"\{.*\}", raw, re.DOTALL)
             if m:
                 data = json.loads(m.group())
                 label = CRAGLabel(data.get("label", "Missing"))
                 reason = str(data.get("reason", ""))
-                return JudgeResult(label=label, reason=reason)
+                return JudgeResult(label=label, reason=reason), True
         except (json.JSONDecodeError, ValueError, KeyError):
             pass
-        return JudgeResult(label=CRAGLabel.MISSING, reason="判定解析エラー")
+        return (
+            JudgeResult(label=CRAGLabel.MISSING, reason=PARSE_ERROR_REASON),
+            False,
+        )

@@ -158,7 +158,65 @@ class RecordingJudge(FakeJudge):
         return super()._call_llm(prompt)
 
 
+class SequenceJudge(LocalJudge):
+    def __init__(self, responses: list[str | Exception]) -> None:
+        self.responses = iter(responses)
+        self.call_count = 0
+
+    def _call_llm(self, prompt: str) -> str:
+        self.call_count += 1
+        response = next(self.responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 class TestLocalJudgeScore:
+    def test_score_retries_once_after_parse_error(self) -> None:
+        judge = SequenceJudge(
+            ["invalid", '{"label": "Perfect", "reason": "retry success"}']
+        )
+
+        result = judge.score("質問", "回答", "正解")
+
+        assert result.label == CRAGLabel.PERFECT
+        assert judge.call_count == 2
+
+    def test_score_returns_missing_when_retry_also_has_parse_error(self) -> None:
+        judge = SequenceJudge(["invalid-first", "invalid-second"])
+
+        result = judge.score("質問", "回答", "正解")
+
+        assert result.label == CRAGLabel.MISSING
+        assert result.reason == "判定解析エラー"
+        assert judge.call_count == 2
+
+    def test_score_does_not_retry_successful_response(self) -> None:
+        judge = SequenceJudge(['{"label": "Acceptable", "reason": "success"}'])
+
+        result = judge.score("質問", "回答", "正解")
+
+        assert result.label == CRAGLabel.ACCEPTABLE
+        assert judge.call_count == 1
+
+    def test_score_does_not_retry_valid_json_with_parse_error_reason(self) -> None:
+        judge = SequenceJudge(
+            ['{"label": "Missing", "reason": "判定解析エラー"}']
+        )
+
+        result = judge.score("質問", "回答", "正解")
+
+        assert result.label == CRAGLabel.MISSING
+        assert judge.call_count == 1
+
+    def test_score_does_not_retry_api_exception(self) -> None:
+        judge = SequenceJudge([RuntimeError("api failure")])
+
+        with pytest.raises(RuntimeError, match="api failure"):
+            judge.score("質問", "回答", "正解")
+
+        assert judge.call_count == 1
+
     def test_score_prompt_prioritizes_exact_reference_match(self) -> None:
         judge = RecordingJudge('{"label": "Perfect", "reason": "一致"}')
 
