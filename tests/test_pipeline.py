@@ -745,7 +745,7 @@ def test_pipeline_spreadsheet_state_returns_complete_condition_and_aggregation(t
     assert result.answer_path == "structured:spreadsheet_state"
     assert "Region = 東、Category = A" in result.answer
     assert "平均 / Sales" in result.answer
-    assert "123.0" in result.answer
+    assert "123.0" not in result.answer
     assert not result.was_gated
 
 

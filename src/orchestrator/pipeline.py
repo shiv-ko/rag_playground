@@ -93,9 +93,7 @@ def _direct_pivot_condition_and_aggregation_answer(
         labels, value = group.group(1).strip(), group.group(2).strip()
         if not labels or not value or value.casefold() in {"none", "null", "nan"}:
             continue
-        answers.append(
-            f"抽出条件: {labels}、集計内容: {aggregate.group(1).strip()} = {value}"
-        )
+        answers.append(f"抽出条件: {labels}、集計内容: {aggregate.group(1).strip()}")
 
     if len(answers) != 1:
         return None
