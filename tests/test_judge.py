@@ -152,7 +152,28 @@ class FakeJudge(LocalJudge):
         return self.fake_response
 
 
+class RecordingJudge(FakeJudge):
+    def _call_llm(self, prompt: str) -> str:
+        self.prompt = prompt
+        return super()._call_llm(prompt)
+
+
 class TestLocalJudgeScore:
+    def test_score_prompt_prioritizes_exact_reference_match(self) -> None:
+        judge = RecordingJudge('{"label": "Perfect", "reason": "一致"}')
+
+        judge.score("質問", "同じ回答", "同じ回答")
+
+        assert "以下に表示された比較基準の文字列が完全一致する場合は必ずPerfect" in judge.prompt
+
+    def test_score_prompt_does_not_treat_concrete_mismatch_as_missing(self) -> None:
+        judge = RecordingJudge('{"label": "Incorrect", "reason": "不一致"}')
+
+        judge.score("質問", "具体的だが異なる回答", "正解")
+
+        assert "具体的な回答がある場合はMissingにしない" in judge.prompt
+        assert "比較基準に照らして誤りならIncorrect" in judge.prompt
+
     def test_score_returns_perfect_when_llm_says_perfect(self) -> None:
         judge = FakeJudge('{"label": "Perfect", "reason": "非常に正確"}')
         result = judge.score(
