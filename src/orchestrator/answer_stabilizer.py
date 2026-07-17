@@ -11,6 +11,10 @@ from src.generator.confidence_gate import MISSING_RESPONSE
 _MISSING_KEY = "\x00missing"
 _REMOVE_CHARS = "、。，,．.・:：;；()（）「」"
 _REMOVE_TRANS = str.maketrans("", "", _REMOVE_CHARS)
+# LLM出力はマイナス/ダッシュに複数のUnicode変種を使い分けるため、多数決キーでは
+# ASCIIハイフンへ畳む。カタカナ長音「ー」(U+30FC)は文字として意味を持つので対象外。
+_DASH_VARIANTS = "‐‑‒–—―−－"
+_DASH_TRANS = str.maketrans({ch: "-" for ch in _DASH_VARIANTS})
 # 通貨表記は数字に隣接する場合のみ正規化する（「円グラフ」等の語中の単位語は保持）。
 # JPYは既定通貨として無印に寄せ、ドルは「<数字>ドル」の形へ寄せて通貨の区別を保つ。
 _YEN_PREFIX = re.compile(r"[¥￥](?=\d)")
@@ -34,6 +38,7 @@ def normalize_answer(text: str) -> str:
     normalized = unicodedata.normalize("NFC", text).casefold()
     normalized = re.sub(r"\s+", "", normalized)
     normalized = normalized.translate(_REMOVE_TRANS)
+    normalized = normalized.translate(_DASH_TRANS)
     normalized = _DOLLAR_PREFIX.sub(r"\1ドル", normalized)
     normalized = _YEN_PREFIX.sub("", normalized)
     normalized = _YEN_SUFFIX.sub("", normalized)

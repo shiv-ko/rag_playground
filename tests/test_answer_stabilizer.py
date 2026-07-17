@@ -40,6 +40,35 @@ def test_normalize_answer_nfc_and_nfd_are_equivalent():
     assert normalize_answer(nfc) == normalize_answer(nfd)
 
 
+def test_normalize_answer_unifies_dash_and_minus_variants():
+    """U+2212(−)・enダッシュ・emダッシュ・全角－はASCIIハイフンと同一視する
+    （実データQ8で同一内容の3回答が文字差だけで3クラスタに割れno_majority化した対策）。"""
+    base = "約14,744ドル（140,000ドル - 125,256ドル）"
+    assert normalize_answer("約14,744ドル（140,000ドル − 125,256ドル）") == normalize_answer(base)
+    assert normalize_answer("約14,744ドル（140,000ドル – 125,256ドル）") == normalize_answer(base)
+    assert normalize_answer("約14,744ドル（140,000ドル — 125,256ドル）") == normalize_answer(base)
+    assert normalize_answer("約14,744ドル（140,000ドル － 125,256ドル）") == normalize_answer(base)
+
+
+def test_normalize_answer_keeps_katakana_prolonged_sound_mark():
+    """カタカナ長音「ー」はダッシュ類と同一視しない（サーバー≠サ-バ-）。"""
+    assert normalize_answer("サーバー") != normalize_answer("サ-バ-")
+
+
+def test_stabilize_answers_dash_variant_answers_form_majority():
+    """ダッシュ文字差だけの回答はクラスタが統合され、no_majorityにならない。"""
+    decisions = stabilize_answers(
+        ["8"],
+        [
+            ["約14,744ドル（140,000ドル − 125,256ドル）"],
+            ["約14,744ドル（140,000ドル - 125,256ドル）"],
+            [MISSING_RESPONSE],
+        ],
+    )
+    assert decisions[0].reason == "majority"
+    assert decisions[0].chosen != MISSING_RESPONSE
+
+
 def test_stabilize_answers_uses_two_of_three_majority_with_raw_representative():
     decisions = stabilize_answers(["1"], [["東京"], ["東京"], ["大阪"]])
     assert decisions[0].question_id == "1"
