@@ -39,6 +39,8 @@ def main() -> None:
                         help="提出用回答生成を複数回実行し、N>1なら正規化多数決で安定化する")
     parser.add_argument("--no-cache", action="store_true",
                         help="パース・埋め込みキャッシュを使わず再計算する")
+    parser.add_argument("--conservative", action="store_true",
+                        help="保守構成: 多数決で勝っても内容の矛盾する少数派回答がある質問はMissingへ倒す")
     parser.add_argument("--hybrid-search", dest="hybrid_search", action="store_true", default=True,
                         help="BM25+日本語埋め込みベクトルのハイブリッド検索を使う（デフォルト。要 pip install -e '.[embeddings]'）")
     parser.add_argument("--no-hybrid-search", dest="hybrid_search", action="store_false",
@@ -108,6 +110,7 @@ def main() -> None:
     decisions = stabilize_answers(
         question_ids=question_ids,
         per_run_answers=per_run_answers,
+        conservative=args.conservative,
     )
 
     write_predictions(args.out, [(d.question_id, d.chosen) for d in decisions])

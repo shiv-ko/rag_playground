@@ -45,11 +45,22 @@ def normalize_answer(text: str) -> str:
     return normalized
 
 
+def _same_content(key_a: str, key_b: str) -> bool:
+    """正規化キー同士が「同じ内容の詳細度・順序ちがい」とみなせるか。
+    片方が他方の部分文字列（詳細度の差）、または文字多重集合が一致（列挙順の入れ替え）なら同内容。"""
+    return key_a in key_b or key_b in key_a or sorted(key_a) == sorted(key_b)
+
+
 def stabilize_answers(
     question_ids: list[str],
     per_run_answers: list[list[str]],
+    conservative: bool = False,
 ) -> list[StabilizationDecision]:
-    """runごとの回答列を質問単位で多数決し、採用回答を返す。"""
+    """runごとの回答列を質問単位で多数決し、採用回答を返す。
+
+    conservative=True（提出2枠の保守構成用）は、多数決で勝っても内容の矛盾する
+    少数派回答が存在する質問をMissingへ倒す（reason="answer_conflict"）。
+    バッチごとに多数決の勝者が入れ替わる真性不安定問（Q69型）のIncorrectヘッジ。"""
     if not per_run_answers:
         raise ValueError("per_run_answers must contain at least one run")
     expected_count = len(question_ids)
@@ -101,6 +112,13 @@ def stabilize_answers(
         if majority_key == _MISSING_KEY:
             chosen = MISSING_RESPONSE
             reason = "all_missing"
+        elif conservative and any(
+            key not in ("", _MISSING_KEY, majority_key)
+            and not _same_content(key, majority_key)
+            for key in cluster_sizes
+        ):
+            chosen = MISSING_RESPONSE
+            reason = "answer_conflict"
         else:
             chosen = _representative_raw_answer(clusters[majority_key])
             reason = "unanimous" if cluster_sizes[majority_key] == run_count else "majority"

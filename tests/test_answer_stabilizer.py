@@ -134,6 +134,60 @@ def test_stabilize_answers_representative_counts_nfc_equivalent_raw_forms():
     assert decisions[0].reason == "unanimous"
 
 
+def test_stabilize_answers_conservative_gates_contradictory_minority():
+    """保守モード: 多数派と内容が矛盾する少数派回答があればMissingへ倒す
+    （Q69型「2-1で勝つがバッチごとに勝者が入れ替わる」ヘッジ）。"""
+    decisions = stabilize_answers(
+        ["69"],
+        [["W5〜W6"], ["W5〜W6"], ["第6週目から第7週目"]],
+        conservative=True,
+    )
+    assert decisions[0].chosen == MISSING_RESPONSE
+    assert decisions[0].reason == "answer_conflict"
+
+
+def test_stabilize_answers_conservative_keeps_majority_over_substring_minority():
+    """詳細度の差（少数派が多数派の部分文字列）は矛盾扱いしない。"""
+    decisions = stabilize_answers(
+        ["41"],
+        [["6件（T01, T02, T05, T12, T13, T14）"], ["6件（T01, T02, T05, T12, T13, T14）"], ["6"]],
+        conservative=True,
+    )
+    assert decisions[0].reason == "majority"
+    assert decisions[0].chosen != MISSING_RESPONSE
+
+
+def test_stabilize_answers_conservative_keeps_majority_over_reordered_minority():
+    """列挙順の入れ替え（正規化キーの文字多重集合が同一）は矛盾扱いしない。"""
+    decisions = stabilize_answers(
+        ["60"],
+        [["AI-05, AI-08, AI-09"], ["AI-05, AI-08, AI-09"], ["AI-05, AI-09, AI-08"]],
+        conservative=True,
+    )
+    assert decisions[0].reason == "majority"
+
+
+def test_stabilize_answers_conservative_keeps_majority_with_missing_minority():
+    """少数派がMissing票の場合は矛盾ではない（現行どおり回答する）。"""
+    decisions = stabilize_answers(
+        ["97"],
+        [["272"], ["272"], [MISSING_RESPONSE]],
+        conservative=True,
+    )
+    assert decisions[0].reason == "majority"
+    assert decisions[0].chosen == "272"
+
+
+def test_stabilize_answers_default_mode_answers_despite_contradiction():
+    """デフォルト（非保守）は従来どおり2-1多数決で回答する（回帰ガード）。"""
+    decisions = stabilize_answers(
+        ["69"],
+        [["W5〜W6"], ["W5〜W6"], ["第6週目から第7週目"]],
+    )
+    assert decisions[0].reason == "majority"
+    assert decisions[0].chosen == "W5〜W6"
+
+
 def test_align_run_answers_passthrough_when_all_runs_complete():
     per_run_answers, dropped = align_run_answers(
         ["1", "2"],
