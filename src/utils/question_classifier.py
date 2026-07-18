@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-IMAGE_KEYWORDS = (".png", ".jpg", "画像", "グラフ", "figure", "マーカー", "折れ線", "図", "可視化")
+IMAGE_KEYWORDS = (".png", ".jpg", "画像", "グラフ", "figure", "マーカー", "折れ線", "図", "可視化", "ヒストグラム")
 VERSION_DIFF_KEYWORDS = (
     "old", "旧版", "新旧", "更新内容", "変更内容", "実質的な変更", "最新版",
     "修正されたもの", "を比較したとき", "変わっている点",
@@ -22,6 +22,7 @@ SPREADSHEET_STATE_KEYWORDS = (
 OFFICE_STYLE_KEYWORDS = (
     "太字", "下線", "イタリック", "強調されている", "マーカーされている",
     ".docx", ".pptx", "スライド", "赤で", "黄色で", "ハイライトされている",
+    "黄色ハイライト",
 )
 # 「の中で」「該当する」のような一般文に頻出する語は入れない（誤ルーティング源になる）
 SPREADSHEET_CALC_KEYWORDS = (

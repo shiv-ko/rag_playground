@@ -531,6 +531,58 @@ def test_pipeline_office_style_explanation_request_not_answered_with_raw_strings
     assert result.answer == "LLM経由の回答"
 
 
+def test_direct_office_style_answer_bails_out_when_match_count_is_implausibly_large(tmp_path: Path) -> None:
+    """装飾抽出の直接回答は、実データの正解件数（1〜数件）に対して桁違いに多い
+    件数がヒットした場合、抽出条件・絞り込みが破綻しているサインとみなし、
+    Noneを返して既存のフォールバック（同じcontextsをgenerate()に渡す経路。
+    ゲートで確信度不足ならMissingになる）に委ねる。大量列挙をそのまま
+    「、」連結して返すとIncorrect(-1)の確率が高い。"""
+    from src.models import ScoredDocument
+    from src.orchestrator.pipeline import Pipeline
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+
+    many_contexts = [
+        ScoredDocument(
+            document=Document(
+                text=f"file.pptx 内の装飾箇所（太字）: 値{i}",
+                source_path=tmp_path / "file.pptx",
+                location="slide_1",
+            ),
+            score=1.0,
+            retrieval_method="structured_office_style",
+        )
+        for i in range(30)
+    ]
+
+    assert pipeline._direct_office_style_answer(many_contexts) is None
+
+
+def test_direct_office_style_answer_still_answers_when_match_count_is_small(tmp_path: Path) -> None:
+    """閾値未満の少数一致は従来どおり直接回答する（回帰確認）。"""
+    from src.models import ScoredDocument
+    from src.orchestrator.pipeline import Pipeline
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+
+    few_contexts = [
+        ScoredDocument(
+            document=Document(
+                text=f"file.pptx 内の装飾箇所（太字）: 値{i}",
+                source_path=tmp_path / "file.pptx",
+                location="slide_1",
+            ),
+            score=1.0,
+            retrieval_method="structured_office_style",
+        )
+        for i in range(2)
+    ]
+
+    direct = pipeline._direct_office_style_answer(few_contexts)
+    assert direct is not None
+    assert "値0" in direct.text and "値1" in direct.text
+
+
 def test_pipeline_routes_spreadsheet_calc_question_to_calc_answerer(tmp_path: Path) -> None:
     """spreadsheet_calcタグの質問はSpreadsheetCalcAnswererへ渡る。"""
     from src.orchestrator.pipeline import Pipeline, QAPair

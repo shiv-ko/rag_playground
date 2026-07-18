@@ -50,6 +50,196 @@ def test_red_question_selects_red_font_color() -> None:
     assert not any("黒字の本文" in t for t in texts)
 
 
+def test_multiple_color_conditions_require_all_to_match_same_mark() -> None:
+    """「黄色ハイライトかつ赤字」のような複数条件の質問は、両方を同時に満たす
+    マークのみを返す（従来はどちらか一方だけでもOR和集合でヒットしていた）。"""
+    store = _store_with_marks([
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "両方一致", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None, "highlight_color": "YELLOW (7)"},
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "黄色のみ", "bold": False, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None, "highlight_color": "YELLOW (7)"},
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "赤字のみ", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None, "highlight_color": None},
+    ])
+    docs = build_office_style_context(
+        "資料において黄色ハイライトかつ赤字となっている部分を抜き出してください。", "A社", store
+    )
+    texts = [d.document.text for d in docs]
+    assert any("両方一致" in t for t in texts)
+    assert not any("黄色のみ" in t for t in texts)
+    assert not any("赤字のみ" in t for t in texts)
+
+
+def test_multiple_style_conditions_require_all_true() -> None:
+    """「太字、下線、イタリックのすべてに該当する」は3条件すべてを満たすマークのみ。"""
+    store = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "全部該当", "bold": True, "italic": True, "underline": True,
+         "font_color": None, "fill_color": None},
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "太字のみ", "bold": True, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None},
+    ])
+    docs = build_office_style_context(
+        "太字、下線、イタリックのすべてに該当する箇所を抽出してください。", "A社", store
+    )
+    texts = [d.document.text for d in docs]
+    assert any("全部該当" in t for t in texts)
+    assert not any("太字のみ" in t for t in texts)
+
+
+def test_english_red_keyword_is_recognized_as_color_condition() -> None:
+    """色名の英語表記（RED）も一般語彙として色条件に認識される。"""
+    store = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "英語表記の赤", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None},
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "無関係", "bold": False, "italic": False, "underline": False,
+         "font_color": "1A1A1A", "fill_color": None},
+    ])
+    docs = build_office_style_context("REDになっている数値を挙げてください。", "A社", store)
+    texts = [d.document.text for d in docs]
+    assert any("英語表記の赤" in t for t in texts)
+    assert not any("無関係" in t for t in texts)
+
+
+def test_bare_color_kanji_in_project_name_does_not_add_spurious_color_condition() -> None:
+    """案件名に色を表す1文字漢字（「青」「緑」等）が偶然含まれることがある
+    （例: 「青〜」で始まる社名）。単独の1文字を無条件に色条件として拾うと、
+    AND判定で無関係な色条件が紛れ込み、本来一致すべきマークまで除外されてしまう。
+    色条件は「色」「で」「字」等の修飾を伴う形でのみ認識する。"""
+    store = _store_with_marks([
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "黄色ハイライトかつ赤字の箇所", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None, "highlight_color": "YELLOW (7)"},
+    ])
+    # 「青空商事」のように社名に色の1文字（青）が含まれるが、質問の装飾条件は
+    # 「黄色ハイライトかつ赤字」のみで「青」に関する条件は本来含まれない。
+    docs = build_office_style_context(
+        "青空商事の中間報告資料にて、黄色ハイライトかつ赤字となっている部分を抜き出してください。",
+        "A社",
+        store,
+    )
+    texts = [d.document.text for d in docs]
+    assert any("黄色ハイライトかつ赤字の箇所" in t for t in texts)
+
+
+def test_or_conjunction_returns_union_not_and() -> None:
+    """「または」のような選言（OR）の質問は、従来どおり和集合を返す。
+    AND化がすべての複数条件に無条件適用されると、OR質問がAND扱いされて
+    0件になり、構造化の恩恵が丸ごと失われてしまう（回帰テスト）。"""
+    store = _store_with_marks([
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "黄色のみ", "bold": False, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None, "highlight_color": "YELLOW (7)"},
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "赤字のみ", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None, "highlight_color": None},
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "どちらでもない", "bold": False, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None, "highlight_color": None},
+    ])
+    docs = build_office_style_context(
+        "黄色ハイライトまたは赤字になっている箇所を抜き出してください。", "A社", store
+    )
+    texts = [d.document.text for d in docs]
+    assert any("黄色のみ" in t for t in texts)
+    assert any("赤字のみ" in t for t in texts)
+    assert not any("どちらでもない" in t for t in texts)
+
+
+def test_ambiguous_conjunction_without_marker_defaults_to_union() -> None:
+    """明示的な連言マーカー（かつ/両方/すべて/同時に）もOR系マーカーも無い場合は、
+    従来どおり和集合として扱う（安全側デフォルト）。"""
+    store = _store_with_marks([
+        {"source_path": "x/報告資料.docx", "file_name": "報告資料.docx", "slide_number": None,
+         "text": "黄色のみ", "bold": False, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None, "highlight_color": "YELLOW (7)"},
+    ])
+    docs = build_office_style_context(
+        "黄色ハイライトと赤字になっている箇所を抜き出してください。", "A社", store
+    )
+    texts = [d.document.text for d in docs]
+    assert any("黄色のみ" in t for t in texts)
+
+
+def test_adjective_color_forms_are_recognized() -> None:
+    """修飾形（「赤い」「赤の」「青い」「青の」「緑の」等）は色条件として認識される
+    （1文字裸の色漢字を条件外にした際に、こうした自然な修飾形まで後退しないこと
+    の回帰テスト。社名等との誤爆防止のため1文字裸自体は引き続き対象外）。"""
+    store_red = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "赤い文字の警告", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None},
+    ])
+    assert any(
+        "赤い文字の警告" in d.document.text
+        for d in build_office_style_context("赤い文字になっている箇所を挙げてください。", "A社", store_red)
+    )
+    assert any(
+        "赤い文字の警告" in d.document.text
+        for d in build_office_style_context("赤の文字になっている箇所を挙げてください。", "A社", store_red)
+    )
+
+    store_blue = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "青い文字の注記", "bold": False, "italic": False, "underline": False,
+         "font_color": "0000FF", "fill_color": None},
+    ])
+    assert any(
+        "青い文字の注記" in d.document.text
+        for d in build_office_style_context("青い文字になっている箇所を挙げてください。", "A社", store_blue)
+    )
+    assert any(
+        "青い文字の注記" in d.document.text
+        for d in build_office_style_context("青の文字になっている箇所を挙げてください。", "A社", store_blue)
+    )
+
+    store_green = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "緑の文字の注記", "bold": False, "italic": False, "underline": False,
+         "font_color": "008000", "fill_color": None},
+    ])
+    assert any(
+        "緑の文字の注記" in d.document.text
+        for d in build_office_style_context("緑の文字になっている箇所を挙げてください。", "A社", store_green)
+    )
+
+
+def test_color_keyword_matching_is_casefold_and_fullwidth_normalized() -> None:
+    """「red」「Red」「ＲＥＤ」のような大小文字・全角差異は同一の色条件として
+    正規化して照合する（classify_question側は既にlower()で吸収しているため、
+    この関数側でも表記ゆれを不統一に扱わないよう揃える）。"""
+    store = _store_with_marks([
+        {"source_path": "x/a.pptx", "file_name": "a.pptx", "slide_number": 1,
+         "text": "英語表記の赤", "bold": False, "italic": False, "underline": False,
+         "font_color": "FF0000", "fill_color": None},
+    ])
+    for phrasing in ("redになっている数値を挙げてください。", "Redになっている数値を挙げてください。", "ＲＥＤになっている数値を挙げてください。"):
+        docs = build_office_style_context(phrasing, "A社", store)
+        texts = [d.document.text for d in docs]
+        assert any("英語表記の赤" in t for t in texts), f"failed for: {phrasing}"
+
+
+def test_single_condition_behavior_unchanged_when_multiple_marks_partially_match() -> None:
+    """後方互換性: 単一条件の場合は従来どおり、その1条件を満たすマークのみを返す
+    （AND化の副作用で単一条件時の挙動が変わらないことの回帰テスト）。"""
+    store = _store_with_marks([
+        {"source_path": "x/提案書.pptx", "file_name": "提案書.pptx", "slide_number": 1,
+         "text": "黄色のみ一致", "bold": False, "italic": False, "underline": False,
+         "font_color": None, "fill_color": None, "highlight_color": "YELLOW (7)"},
+    ])
+    docs = build_office_style_context(
+        "黄色でハイライトされている部分を抜き出してください。", "A社", store
+    )
+    texts = [d.document.text for d in docs]
+    assert any("黄色のみ一致" in t for t in texts)
+
+
 def test_no_matching_marks_returns_empty_list() -> None:
     store = _store_with_marks([])
     docs = build_office_style_context("太字で記載されている箇所をすべて抽出してください。", "A社", store)

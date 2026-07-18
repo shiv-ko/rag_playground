@@ -22,13 +22,20 @@ _COLOR_LABELS = {
     "orange": "オレンジ", "purple": "紫", "pink": "ピンク",
     "black": "黒", "white": "白", "gray": "灰色", "brown": "茶", "cyan": "シアン",
 }
+
+# 1文字の色漢字（「青」「赤」等）は社名・地名等の固有名詞にも頻出するため
+# （例: 「青葉」「青潮」のように「青」で始まる社名）、単独の1文字だけでは
+# 色条件として採用しない。「色」「で」「字」「い」（形容詞形）「の」等、
+# 色の言及であることを示す修飾が伴う形のみを一般語彙として認識する。
+# 英語の色名（RED等）は大小文字・全角/半角の表記ゆれを吸収して比較するため、
+# ここでは小文字のまま持つ（比較側でcasefold/NFKC正規化する）。
 _COLOR_KEYWORD_MAP = {
-    "red": ("赤",),
-    "yellow": ("黄", "黄色"),
-    "blue": ("青",),
-    "green": ("緑",),
+    "red": ("赤色", "赤で", "赤字", "赤い", "赤の", "red"),
+    "yellow": ("黄色",),
+    "blue": ("青色", "青で", "青い", "青の"),
+    "green": ("緑色", "緑で", "緑の"),
     "orange": ("オレンジ",),
-    "purple": ("紫",),
+    "purple": ("紫色", "紫で", "紫の"),
     "pink": ("ピンク",),
 }
 
@@ -43,20 +50,41 @@ def question_mentions_spreadsheet(question: str) -> bool:
     return any(hint in lower for hint in _SPREADSHEET_HINTS)
 
 
+def _normalize_for_keyword_match(text: str) -> str:
+    """全角/半角・大小文字の表記ゆれ（"RED"/"Red"/"red"/"ＲＥＤ"等）を吸収して
+    比較するための正規化。NFKCで全角英数を半角化してからcasefoldする。"""
+    return unicodedata.normalize("NFKC", text).casefold()
+
+
 def _requested_style_attrs(question: str) -> list[str]:
+    normalized = _normalize_for_keyword_match(question)
     return [
         attr
         for attr, keywords in _STYLE_KEYWORD_MAP.items()
-        if any(k in question for k in keywords)
+        if any(_normalize_for_keyword_match(k) in normalized for k in keywords)
     ]
 
 
 def _requested_color_names(question: str) -> list[str]:
+    normalized = _normalize_for_keyword_match(question)
     return [
         name
         for name, keywords in _COLOR_KEYWORD_MAP.items()
-        if any(k in question for k in keywords)
+        if any(_normalize_for_keyword_match(k) in normalized for k in keywords)
     ]
+
+
+# 明示的な連言マーカー（一般語彙）がある場合のみAND（全条件を同時に満たす
+# マークのみ採用）にする。マーカーが無い場合や「または」「もしくは」等の
+# 選言の場合は、従来どおり和集合（OR、条件を1つでも満たせば採用）で扱う。
+# 「または」「もしくは」等を専用検出しないのは、デフォルトが既にORのため
+# 不要であることに加え、「か」のような1文字は一般文に頻出し誤検出源になる
+# ため（既存の色1文字漢字と同様の理由で避ける）。
+_AND_CONJUNCTION_MARKERS = ("かつ", "両方", "すべて", "全て", "同時に")
+
+
+def _requires_all_conditions(question: str) -> bool:
+    return any(marker in question for marker in _AND_CONJUNCTION_MARKERS)
 
 
 # docxのrun.font.highlight_colorはWD_COLOR_INDEXの文字列（例: "YELLOW (7)"）で入る
@@ -116,24 +144,39 @@ def build_office_style_context(
     if not style_attrs and not color_names:
         return []
 
+    # 質問が複数条件（複数のスタイル属性・複数の色、または両者の組み合わせ）に
+    # 言及している場合、明示的な連言マーカー（「かつ」「両方」「すべて」「同時に」等）
+    # があるときだけ全条件を同時に満たすマークのみ採用する（AND）。マーカーが無い、
+    # または「または」等の選言の場合は従来どおり和集合（OR、条件を1つでも
+    # 満たせば採用）で扱う。条件が1つだけの場合はAND/ORの区別自体が無意味
+    # （後方互換）。
+    require_all = _requires_all_conditions(question)
     matched = []
     for mark in marks:
         if not mark.get("text", "").strip():
             continue
-        decorations = [
-            _STYLE_LABELS[attr] for attr in style_attrs if mark.get(attr)
+        # (条件が真か, その条件が真だった場合の装飾説明) のリスト。
+        conditions: list[tuple[bool, list[str]]] = [
+            (bool(mark.get(attr)), [_STYLE_LABELS[attr]] if mark.get(attr) else [])
+            for attr in style_attrs
         ]
         if color_names:
             font_name = nearest_basic_color_name(mark.get("font_color"))
             fill_name = nearest_basic_color_name(mark.get("fill_color"))
             highlight_name = _highlight_color_name(mark)
-            if font_name in color_names:
-                decorations.append(f"{_COLOR_LABELS.get(font_name, font_name)}の文字色")
-            if fill_name in color_names:
-                decorations.append(f"{_COLOR_LABELS.get(fill_name, fill_name)}の背景色")
-            if highlight_name in color_names:
-                decorations.append(f"{_COLOR_LABELS.get(highlight_name, highlight_name)}のハイライト")
-        if decorations:
+            for color in color_names:
+                channels_hit = []
+                if font_name == color:
+                    channels_hit.append(f"{_COLOR_LABELS.get(color, color)}の文字色")
+                if fill_name == color:
+                    channels_hit.append(f"{_COLOR_LABELS.get(color, color)}の背景色")
+                if highlight_name == color:
+                    channels_hit.append(f"{_COLOR_LABELS.get(color, color)}のハイライト")
+                conditions.append((bool(channels_hit), channels_hit))
+
+        ok = all(hit for hit, _ in conditions) if require_all else any(hit for hit, _ in conditions)
+        decorations = [d for hit, decs in conditions if hit for d in decs]
+        if ok and decorations:
             matched.append((mark, decorations))
 
     narrowed_marks = _narrow_marks_by_question_hints(question, [m for m, _ in matched])

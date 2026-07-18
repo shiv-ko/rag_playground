@@ -146,6 +146,20 @@ def test_detects_cross_project_question() -> None:
     )
 
 
+def test_detects_histogram_question_as_image_or_graph() -> None:
+    """「ヒストグラム」はIMAGE_KEYWORDS未収録で画像パスに回らず、無関係なピボット
+    集計に誤マッチしていた（test Missing診断P1）。"""
+    q = "対象データのヒストグラムにおいて、3番目にカウントが多い区間の範囲を教えてください。"
+    assert "image_or_graph" in classify_question(q)
+
+
+def test_detects_combined_color_highlight_phrase_as_office_style() -> None:
+    """「黄色で」「ハイライトされている」という助詞付きの言い回しのみ対応しており、
+    「黄色ハイライト」という助詞非依存の複合語には一致しなかった（test Missing診断P1）。"""
+    q = "資料において黄色ハイライトとなっている箇所の数値をすべて抜き出してください。"
+    assert "office_style" in classify_question(q)
+
+
 def test_generic_phrases_alone_do_not_trigger_spreadsheet_calc():
     """「の中で」「該当する」は一般文に頻出するため、単独ではcalcタグを付けない。"""
     assert "spreadsheet_calc" not in classify_question(

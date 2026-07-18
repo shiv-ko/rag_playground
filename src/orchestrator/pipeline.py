@@ -49,6 +49,17 @@ def is_style_extraction_request(question: str) -> bool:
     return bool(_STYLE_EXTRACTION_INTENT.search(unicodedata.normalize("NFC", question)))
 
 
+# office_style直接回答（装飾箇所の値を「、」連結して返す）の過剰列挙ガード。
+# 実データ（questions_valid.csv等）で観測された正答の件数は1〜4件程度（例:
+# 「hr、weekday、weathersit、temp」の4件、「1. データ理解・EDA」の1件）。
+# 一方、抽出条件・絞り込みが破綻した場合は装飾条件を満たすマークが数百件単位で
+# 混入する（実測: 375件・437件・646件）。桁が2つ以上違うため、閾値はどちらの
+# 集団からも十分離れた20件に設定し、超過時は直接回答を諦めて既存のフォールバック
+# （同じ構造化contextsをgenerate()に渡すLLM生成経路。ゲートで確信度不足なら
+# Missingになる）に委ねる。
+_DIRECT_OFFICE_STYLE_MAX_MATCHES = 20
+
+
 def _requests_pivot_condition_and_aggregation(question: str) -> bool:
     normalized = unicodedata.normalize("NFC", question)
     has_superlative = any(
@@ -392,6 +403,11 @@ class Pipeline:
         return self.generator.generate(qa.question, contexts), f"structured:{used_tag}"
 
     def _direct_office_style_answer(self, contexts: list[ScoredDocument]) -> Answer | None:
+        if len(contexts) > _DIRECT_OFFICE_STYLE_MAX_MATCHES:
+            # 絞り込みが破綻して無関係なマークまで大量に混入しているサイン。
+            # 誤った大量列挙（Incorrect）よりは、同じcontextsをgenerate()に渡す
+            # 後続経路（ゲート経由でのMissing化を含む）に委ねる方が安全側。
+            return None
         values = []
         for context in contexts:
             text = context.document.text
