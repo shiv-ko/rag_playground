@@ -173,22 +173,42 @@ def _render_highlight_block(block: dict) -> str:
 
 
 # スケジュール表の列名はプロジェクトごとに揺れる（「フェーズ名」/「フェーズ」等）ため、
-# 列名の部分一致で「質問の絞り込み条件になりうる列」を判定する
-_SCHEDULE_MATCH_KEY_PARTS = ("フェーズ", "担当", "ステータス", "成果物")
+# 列名の完全一致ではなく部分一致で「質問の絞り込み条件になりうる列」を判定する。
+# 当初の4種（フェーズ/担当/ステータス/成果物）に加え、WBS/スケジュール表で頻出する
+# 分類・識別用の一般語彙（種別・状態・区分・分類・タスク・マイルストーン・回次）を追加し、
+# 未知の列名にもある程度汎用的に対応する。
+# 列名を問わず全列を対象にする案は却下した: 「工数(h)」「確認欄」のような数値・自由記述の
+# 列まで対象になり、質問文中の無関係な数字（日付等）や汎用語（「完了」等）との偶然の
+# 部分一致で誤マッチする（このコンペはIncorrect=-1のため、正答喪失より誤マッチの方が重い）。
+_SCHEDULE_MATCH_KEY_PARTS = (
+    "フェーズ", "担当", "ステータス", "状態", "成果物",
+    "種別", "区分", "分類", "タスク", "マイルストーン", "回次",
+)
 # 値の先頭の番号接頭辞（「3. 探索的分析・仮説整理」等）は質問文には現れないことが多い
 _NUMBER_PREFIX_RE = re.compile(r"^\s*\d+\s*[\.．]\s*")
+# 数値のみの値（工数の時間数・ステータスコード等）は、質問文中の日付・件数・金額等の
+# 数字と無関係に部分一致しやすく、列名一致だけでは誤マッチを防げないため、
+# 列名を問わず一律にマッチ対象から除外する。
+_PURE_NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
+
+
+def _looks_purely_numeric(value: str) -> bool:
+    normalized = unicodedata.normalize("NFKC", value).replace(",", "").strip()
+    return bool(_PURE_NUMBER_RE.fullmatch(normalized))
 
 
 def _schedule_value_match_parts(raw_value: str) -> list[str]:
     """マッチ判定に使う値の候補: 番号接頭辞を除いた全体＋区切り文字で分割した各要素
-    （担当者「山本 彩乃 / 藤田 彩」のような複合値に対応）。短すぎる断片は誤マッチ源なので捨てる。"""
+    （担当者「山本 彩乃 / 藤田 彩」のような複合値に対応）。短すぎる断片・数値のみの
+    断片は誤マッチ源なので捨てる。"""
     value = _NUMBER_PREFIX_RE.sub("", raw_value).strip()
     parts = [value] + [p.strip() for p in re.split(r"[/、,]", value)]
-    return [p for p in parts if len(p) >= 2]
+    return [p for p in parts if len(p) >= 2 and not _looks_purely_numeric(p)]
 
 
 def _schedule_row_matches_question(values: dict, question: str) -> bool:
-    question_no_space = re.sub(r"[ 　]", "", question)
+    question_nfc = unicodedata.normalize("NFC", question)
+    question_no_space = re.sub(r"[ 　]", "", question_nfc)
     for key, raw in values.items():
         if not any(part in str(key) for part in _SCHEDULE_MATCH_KEY_PARTS):
             continue
@@ -196,7 +216,8 @@ def _schedule_row_matches_question(values: dict, question: str) -> bool:
         if not raw_str or raw_str == str(key):  # 空値・ヘッダ行の残骸は除外
             continue
         for part in _schedule_value_match_parts(raw_str):
-            if part in question or re.sub(r"[ 　]", "", part) in question_no_space:
+            part_nfc = unicodedata.normalize("NFC", part)
+            if part_nfc in question_nfc or re.sub(r"[ 　]", "", part_nfc) in question_no_space:
                 return True
     return False
 

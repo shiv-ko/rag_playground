@@ -190,6 +190,98 @@ class TestScheduleTaskMatchingGeneralization:
         )
         assert all("row_2" not in d.document.location for d in docs)
 
+    def test_non_whitelisted_column_name_matches_by_value(self) -> None:
+        """列名ホワイトリストの当初4種（フェーズ/担当/ステータス/成果物）に含まれない
+        拡張後の列名（例: 種別）でも、値が質問文に現れれば行をマッチさせる。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 5,
+             "values": {"タスクID": "T30", "種別": "バッファ", "工数(h)": "2"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 6,
+             "values": {"タスクID": "T31", "種別": "レビュー", "工数(h)": "3"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "バッファに該当するタスクIDと工数を教えてください。", "A社", store
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T30" in texts
+        assert "T31" not in texts
+
+    def test_extended_synonym_columns_match_by_value(self) -> None:
+        """種別以外にも、タスク・マイルストーン・回次といった類義の列名（未知の
+        スケジュール表で一般的に現れる分類・識別用の列名）が値一致でマッチする。
+        列名を無制限に許すのではなく、この一般語彙リストの範囲で汎用化する設計。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "WBS", "row_number": 3,
+             "values": {"タスクID": "T50", "タスク名": "モデル改善実験"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "WBS", "row_number": 4,
+             "values": {"タスクID": "T51", "関連マイルストーン": "MS3"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "WBS", "row_number": 5,
+             "values": {"タスクID": "T52", "回次/ID": "CP2"}},
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "WBS", "row_number": 6,
+             "values": {"タスクID": "T53", "タスク名": "無関係の作業"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "モデル改善実験というタスク、MS3に関連するタスク、CP2に関連するタスクの"
+            "タスクIDをそれぞれ教えてください。",
+            "A社", store,
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T50" in texts
+        assert "T51" in texts
+        assert "T52" in texts
+        assert "T53" not in texts
+
+    def test_header_echo_row_not_matched_for_non_whitelisted_column(self) -> None:
+        """拡張後の列名（当初のホワイトリスト4種以外）でも、値==列名のヘッダ行残骸は除外される。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 2,
+             "values": {"タスクID": "タスクID", "種別": "種別"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "種別の一覧を教えてください。", "A社", store
+        )
+        assert docs == []
+
+    def test_column_name_outside_generic_vocabulary_is_not_matched(self) -> None:
+        """一般語彙リストに含まれない列名（例: 工数、確認欄のような数値・自由記述の列）は
+        値一致の対象にしない。列名を問わず全列を対象にすると、質問と無関係な列の値が
+        誤って行マッチの根拠になってしまう（Incorrect回答のリスクを高める）ため。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 7,
+             "values": {"タスクID": "T60", "タスク名": "初期設計", "工数(h)": "18", "ステータス": "未着手"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "7月18日時点で完了しているタスクIDを教えてください。", "A社", store
+        )
+        assert docs == []
+
+    def test_purely_numeric_value_is_not_matched_even_in_whitelisted_column(self) -> None:
+        """一般語彙リストに含まれる列名（例: ステータスコード）であっても、値が数値のみ
+        （ステータスコード等の識別番号）の場合は、質問文中の無関係な数字（日付等）との
+        偶然の部分一致で行マッチの根拠にしない。列名一致だけでは誤マッチを防げないため、
+        値側にも数値単独除外という独立した安全条件を設ける。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 8,
+             "values": {"タスクID": "T61", "タスク名": "設計レビュー", "ステータスコード": "18"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "7月18日に予定されているタスクIDを教えてください。", "A社", store
+        )
+        assert docs == []
+
+    def test_generic_status_word_in_unrelated_column_does_not_shadow_authoritative_status(self) -> None:
+        """本来の状態を表す列（ステータス）は「未着手」なのに、無関係な自由記述列
+        （確認欄）に紛れ込んだ汎用語「完了」だけで行を完了扱いにしない。列名が
+        一般語彙リストの対象外である以上、値が一致しても行マッチの根拠にしない。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/raw/x/スケジュール.xlsx", "sheet_name": "sheet1", "row_number": 9,
+             "values": {"タスクID": "T62", "フェーズ": "検証", "ステータス": "未着手", "確認欄": "完了"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "レビューが完了したフェーズを教えてください。", "A社", store
+        )
+        assert docs == []
+
 
 class TestOfficeStyleHighlightAndNarrowing:
     """docxのhighlight_colorキー対応と、質問中のヒント（拡張子・ファイル名・ページ番号）
