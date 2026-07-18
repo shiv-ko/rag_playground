@@ -154,6 +154,138 @@ class TestOfficeParser:
         assert len(docs) == 1
         assert "解析失敗" in docs[0].text
 
+    def test_docx_parse_includes_table_cell_text(self, tmp_path: Path) -> None:
+        """Wordの表（doc.tables）のセルテキストも索引対象に含める。
+
+        現状は doc.paragraphs のみを結合しており doc.tables を無視しているため、
+        表形式の内容（略語辞典・契約条件表等）がまるごと検索対象から消える
+        （実データ: 社内用語集.docxが9表820セルのうち0セルしか索引されない）。
+        """
+        import docx
+
+        f = tmp_path / "with_table.docx"
+        doc = docx.Document()
+        doc.add_paragraph("見出し")
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "略語"
+        table.cell(0, 1).text = "意味"
+        table.cell(1, 0).text = "FM"
+        table.cell(1, 1).text = "ファシリティマネジメント"
+        doc.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)
+
+        assert any("ファシリティマネジメント" in d.text for d in docs), (
+            "表セルのテキストがパース結果に含まれていない"
+        )
+
+    def test_docx_parse_preserves_body_order_of_paragraphs_and_tables(
+        self, tmp_path: Path
+    ) -> None:
+        """段落と表が混在する文書で、本文中の出現順を保持する。"""
+        import docx
+
+        f = tmp_path / "ordered.docx"
+        doc = docx.Document()
+        doc.add_paragraph("最初の段落")
+        table = doc.add_table(rows=1, cols=1)
+        table.cell(0, 0).text = "表の内容"
+        doc.add_paragraph("最後の段落")
+        doc.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)
+        text = "\n".join(d.text for d in docs)
+
+        first_idx = text.index("最初の段落")
+        table_idx = text.index("表の内容")
+        last_idx = text.index("最後の段落")
+        assert first_idx < table_idx < last_idx, (
+            "段落と表の出現順（body順）が保持されていない"
+        )
+
+    def test_docx_parse_handles_merged_and_empty_cells_without_raising(
+        self, tmp_path: Path
+    ) -> None:
+        """結合セル・空セルを含む表でも例外を出さず、非空セルの内容を抽出する。
+
+        python-docxの`row.cells`は横結合(gridSpan)されたセルをスパン列数分
+        同一tc要素として複数回yieldする仕様のため、そのまま連結すると
+        「結合セル見出し | 結合セル見出し」のように内容が重複してしまう。
+        tc要素の同一性でデデュープし、重複なく1回だけ抽出されることを検証する。
+        """
+        import docx
+
+        f = tmp_path / "merged_cells.docx"
+        doc = docx.Document()
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).merge(table.cell(0, 1))
+        table.cell(0, 0).text = "結合セル見出し"
+        table.cell(1, 0).text = ""
+        table.cell(1, 1).text = "右下セルの値"
+        doc.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)  # 例外を出さないこと
+
+        text = "\n".join(d.text for d in docs)
+        assert text.count("結合セル見出し") == 1, (
+            "横結合セルの内容が重複して抽出されている: " + repr(text)
+        )
+        assert "右下セルの値" in text
+
+    def test_docx_parse_dedups_vertically_merged_cell_across_rows(
+        self, tmp_path: Path
+    ) -> None:
+        """縦結合(vMerge)セルの継続行でも、python-docxは起点セルの内容を
+        再度yieldする仕様のため、そのまま連結すると起点セルの内容が
+        行数分だけ丸ごと重複してしまう。tc要素の同一性で表全体にわたって
+        デデュープし、1回だけ抽出されることを検証する。
+        """
+        import docx
+
+        f = tmp_path / "vmerged.docx"
+        doc = docx.Document()
+        table = doc.add_table(rows=3, cols=2)
+        table.cell(0, 0).merge(table.cell(1, 0))
+        table.cell(0, 0).text = "縦結合の内容"
+        table.cell(0, 1).text = "上段の値"
+        table.cell(1, 1).text = "下段の値"
+        table.cell(2, 0).text = "無関係セル"
+        table.cell(2, 1).text = "無関係の値"
+        doc.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)
+
+        text = "\n".join(d.text for d in docs)
+        assert text.count("縦結合の内容") == 1, (
+            "縦結合セルの内容が行ごとに重複して抽出されている: " + repr(text)
+        )
+        assert "上段の値" in text
+        assert "下段の値" in text
+        assert "無関係セル" in text
+
+    def test_docx_parse_handles_nested_table_without_raising(self, tmp_path: Path) -> None:
+        """表のセル内にネストした表があっても例外を出さない。"""
+        import docx
+
+        f = tmp_path / "nested_table.docx"
+        doc = docx.Document()
+        outer_table = doc.add_table(rows=1, cols=1)
+        outer_cell = outer_table.cell(0, 0)
+        outer_cell.text = "外側セル"
+        nested_table = outer_cell.add_table(rows=1, cols=1)
+        nested_table.cell(0, 0).text = "内側セル"
+        doc.save(f)
+
+        parser = OfficeParser()
+        docs = parser.parse(f)  # 例外を出さないこと
+
+        assert len(docs) == 1
+        assert "外側セル" in docs[0].text
+
     def test_xlsx_parse_failure_returns_stub_not_raises(self, tmp_path: Path) -> None:
         f = tmp_path / "broken.xlsx"
         f.write_bytes(b"not a real xlsx file")
