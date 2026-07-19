@@ -25,8 +25,14 @@ from src.generator.milestone_date_answerer import (
 )
 from src.generator.office_chart import OfficeChartAnswerer
 from src.generator.spreadsheet_calc import SpreadsheetCalcAnswerer
-from src.generator.vlm_answerer import VLMImageAnswerer, find_referenced_image
-from src.models import Answer, CRAGLabel, JudgeResult, ScoredDocument
+from src.generator.vlm_answerer import (
+    VLMImageAnswerer,
+    extract_visual_images,
+    find_referenced_image,
+    find_referenced_visual_files,
+    select_visual_images,
+)
+from src.models import Answer, CRAGLabel, Document, JudgeResult, ScoredDocument
 from src.parsers.dispatcher import ParserDispatcher
 from src.retriever.project_scoped_retriever import ProjectScopedRetriever
 from src.retriever.query_expander import QueryExpander
@@ -629,7 +635,35 @@ class Pipeline:
             contexts = self.retriever.search(
                 search_query, top_k=self.top_k, term_hints=term_hints
             )
-            answer = self.generator.generate(qa.question, contexts)
+            project_name = self._resolve_project_name(qa.question)
+            visual_paths = find_referenced_visual_files(
+                search_query, project_name, self.data_dir
+            )
+            if visual_paths:
+                visual_images = select_visual_images([
+                    image for path in visual_paths for image in extract_visual_images(path)
+                ])
+                visual_answer = self.vlm_answerer.answer_visuals(qa.question, visual_images)
+                if not visual_answer.was_gated:
+                    visual_sources = []
+                    selected_paths = list(dict.fromkeys(
+                        image.source_path for image in visual_images if image.source_path is not None
+                    ))
+                    for path in selected_paths:
+                        existing = next(
+                            (sd for sd in contexts if sd.document.source_path == path), None
+                        )
+                        visual_sources.append(existing or ScoredDocument(
+                            document=Document(text="", source_path=path, location="visual"),
+                            score=0.0,
+                            retrieval_method="visual_file",
+                        ))
+                    visual_answer.source_docs = visual_sources
+                    answer = visual_answer
+                    contexts = visual_sources
+                    answer_path = "structured:vlm_document"
+            if answer is None:
+                answer = self.generator.generate(qa.question, contexts)
         else:
             contexts = answer.source_docs
 

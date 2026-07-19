@@ -1865,6 +1865,49 @@ def test_pipeline_routes_standalone_image_question_to_vlm_answerer(tmp_path: Pat
     assert result.answer == "20日"
 
 
+def test_pipeline_routes_text_only_image_pptx_to_vlm_fallback(tmp_path: Path) -> None:
+    """画像タグがなくても、名指しされた画像専用PPTXは通常生成前にVLMへ渡す。"""
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    project = "京橋信用ソリューションズ株式会社"
+    project_dir = tmp_path / "プロジェクト" / project
+    project_dir.mkdir(parents=True)
+    png_path = tmp_path / "seat.png"
+    png_path.write_bytes(
+        bytes.fromhex(
+            "89504e470d0a1a0a0000000d49484452000000010000000108020000009077"
+            "53de0000000c4944415408d763f8ffff3f0005fe02fea739669f0000000049454e44ae426082"
+        )
+    )
+    pptx_path = project_dir / "座席表.pptx"
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_picture(str(png_path), Inches(1), Inches(1))
+    prs.save(pptx_path)
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False)
+    pipeline.generator.generate = lambda *_: (_ for _ in ()).throw(
+        AssertionError("画像専用文書は通常生成へ流してはいけない")
+    )
+    pipeline.vlm_answerer._call_vlm_images = lambda question, images: (
+        '{"answer":"田中さん","confidence":0.9,"reasoning":"右隣"}'
+    )
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="44",
+        question="京橋信用ソリューションズの座席表で佐藤さんの右側の人物は誰ですか。",
+    ))
+
+    assert result.routing_tags == ["text_only"]
+    assert result.answer_path == "structured:vlm_document"
+    assert result.answer == "田中さん"
+    assert any("座席表.pptx" in source for source in result.retrieved_sources)
+
+
 def test_image_keyword_kashika_is_tagged_image_or_graph() -> None:
     """『可視化』というキーワードだけの質問もimage_or_graphタグが付く
     （test idx66型: 従来はキーワード漏れでtext_onlyのまま通常LLM生成に流れていた）。"""
