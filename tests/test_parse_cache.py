@@ -1,4 +1,6 @@
 """parse_cache のテスト。実パーサーは呼ばず、txtファイルで検証する。"""
+import os
+import time
 from pathlib import Path
 
 from src.utils.parse_cache import compute_fingerprint, load_or_parse
@@ -87,3 +89,75 @@ def test_load_or_parse_exclusion_does_not_reuse_unexcluded_cache(tmp_path):
     assert any("questions_valid" in str(d.source_path) for d in docs_all)
     docs_excluded = load_or_parse(data_dir, cache_dir, exclude_dirs=[qa_dir])
     assert not any("questions_valid" in str(d.source_path) for d in docs_excluded)
+
+
+def _make_code_dir(tmp_path: Path, name: str = "fake_parsers") -> Path:
+    code_dir = tmp_path / name
+    code_dir.mkdir()
+    (code_dir / "text_parser.py").write_text(
+        "def parse():\n    return 1\n", encoding="utf-8"
+    )
+    sub = code_dir / "sub"
+    sub.mkdir()
+    (sub / "chunker.py").write_text(
+        "def chunk():\n    return []\n", encoding="utf-8"
+    )
+    return code_dir
+
+
+def test_fingerprint_changes_when_parser_code_changes(tmp_path):
+    """パーサー/チャンカーのコード内容が変わるとfingerprintが変わる。"""
+    data_dir = _make_data_dir(tmp_path)
+    code_dir = _make_code_dir(tmp_path)
+    fp1 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+
+    (code_dir / "text_parser.py").write_text(
+        "def parse():\n    return 2  # 内容変更\n", encoding="utf-8"
+    )
+    fp2 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+    assert fp1 != fp2
+
+
+def test_fingerprint_changes_when_nested_code_changes(tmp_path):
+    """サブディレクトリ（chunker相当）の内容変更も検知する。"""
+    data_dir = _make_data_dir(tmp_path)
+    code_dir = _make_code_dir(tmp_path)
+    fp1 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+
+    (code_dir / "sub" / "chunker.py").write_text(
+        "def chunk():\n    return [1]  # 内容変更\n", encoding="utf-8"
+    )
+    fp2 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+    assert fp1 != fp2
+
+
+def test_fingerprint_stable_when_data_and_code_unchanged(tmp_path):
+    """データもコードも不変ならfingerprintは安定。"""
+    data_dir = _make_data_dir(tmp_path)
+    code_dir = _make_code_dir(tmp_path)
+    assert compute_fingerprint(data_dir, code_dirs=[code_dir]) == compute_fingerprint(
+        data_dir, code_dirs=[code_dir]
+    )
+
+
+def test_fingerprint_stable_when_only_mtime_changes(tmp_path):
+    """mtimeだけ変わって内容が不変なら同一fingerprint（内容ハッシュで判定するため）。"""
+    data_dir = _make_data_dir(tmp_path)
+    code_dir = _make_code_dir(tmp_path)
+    fp1 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+
+    target = code_dir / "text_parser.py"
+    # 内容は変えずmtimeだけ未来にずらす（gitチェックアウトでの再書き込みを模擬）
+    future = time.time() + 1000
+    os.utime(target, (future, future))
+    fp2 = compute_fingerprint(data_dir, code_dirs=[code_dir])
+    assert fp1 == fp2
+
+
+def test_fingerprint_uses_real_parsers_dir_by_default():
+    """code_dirs省略時はsrc/parsers/配下が使われ、実行のたびに安定する。"""
+    tmp = Path(__file__).resolve().parent
+    data_dir = tmp / "fixtures" if (tmp / "fixtures").exists() else tmp
+    fp1 = compute_fingerprint(data_dir)
+    fp2 = compute_fingerprint(data_dir)
+    assert fp1 == fp2

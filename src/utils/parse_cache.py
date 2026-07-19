@@ -21,7 +21,36 @@ from src.parsers.dispatcher import (
 )
 
 
-def compute_fingerprint(data_dir: Path, exclude_dirs: list[Path] | None = None) -> str:
+def _default_code_dirs() -> list[Path]:
+    """パース結果に影響するコードが置かれているディレクトリ群。
+    新しいパーサー/チャンカーを追加してもハードコード列挙を増やさずに
+    自動で対象になるよう、ファイル名ではなくディレクトリ単位で指定する。"""
+    return [Path(__file__).resolve().parent.parent / "parsers"]
+
+
+def _hash_code_dirs(code_dirs: list[Path]) -> str:
+    """コードディレクトリ配下の全.pyファイルの内容ハッシュを集約する。
+    mtimeではなくファイル内容のハッシュを使うため、gitチェックアウト等で
+    mtimeだけ変わっても内容が同じならキャッシュキーは変化しない。"""
+    entries = []
+    for code_dir in code_dirs:
+        if not code_dir.is_dir():
+            continue
+        code_dir_norm = normalized_resolved_posix(code_dir)
+        for p in sorted(code_dir.rglob("*.py")):
+            if not p.is_file():
+                continue
+            content_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+            rel = normalized_resolved_posix(p)[len(code_dir_norm):].lstrip("/")
+            entries.append(f"{code_dir.name}/{rel}|{content_hash}")
+    return hashlib.sha256("\n".join(sorted(entries)).encode("utf-8")).hexdigest()
+
+
+def compute_fingerprint(
+    data_dir: Path,
+    exclude_dirs: list[Path] | None = None,
+    code_dirs: list[Path] | None = None,
+) -> str:
     excluded = [normalized_resolved_posix(d) for d in (exclude_dirs or [])]
     entries = []
     for p in sorted(data_dir.rglob("*")):
@@ -40,6 +69,9 @@ def compute_fingerprint(data_dir: Path, exclude_dirs: list[Path] | None = None) 
         else:
             exclude_marks.append(unicodedata.normalize("NFC", Path(d).name))
     entries.append("exclude:" + "|".join(sorted(exclude_marks)))
+    # パーサー/チャンカーのコード内容をキーに混ぜる。コードを直しても古い
+    # キャッシュがヒットし続けて修正が無効化される罠を防ぐため。
+    entries.append("code:" + _hash_code_dirs(code_dirs if code_dirs is not None else _default_code_dirs()))
     digest = hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
     return digest[:16]
 
