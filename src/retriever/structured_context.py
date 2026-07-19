@@ -600,13 +600,81 @@ def _is_number(v: Any) -> bool:
         return False
 
 
+def _xlsx_file_and_sheet_universe(
+    project_name: str, store: StructuredArtifactStore
+) -> tuple[set[str], set[str]]:
+    """プロジェクト内の既知xlsxファイル名・シート名の全体集合を返す（ハイライト
+    抽出結果の有無を問わない全件ベース: train_xlsx_sheets/schedule_tasksから収集）。
+    質問文中のファイル名・シート名ヒントが「実在する参照」か「表記ゆれ・誤ヒント」
+    かを判定する基準として使う。train_xlsx_highlight_blocks自体はtrain.xlsx以外の
+    ファイルを一切含まないため、それ単体を基準にすると「質問が別の実在ファイルを
+    名指ししている」ケースを検出できない（絞り込みが常にフォールバックしてしまう）。"""
+    files: set[str] = set()
+    sheets: set[str] = set()
+    for row in store.train_xlsx_sheets_for(project_name) + store.schedule_tasks_for(project_name):
+        name = row.get("file_name") or Path(str(row.get("source_path") or "")).name
+        if name:
+            files.add(str(name))
+        if row.get("sheet_name"):
+            sheets.add(str(row["sheet_name"]))
+    return files, sheets
+
+
+def _narrow_xlsx_rows_by_question_hints(
+    question: str,
+    rows: list[dict],
+    known_files: set[str],
+    known_sheets: set[str],
+) -> list[dict]:
+    """xlsx由来の候補（train_xlsx_highlight_blocks・schedule_tasksのハイライト行等）を
+    質問文中のファイル名・シート名ヒントで絞り込む。office_style側の
+    _narrow_marks_by_question_hintsと対称の設計だが、「ヒントに一致する対象が
+    存在するか」の判定はrows単体ではなく、プロジェクト全体の既知ファイル/シート集合
+    （known_files/known_sheets、抽出データの有無を問わない全件）を基準にする。
+    - 質問がプロジェクト内の既知ファイルのいずれかを名指ししている場合、その
+      ファイルのrowsだけを残す（他の既知ファイルを名指ししている場合、rows全体が
+      対象外＝0件になることがあるが、それは正しい絞り込み結果）。名指しがどの
+      既知ファイルとも一致しない場合（表記ゆれ・誤ヒント）は絞り込みを適用しない
+      （安全側フォールバック、誤ヒントで全損しないため）。
+    - シート名ヒントも同様の考え方。ただしシート名が既知ファイル名（拡張子抜き）の
+      部分文字列である場合（例: シート名"工程"とファイル"工程_r2.xlsx"）は、
+      ファイル名の言及との区別がつかないためシートヒントの対象外にする。
+    NFC/casefold正規化を照合に適用する。
+    """
+    def _row_file_name(row: dict) -> str:
+        return str(row.get("file_name") or Path(str(row.get("source_path") or "")).name)
+
+    matched_files = set(find_named_files(question, known_files))
+    if matched_files:
+        rows = [r for r in rows if unicodedata.normalize("NFC", _row_file_name(r)) in matched_files]
+
+    question_norm = _normalize_for_keyword_match(question)
+    file_stems = {_normalize_for_keyword_match(Path(f).stem) for f in known_files if f}
+    matched_sheets = {
+        s for s in known_sheets
+        if s
+        and len(s) >= 2
+        and _normalize_for_keyword_match(s) in question_norm
+        and not any(_normalize_for_keyword_match(s) in stem for stem in file_stems)
+    }
+    if matched_sheets:
+        rows = [r for r in rows if str(r.get("sheet_name")) in matched_sheets]
+
+    return rows
+
+
 def build_spreadsheet_state_context(
     question: str, project_name: str, store: StructuredArtifactStore
 ) -> list[ScoredDocument]:
     docs: list[ScoredDocument] = []
 
     if _requests_highlight_condition(question):
-        for block in store.train_xlsx_highlight_blocks_for(project_name):
+        known_files, known_sheets = _xlsx_file_and_sheet_universe(project_name, store)
+
+        highlight_blocks = _narrow_xlsx_rows_by_question_hints(
+            question, store.train_xlsx_highlight_blocks_for(project_name), known_files, known_sheets
+        )
+        for block in highlight_blocks:
             source = block.get("source_path")
             if not source:
                 continue
@@ -618,7 +686,11 @@ def build_spreadsheet_state_context(
                 location=f"sheet_{block.get('sheet_name')}_range_{block.get('range')}",
             )
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
-        docs.extend(_schedule_highlight_docs(question, store.schedule_tasks_for(project_name)))
+
+        schedule_rows = _narrow_xlsx_rows_by_question_hints(
+            question, store.schedule_tasks_for(project_name), known_files, known_sheets
+        )
+        docs.extend(_schedule_highlight_docs(question, schedule_rows))
 
     if _requests_filter_condition(question):
         # train.xlsx（XML直読み系）のフィルタ条件 — 条件そのものが取れるので最優先

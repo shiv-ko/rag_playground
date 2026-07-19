@@ -331,6 +331,135 @@ class TestSpreadsheetStateContext:
         assert docs == []
 
 
+class TestSpreadsheetStateSheetAndFileScoping:
+    """質問文中のシート名・ファイル名ヒントでxlsxハイライト系候補を絞り込む
+    （office_style側の_narrow_marks_by_question_hintsと対称の設計）。
+    「対象が実在するか」の判定はtrain_xlsx_sheets/schedule_tasksの全件
+    （ハイライトの有無を問わない）を基準にする — train_xlsx_highlight_blocks
+    自体はtrain.xlsx以外のファイルを一切含まないため、それ単体では
+    「質問が別の実在ファイルを名指ししている」ケースを検出できないため。"""
+
+    def test_sheet_name_hint_narrows_highlight_blocks_to_named_sheet(self) -> None:
+        store = _full_store(
+            train_xlsx_sheets={"A社": [
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet1"},
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet2"},
+            ]},
+            train_xlsx_highlight_blocks={"A社": [
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet1", "range": "A1",
+                 "fill_color_name": "yellow", "first_value": "sheet1-value"},
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet2", "range": "B2",
+                 "fill_color_name": "yellow", "first_value": "sheet2-value"},
+            ]},
+        )
+        docs = build_spreadsheet_state_context(
+            "train.xlsxのSheet2で黄色にハイライトされたセルの抽出条件を教えてください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("sheet2-value" in t for t in texts)
+        assert not any("sheet1-value" in t for t in texts)
+
+    def test_file_name_hint_excludes_train_xlsx_when_different_file_named(self) -> None:
+        """質問がプロジェクト内の別の実在ファイル（スケジュール.xlsx）を名指しして
+        いる場合、train_xlsx_highlight_blocks（train.xlsx由来）は混入させない。"""
+        store = _full_store(
+            train_xlsx_highlight_blocks={"A社": [
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet1", "range": "A1",
+                 "fill_color_name": "yellow", "first_value": "train-value"},
+            ]},
+            schedule_tasks={"A社": [
+                {"source_path": "data/x/スケジュール.xlsx", "file_name": "スケジュール.xlsx",
+                 "sheet_name": "WBSタスク一覧", "row_number": 2, "dominant_row_fill": None,
+                 "values": {"タスクID": "T01"}},
+            ]},
+        )
+        docs = build_spreadsheet_state_context(
+            "スケジュール.xlsxにおいて、オレンジ色にハイライトされている行のタスクIDを教えてください。",
+            "A社", store,
+        )
+        assert not any("train-value" in d.document.text for d in docs)
+
+    def test_unmatched_sheet_hint_falls_back_to_original_candidates(self) -> None:
+        """質問中のシート名ヒントがプロジェクト内のどの既知シートとも一致しない
+        （表記ゆれ・誤ヒント）場合、絞り込みを適用せず従来候補を維持する。"""
+        store = _full_store(
+            train_xlsx_sheets={"A社": [
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet1"},
+            ]},
+            train_xlsx_highlight_blocks={"A社": [
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet1", "range": "A1",
+                 "fill_color_name": "yellow", "first_value": "sheet1-value"},
+            ]},
+        )
+        docs = build_spreadsheet_state_context(
+            "train.xlsxのSheet9で黄色にハイライトされたセルを教えてください。", "A社", store
+        )
+        assert any("sheet1-value" in d.document.text for d in docs)
+
+    def test_sheet_name_that_is_substring_of_named_file_is_not_treated_as_hint(self) -> None:
+        """シート名がファイル名（拡張子抜き）に含まれる場合（例: シート名"工程"と
+        ファイル"工程_r2.xlsx"）、ファイル名の言及とシート名の言及を区別できない
+        ため、シート名ヒントとしては扱わない（ファイル名絞り込みのみ適用）。"""
+        store = _full_store(schedule_tasks={"A社": [
+            {"source_path": "data/x/02.計画/工程_r2.xlsx", "file_name": "工程_r2.xlsx",
+             "sheet_name": "工程", "row_number": 2, "dominant_row_fill": "F2E0D0",
+             "values": {"タスクID": "T02", "タスク名": "要件整理"}},
+            {"source_path": "data/x/02.計画/工程_r2.xlsx", "file_name": "工程_r2.xlsx",
+             "sheet_name": "サブ工程", "row_number": 3, "dominant_row_fill": "F2E0D0",
+             "values": {"タスクID": "T03", "タスク名": "詳細設計"}},
+        ]})
+        docs = build_spreadsheet_state_context(
+            "工程_r2.xlsxにおいて、オレンジにハイライトされている行のタスクIDは？", "A社", store
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "T02" in texts
+        assert "T03" in texts  # sheet_name「工程」はfile_stemの部分文字列なのでシートヒントとして誤発火しない
+
+    def test_no_hint_question_leaves_multi_sheet_candidates_unchanged(self) -> None:
+        """質問文にシート名・別ファイル名ヒントが一切無い場合は、既知シート/
+        ファイル情報が利用可能でも従来どおり全候補を返す（後方互換）。"""
+        store = _full_store(
+            train_xlsx_sheets={"A社": [
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet1"},
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet2"},
+            ]},
+            train_xlsx_highlight_blocks={"A社": [
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet1", "range": "A1",
+                 "fill_color_name": "yellow", "first_value": "sheet1-value"},
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet2", "range": "B2",
+                 "fill_color_name": "yellow", "first_value": "sheet2-value"},
+            ]},
+        )
+        docs = build_spreadsheet_state_context(
+            "train.xlsxで黄色にハイライトされたセルをすべて教えてください。", "A社", store
+        )
+        texts = "\n".join(d.document.text for d in docs)
+        assert "sheet1-value" in texts
+        assert "sheet2-value" in texts
+
+    def test_sheet_name_hint_matching_is_nfc_and_casefold_normalized(self) -> None:
+        """シート名ヒントの照合はNFC正規化・casefoldを適用する（全角英数等の
+        表記ゆれを吸収する）。"""
+        store = _full_store(
+            train_xlsx_sheets={"A社": [
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet1"},
+                {"source_path": "data/x/train.xlsx", "file_name": "train.xlsx", "sheet_name": "Sheet2"},
+            ]},
+            train_xlsx_highlight_blocks={"A社": [
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet1", "range": "A1",
+                 "fill_color_name": "yellow", "first_value": "sheet1-value"},
+                {"source_path": "data/x/train.xlsx", "sheet_name": "Sheet2", "range": "B2",
+                 "fill_color_name": "yellow", "first_value": "sheet2-value"},
+            ]},
+        )
+        docs = build_spreadsheet_state_context(
+            "train.xlsxのＳｈｅｅｔ２で黄色にハイライトされたセルを教えてください。", "A社", store
+        )
+        texts = [d.document.text for d in docs]
+        assert any("sheet2-value" in t for t in texts)
+        assert not any("sheet1-value" in t for t in texts)
+
+
 class TestScheduleTaskMatchingGeneralization:
     """実データ形式への対応: 列名「フェーズ」（「フェーズ名」でない）、
     番号接頭辞付きの値（「3. 探索的分析・仮説整理」）、複合担当者（「A / B」）。"""
