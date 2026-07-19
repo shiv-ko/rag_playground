@@ -1228,3 +1228,160 @@ def test_spreadsheet_state_context_train_xlsx_path_unchanged() -> None:
         "train.xlsxでハイライトされているセルの値は？", "A社", store
     )
     assert any("ハイライト範囲" in d.document.text for d in docs)
+
+
+# --- 回帰予測（回帰係数×特徴量値の内積＋切片）の係数グリッド検出 -------------------- #
+
+
+def test_regression_prediction_context_detects_grid_with_intercept_before_features() -> None:
+    """Excel回帰分析出力の典型レイアウト（切片行が特徴量行より上）から
+    「係数」ヘッダ列＋「切片」ラベル行の組み合わせのみで係数グリッドを検出し、doc化する。"""
+    cells = [
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B5", "row": 5, "value": "係数"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "C5", "row": 5, "value": "標準誤差"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A6", "row": 6, "value": "切片"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B6", "row": 6, "value": "1.5"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A7", "row": 7, "value": "feat_x"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B7", "row": 7, "value": "2.0"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A8", "row": 8, "value": "feat_y"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B8", "row": 8, "value": "-0.5"},
+    ]
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "テスト案件のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。",
+        "テスト案件", store,
+    )
+    matches = [d for d in docs if "切片" in d.document.text and "係数" in d.document.text]
+    assert len(matches) == 1
+    text = matches[0].document.text
+    assert "切片: 1.5" in text
+    assert "feat_x=2.0" in text
+    assert "feat_y=-0.5" in text
+
+
+def test_regression_prediction_context_detects_grid_with_intercept_after_features() -> None:
+    """切片行が特徴量行より下（表の末尾）に来るレイアウトでも同様に検出できる
+    （実データ2案件で順序が異なることを確認済みのため、順序に依存しない設計であることの回帰テスト）。"""
+    cells = [
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B5", "row": 5, "value": "係数"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A6", "row": 6, "value": "feat_x"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B6", "row": 6, "value": "0.3"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A7", "row": 7, "value": "feat_y"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B7", "row": 7, "value": "0.7"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A8", "row": 8, "value": "切片"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B8", "row": 8, "value": "-2.25"},
+    ]
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "テスト案件のtrain.xlsxの回帰分析の結果として記載されている係数をindex=10のデータに"
+        "当てはめたときの予測値はいくつですか。",
+        "テスト案件", store,
+    )
+    matches = [d for d in docs if "切片" in d.document.text and "係数" in d.document.text]
+    assert len(matches) == 1
+    text = matches[0].document.text
+    assert "切片: -2.25" in text
+    assert "feat_x=0.3" in text
+    assert "feat_y=0.7" in text
+
+
+def test_regression_prediction_context_not_triggered_without_prediction_keyword() -> None:
+    """「回帰」「係数」は含むが「予測」を含まない質問では回帰係数docを追加しない
+    （検出は一般語彙3語の共起のみで判定し、既存のPivot等の挙動に影響を与えないことの確認）。"""
+    cells = [
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B5", "row": 5, "value": "係数"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A6", "row": 6, "value": "切片"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B6", "row": 6, "value": "1.5"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A7", "row": 7, "value": "feat_x"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B7", "row": 7, "value": "2.0"},
+    ]
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "train.xlsxの回帰分析シートに記載されている係数を教えてください。", "テスト案件", store,
+    )
+    assert not any("切片" in d.document.text for d in docs)
+
+
+def test_regression_prediction_context_not_triggered_for_residual_or_error_request() -> None:
+    """「予測値と実測値の残差/誤差を求めよ」型の質問は、予測値そのものではなく
+    別の量（実測値との差）を問うものであり、予測値を直答すると誤答になる。
+    「残差」「誤差」を含む質問では回帰係数docを追加しない（負のガード）。"""
+    cells = [
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B5", "row": 5, "value": "係数"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A6", "row": 6, "value": "切片"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B6", "row": 6, "value": "1.5"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A7", "row": 7, "value": "feat_x"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B7", "row": 7, "value": "2.0"},
+    ]
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    for question in (
+        "train.xlsxで算出された回帰係数を使ってid=0を予測した場合の残差はいくらですか。",
+        "train.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値との誤差はいくらですか。",
+    ):
+        docs = build_spreadsheet_state_context(question, "テスト案件", store)
+        assert not any("切片" in d.document.text for d in docs), question
+
+
+def test_regression_prediction_context_ambiguous_multiple_grids_returns_nothing() -> None:
+    """案件内に複数の回帰係数グリッド候補（複数シート）が構造的に検出される場合、
+    誤った式を使うリスクを避けるため回帰係数docを一切出さない（曖昧なら出さない）。"""
+    cells = []
+    for sheet in ("回帰分析A", "回帰分析B"):
+        cells.append({"sheet_name": sheet, "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+                       "cell": "B5", "row": 5, "value": "係数"})
+        cells.append({"sheet_name": sheet, "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+                       "cell": "A6", "row": 6, "value": "切片"})
+        cells.append({"sheet_name": sheet, "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+                       "cell": "B6", "row": 6, "value": "1.0"})
+        cells.append({"sheet_name": sheet, "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+                       "cell": "A7", "row": 7, "value": "feat_x"})
+        cells.append({"sheet_name": sheet, "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+                       "cell": "B7", "row": 7, "value": "2.0"})
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "train.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。", "テスト案件", store,
+    )
+    assert not any("切片" in d.document.text for d in docs)
+
+
+def test_regression_prediction_context_missing_intercept_label_returns_nothing() -> None:
+    """「係数」ヘッダはあっても「切片」ラベル行が無い場合はグリッドとして採用しない
+    （切片が欠ければ予測値を計算できないため）。"""
+    cells = [
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B5", "row": 5, "value": "係数"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "A6", "row": 6, "value": "feat_x"},
+        {"sheet_name": "回帰分析", "file_name": "train.xlsx", "source_path": "data/raw/x/train.xlsx",
+         "cell": "B6", "row": 6, "value": "2.0"},
+    ]
+    store = _store({"train_xlsx_small_sheet_cells": cells})
+    docs = build_spreadsheet_state_context(
+        "train.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。", "テスト案件", store,
+    )
+    assert not any("切片" in d.document.text for d in docs)

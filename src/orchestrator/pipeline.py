@@ -8,7 +8,9 @@ import re
 import time
 import unicodedata
 from dataclasses import asdict, dataclass, field
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
+from typing import Any
 
 from src.evaluator.judge import LocalJudge
 from src.evaluator.metrics import EvalSummary, summarize
@@ -32,6 +34,7 @@ from src.retriever.structured_context import (
     build_office_style_context,
     build_spreadsheet_state_context,
     build_version_diff_context,
+    is_regression_prediction_request,
     question_mentions_spreadsheet,
 )
 from src.structured.artifact_store import StructuredArtifactStore
@@ -115,6 +118,88 @@ def _direct_pivot_condition_and_aggregation_answer(
         was_gated=False,
         raw_text=answers[0],
     )
+
+
+# 回帰予測直接計算answerer用の解析ユーティリティ。
+# build_spreadsheet_state_contextが埋め込む「切片: ...」「係数: name=val, ...」形式の
+# docテキストを再パースする（既存の_direct_pivot_condition_and_aggregation_answerと
+# 同じ「contextsのテキストを正規表現で読み戻す」設計パターン）。
+_REGRESSION_INTERCEPT_RE = re.compile(r"^切片:\s*(.+)$", re.MULTILINE)
+_REGRESSION_COEFFICIENTS_RE = re.compile(r"^係数:\s*(.+)$", re.MULTILINE)
+# 質問文中の行指定（id=0 / index=1770 等）。全角=・全角数字はNFKC正規化後に吸収する。
+_REGRESSION_ROW_SELECTOR_RE = re.compile(r"(id|index)\s*=\s*(\d+)", re.IGNORECASE)
+# 「小数第5位まで」のような丸め桁指定。指定が無ければ出力フォーマットを確定できない
+# ため直接回答しない（曖昧な丸めよりMissingを優先）。
+_REGRESSION_DECIMAL_PLACES_RE = re.compile(r"小数第\s*(\d+)\s*位")
+
+
+def _parse_regression_grid_from_contexts(
+    contexts: list[ScoredDocument],
+) -> dict[str, Any] | None:
+    matches: list[dict[str, Any]] = []
+    for context in contexts:
+        text = context.document.text
+        intercept_m = _REGRESSION_INTERCEPT_RE.search(text)
+        coef_m = _REGRESSION_COEFFICIENTS_RE.search(text)
+        if not intercept_m or not coef_m:
+            continue
+        try:
+            intercept = float(intercept_m.group(1).strip())
+        except ValueError:
+            continue
+        coefficients: dict[str, float] = {}
+        ok = True
+        for part in coef_m.group(1).split(","):
+            part = part.strip()
+            if not part or "=" not in part:
+                ok = False
+                break
+            name, raw_value = part.split("=", 1)
+            try:
+                coefficients[name.strip()] = float(raw_value.strip())
+            except ValueError:
+                ok = False
+                break
+        if not ok or not coefficients:
+            continue
+        matches.append({"intercept": intercept, "coefficients": coefficients})
+
+    if len(matches) != 1:
+        return None  # 回帰係数doc0件、または複数（曖昧）なら回答しない
+    return matches[0]
+
+
+def _extract_regression_row_selector(question: str) -> tuple[str, int] | None:
+    normalized = unicodedata.normalize("NFKC", question)
+    matches = _REGRESSION_ROW_SELECTOR_RE.findall(normalized)
+    if len(matches) != 1:
+        return None  # 指定なし、または複数の指定があり曖昧
+    key, value = matches[0]
+    return key.lower(), int(value)
+
+
+def _extract_regression_decimal_places(question: str) -> int | None:
+    matches = _REGRESSION_DECIMAL_PLACES_RE.findall(question)
+    if len(matches) != 1:
+        return None
+    return int(matches[0])
+
+
+def _select_regression_row(df, selector: tuple[str, int]):
+    """selectorのキー("id"/"index")と同名の列がtrain.csvにあればその列の値一致で
+    行を選ぶ。"index"指定で該当列が無い場合のみ、pandasの位置参照(0始まり)に
+    フォールバックする（"id"指定で該当列が無い場合は位置参照との対応が不明なため
+    フォールバックしない＝None）。一致行が0件/複数なら曖昧としてNone。"""
+    key, value = selector
+    matching_cols = [c for c in df.columns if str(c).strip().casefold() == key]
+    if matching_cols:
+        matched = df[df[matching_cols[0]] == value]
+        if len(matched) != 1:
+            return None
+        return matched.iloc[0]
+    if key == "index" and 0 <= value < len(df):
+        return df.iloc[value]
+    return None
 
 
 @dataclass
@@ -400,6 +485,12 @@ class Pipeline:
                     was_gated=True,
                     gate_reason="spreadsheet_state_incomplete",
                 ), "structured:spreadsheet_state"
+        if used_tag == "spreadsheet_state" and is_regression_prediction_request(qa.question):
+            direct = self._direct_regression_prediction_answer(qa.question, contexts, project_name)
+            if direct is not None:
+                return direct, "structured:spreadsheet_state"
+            # 係数・行指定・特徴量値・丸め桁のいずれかが欠ける/曖昧な場合はMissing固定にせず
+            # 既存のgenerate()フォールバック（後続のゲートでMissingになりうる）へ委ねる
         return self.generator.generate(qa.question, contexts), f"structured:{used_tag}"
 
     def _direct_office_style_answer(self, contexts: list[ScoredDocument]) -> Answer | None:
@@ -425,6 +516,65 @@ class Pipeline:
             source_docs=contexts,
             was_gated=False,
             raw_text="、".join(values),
+        )
+
+    def _direct_regression_prediction_answer(
+        self, question: str, contexts: list[ScoredDocument], project_name: str
+    ) -> Answer | None:
+        """回帰分析シートの係数グリッド（build_spreadsheet_state_contextが埋め込んだ
+        contextsのテキストから復元）＋train.csvの該当行から、予測値=切片+Σ(係数×特徴量値)
+        をLLMを介さず直接計算する。必要な係数・行・特徴量値・丸め桁のいずれかが
+        欠ける/曖昧な場合はNone（既存のgenerate()フォールバックへ委ねる）。"""
+        grid = _parse_regression_grid_from_contexts(contexts)
+        if grid is None:
+            return None
+        selector = _extract_regression_row_selector(question)
+        if selector is None:
+            return None
+        decimals = _extract_regression_decimal_places(question)
+        if decimals is None:
+            return None
+        df = self._load_train_csv(project_name)
+        if df is None:
+            return None
+        row = _select_regression_row(df, selector)
+        if row is None:
+            return None
+
+        import pandas as pd
+
+        prediction = grid["intercept"]
+        for feature, coef in grid["coefficients"].items():
+            if feature not in row.index:
+                return None
+            value = row[feature]
+            if pd.isna(value):
+                return None
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                return None
+            prediction += coef * numeric_value
+
+        # Pythonのformat()はround-half-even（banker's rounding）だが、日本語の
+        # 「小数第N位まで求めてください」という丸め指定は四捨字（ROUND_HALF_UP）を
+        # 期待する（実測: f"{0.125:.2f}"→"0.12"だが四捨五入なら"0.13"）。CRAGは数値
+        # 完全一致のみPerfectのため、丸め桁の次が5になる境界値でのズレはIncorrect
+        # 直行のリスクがある。既存のsrc/generator/analysis_answerer.pyと同じ
+        # Decimal+ROUND_HALF_UP方式に揃える。
+        try:
+            quantized = Decimal(str(prediction)).quantize(
+                Decimal(f"1e-{decimals}"), rounding=ROUND_HALF_UP
+            )
+        except InvalidOperation:
+            return None
+        formatted = format(quantized, f".{decimals}f")
+        return Answer(
+            text=formatted,
+            confidence=0.95,
+            source_docs=contexts,
+            was_gated=False,
+            raw_text=formatted,
         )
 
     def _structured_pool_size(self, tag: str, project_name: str) -> int:

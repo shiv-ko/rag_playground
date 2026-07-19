@@ -1160,6 +1160,340 @@ def test_load_train_csv_does_not_fall_back_to_other_projects_csv(tmp_path: Path)
     assert pipeline._load_train_csv("テスト社") is None
     assert pipeline._load_train_csv("別社") is not None
 
+
+# --- 回帰予測（係数×特徴量値の内積＋切片）の直接計算answerer -------------------- #
+
+
+def _write_regression_grid_artifacts(artifacts_dir: Path, project_name: str) -> None:
+    """切片=10.0, feat_a=2.0, feat_b=-1.0 の合成回帰係数グリッドを書き出す。"""
+    cells = [
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B5", "row": 5, "value": "係数"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "A6", "row": 6, "value": "切片"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B6", "row": 6, "value": "10.0"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "A7", "row": 7, "value": "feat_a"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B7", "row": 7, "value": "2.0"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "A8", "row": 8, "value": "feat_b"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B8", "row": 8, "value": "-1.0"},
+    ]
+    (artifacts_dir / "train_xlsx_small_sheet_cells.jsonl").write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cells), encoding="utf-8",
+    )
+
+
+def test_pipeline_regression_prediction_direct_answer_with_id_selector(tmp_path: Path) -> None:
+    """回帰分析シートの係数グリッド＋train.csvの該当id行から、LLMを介さず
+    予測値=切片+Σ(係数×特徴量値)を直接計算して返す。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text(
+        "id,feat_a,feat_b\n0,3.0,4.0\n1,100.0,200.0\n", encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator.generate = lambda q, c: (_ for _ in ()).throw(
+        AssertionError("係数・特徴量値が揃った回帰予測はLLMに委ねない")
+    )
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の"
+                 "予測値はいくらになりますか。小数第2位まで求めてください。",
+    ))
+
+    # 10.0 + 2.0*3.0 + (-1.0)*4.0 = 12.0
+    assert result.answer == "12.00"
+    assert result.answer_path == "structured:spreadsheet_state"
+    assert not result.was_gated
+
+
+def test_pipeline_regression_prediction_direct_answer_with_index_column_selector(tmp_path: Path) -> None:
+    """train.csvに明示的な"index"列がある場合、位置参照ではなく列の値一致で行を選ぶ
+    （実データで位置参照と列値が食い違う案件が確認されているための回帰テスト）。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    # 0行目の"index"列の値は5だが、質問はindex=5ではなくindex=999（1行目）を指す。
+    # 位置参照(iloc)なら0行目(feat_a=3.0)を誤って選んでしまう。
+    (csv_dir / "train.csv").write_text(
+        "index,feat_a,feat_b\n5,3.0,4.0\n999,7.0,8.0\n", encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator.generate = lambda q, c: (_ for _ in ()).throw(
+        AssertionError("係数・特徴量値が揃った回帰予測はLLMに委ねない")
+    )
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxの回帰分析の結果として記載されている係数をindex=999のデータに"
+                 "当てはめたときの予測値はいくつですか。小数第1位まで答えてください。",
+    ))
+
+    # 10.0 + 2.0*7.0 + (-1.0)*8.0 = 16.0 (index=999の行、位置参照なら3.0/4.0の12.0になり不一致)
+    assert result.answer == "16.0"
+    assert result.answer_path == "structured:spreadsheet_state"
+    assert not result.was_gated
+
+
+def test_pipeline_regression_prediction_missing_row_selector_falls_back_to_generator(
+    tmp_path: Path,
+) -> None:
+    """id=/index=のような行指定が質問文に無い場合は予測値を確定できないため、
+    Missing固定にはせず既存のgenerate()フォールバックへ委ねる。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("id,feat_a,feat_b\n0,3.0,4.0\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    fallback_calls: list[str] = []
+
+    def _fallback_generate(question, contexts):
+        fallback_calls.append(question)
+        from src.models import Answer
+        return Answer(text="fallback", confidence=0.9, source_docs=contexts, was_gated=False)
+
+    pipeline.generator.generate = _fallback_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使って予測値はいくらになりますか。"
+                 "小数第2位まで求めてください。",
+    ))
+
+    assert fallback_calls  # generate()にフォールスルーしたこと
+    assert result.answer == "fallback"
+
+
+def test_pipeline_regression_prediction_missing_rounding_instruction_falls_back_to_generator(
+    tmp_path: Path,
+) -> None:
+    """「小数第N位まで」の丸め指定が質問文に無い場合、出力桁数を確定できないため
+    直接回答はせず既存のgenerate()フォールバックへ委ねる。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("id,feat_a,feat_b\n0,3.0,4.0\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    fallback_calls: list[str] = []
+
+    def _fallback_generate(question, contexts):
+        fallback_calls.append(question)
+        from src.models import Answer
+        return Answer(text="fallback", confidence=0.9, source_docs=contexts, was_gated=False)
+
+    pipeline.generator.generate = _fallback_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。",
+    ))
+
+    assert fallback_calls
+    assert result.answer == "fallback"
+
+
+def test_pipeline_regression_prediction_missing_feature_column_falls_back_to_generator(
+    tmp_path: Path,
+) -> None:
+    """グリッドが要求する特徴量列がtrain.csvに存在しない場合、曖昧な計算を避けて
+    直接回答をせず既存のgenerate()フォールバックへ委ねる。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    # feat_b列が無い（グリッドはfeat_a・feat_bの両方を要求する）
+    (csv_dir / "train.csv").write_text("id,feat_a\n0,3.0\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    fallback_calls: list[str] = []
+
+    def _fallback_generate(question, contexts):
+        fallback_calls.append(question)
+        from src.models import Answer
+        return Answer(text="fallback", confidence=0.9, source_docs=contexts, was_gated=False)
+
+    pipeline.generator.generate = _fallback_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。"
+                 "小数第2位まで求めてください。",
+    ))
+
+    assert fallback_calls
+    assert result.answer == "fallback"
+
+
+def test_pipeline_regression_prediction_no_train_csv_falls_back_to_generator(tmp_path: Path) -> None:
+    """train.csvが見つからない場合は特徴量値を取得できないため、直接回答をせず
+    既存のgenerate()フォールバックへ委ねる（train.csv不在でMissing固定にしない）。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    fallback_calls: list[str] = []
+
+    def _fallback_generate(question, contexts):
+        fallback_calls.append(question)
+        from src.models import Answer
+        return Answer(text="fallback", confidence=0.9, source_docs=contexts, was_gated=False)
+
+    pipeline.generator.generate = _fallback_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。"
+                 "小数第2位まで求めてください。",
+    ))
+
+    assert fallback_calls
+    assert result.answer == "fallback"
+
+
+def test_pipeline_regression_prediction_ambiguous_duplicate_id_falls_back_to_generator(
+    tmp_path: Path,
+) -> None:
+    """指定したid値に一致する行が複数（重複id）ある場合、どの行を使うべきか
+    曖昧なため直接回答をせず既存のgenerate()フォールバックへ委ねる。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts(artifacts_dir, "テスト社")
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    # id=0が2行ある（重複）
+    (csv_dir / "train.csv").write_text(
+        "id,feat_a,feat_b\n0,3.0,4.0\n0,9.0,9.0\n", encoding="utf-8",
+    )
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    fallback_calls: list[str] = []
+
+    def _fallback_generate(question, contexts):
+        fallback_calls.append(question)
+        from src.models import Answer
+        return Answer(text="fallback", confidence=0.9, source_docs=contexts, was_gated=False)
+
+    pipeline.generator.generate = _fallback_generate
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の予測値はいくらですか。"
+                 "小数第2位まで求めてください。",
+    ))
+
+    assert fallback_calls
+    assert result.answer == "fallback"
+
+
+def _write_regression_grid_artifacts_single_feature(
+    artifacts_dir: Path, project_name: str, intercept: str, coef: str
+) -> None:
+    """切片・単一特徴量(feat_a)の係数を指定できる合成回帰係数グリッド
+    （丸め境界値テスト用に、prediction値を直接コントロールするために使う）。"""
+    cells = [
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B5", "row": 5, "value": "係数"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "A6", "row": 6, "value": "切片"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B6", "row": 6, "value": intercept},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "A7", "row": 7, "value": "feat_a"},
+        {"project_name": project_name, "source_path": "data/raw/x/train.xlsx", "file_name": "train.xlsx",
+         "sheet_name": "回帰分析", "cell": "B7", "row": 7, "value": coef},
+    ]
+    (artifacts_dir / "train_xlsx_small_sheet_cells.jsonl").write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cells), encoding="utf-8",
+    )
+
+
+def test_pipeline_regression_prediction_uses_round_half_up_at_boundary(tmp_path: Path) -> None:
+    """丸め桁の次がちょうど5になる境界値では、Pythonのformat()のround-half-even
+    ではなく日本語の四捨五入（ROUND_HALF_UP、既存のsrc/generator/analysis_answerer.py
+    と同じ方式）を使う。0.125を小数第2位までなら四捨五入で0.13
+    （round-half-evenだと0.12になりCRAGの完全一致判定でIncorrectになりうる）。"""
+    from src.orchestrator.pipeline import Pipeline, QAPair
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _write_regression_grid_artifacts_single_feature(
+        artifacts_dir, "テスト社", intercept="0.0", coef="1.0"
+    )
+
+    csv_dir = tmp_path / "テスト社" / "03.データ"
+    csv_dir.mkdir(parents=True)
+    (csv_dir / "train.csv").write_text("id,feat_a\n0,0.125\n", encoding="utf-8")
+
+    pipeline = Pipeline(data_dir=tmp_path, run_judge=False, artifacts_dir=artifacts_dir)
+    pipeline.generator.generate = lambda q, c: (_ for _ in ()).throw(
+        AssertionError("係数・特徴量値が揃った回帰予測はLLMに委ねない")
+    )
+    (tmp_path / "a.txt").write_text("関係ないテキスト", encoding="utf-8")
+    pipeline.build_index()
+
+    result = pipeline._process_one(QAPair(
+        question_id="0",
+        question="テスト社のtrain.xlsxで算出された回帰係数を使ってid=0を予測した場合の"
+                 "予測値はいくらになりますか。小数第2位まで求めてください。",
+    ))
+
+    assert result.answer == "0.13"
+
+
 def test_pipeline_result_has_diagnostics(tmp_path: Path) -> None:
     """runの結果に raw_answer / retrieved_sources が入り、summaryに時間・トークンが入る。"""
     from src.orchestrator.pipeline import Pipeline, QAPair

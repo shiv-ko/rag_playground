@@ -663,6 +663,112 @@ def _narrow_xlsx_rows_by_question_hints(
     return rows
 
 
+# 回帰予測質問検出用の一般語彙。「回帰」「係数」「予測」の3語が揃う場合のみ
+# 「回帰係数を使って特徴量値から予測値を計算する」質問とみなす。特定案件名・
+# ファイル名・質問文のハードコードはしない（一般語彙の共起判定のみ）。
+# 「残差」「誤差」は予測値そのものではなく別の量（実測値との差）を問う質問の
+# 一般語彙。これらを含む質問で予測値を直答すると誤答（別の量とのすり替え）になる
+# ため、検出対象から除外する（負のガード。過剰ブロックにならないよう一般語彙のみ）。
+_REGRESSION_NON_PREDICTION_VALUE_KEYWORDS = ("残差", "誤差")
+
+
+def is_regression_prediction_request(question: str) -> bool:
+    normalized = unicodedata.normalize("NFKC", question)
+    if any(k in normalized for k in _REGRESSION_NON_PREDICTION_VALUE_KEYWORDS):
+        return False
+    return "回帰" in normalized and "係数" in normalized and "予測" in normalized
+
+
+_REGRESSION_COEFFICIENT_HEADER = "係数"
+_REGRESSION_INTERCEPT_LABEL = "切片"
+
+
+def _prev_column_letter(col: str) -> str | None:
+    """Excel列文字の1つ左の列を返す（単一アルファベット列のみ対応。複数文字の
+    列やA列自体はNone＝ラベル列を機械的に特定できないとみなす、保守側）。"""
+    if len(col) != 1 or col == "A":
+        return None
+    return chr(ord(col) - 1)
+
+
+def _regression_coefficient_grid(cells: list[dict]) -> dict[str, Any] | None:
+    """小型シートのセル値から、Excel「回帰分析」ツール出力形式の係数グリッド
+    （「係数」ヘッダ列＋「切片」ラベル行＋変数別係数行）を構造的に検出する。
+    シート名・列名・案件名・特徴量名のハードコードはせず、「係数」という列見出しと
+    「切片」という行ラベルの組み合わせのみで判定する（Excel回帰分析出力の定型
+    フォーマットに基づく一般則）。切片行が特徴量行より上/下どちらに来ても対応する
+    （実データで順序が案件ごとに異なることを確認済み）。曖昧な場合（「係数」ヘッダが
+    複数ある、切片が0件/複数、特徴量係数が1つも取れない、案件内に複数の候補シートが
+    ある等）はNoneを返す（誤った式を使うより回答しない方を優先）。"""
+    by_sheet: dict[tuple[str, str], list[dict]] = {}
+    for c in cells:
+        by_sheet.setdefault((str(c.get("source_path")), str(c.get("sheet_name"))), []).append(c)
+
+    candidates: list[dict[str, Any]] = []
+    for (source, sheet_name), sheet_cells in by_sheet.items():
+        grid: dict[int, dict[str, Any]] = {}
+        for c in sheet_cells:
+            grid.setdefault(int(c["row"]), {})[re.sub(r"\d+", "", c["cell"])] = c.get("value")
+
+        header_hits = [
+            (r, col)
+            for r, row in grid.items()
+            for col, val in row.items()
+            if str(val).strip() == _REGRESSION_COEFFICIENT_HEADER
+        ]
+        if len(header_hits) != 1:
+            continue  # 「係数」ヘッダが無い/複数あって曖昧
+        header_row, coef_col = header_hits[0]
+        label_col = _prev_column_letter(coef_col)
+        if label_col is None:
+            continue
+
+        label_value_pairs: list[tuple[str, float]] = []
+        for r in sorted(k for k in grid if k > header_row):
+            label = grid[r].get(label_col)
+            coef = grid[r].get(coef_col)
+            if label is None or not str(label).strip() or not _is_number(coef):
+                continue
+            label_value_pairs.append((str(label).strip(), float(coef)))
+
+        intercepts = [v for lbl, v in label_value_pairs if lbl == _REGRESSION_INTERCEPT_LABEL]
+        features = {lbl: v for lbl, v in label_value_pairs if lbl != _REGRESSION_INTERCEPT_LABEL}
+        if len(intercepts) != 1 or not features:
+            continue  # 切片が0件/複数、または特徴量係数が1つも取れない場合は曖昧
+
+        candidates.append({
+            "source_path": source,
+            "sheet_name": sheet_name,
+            "intercept": intercepts[0],
+            "coefficients": features,
+        })
+
+    if len(candidates) != 1:
+        return None  # 案件内に複数の回帰係数グリッド候補があると誤った式を使うリスクがある
+    return candidates[0]
+
+
+def _regression_coefficient_context_doc(question: str, cells: list[dict]) -> Document | None:
+    """質問が回帰予測を要求している場合のみ、係数グリッドをLLM可読なdocに変換する
+    （直接計算answererはこのdocのテキストを再パースして予測値を計算する）。"""
+    if not is_regression_prediction_request(question):
+        return None
+    grid = _regression_coefficient_grid(cells)
+    if grid is None:
+        return None
+    coeff_desc = ", ".join(f"{k}={v}" for k, v in grid["coefficients"].items())
+    text = "\n".join([
+        f"シート: {grid['sheet_name']}（回帰分析の係数グリッド・xlsxセル値から機械抽出）",
+        f"切片: {grid['intercept']}",
+        f"係数: {coeff_desc}",
+    ])
+    return Document(
+        text=text,
+        source_path=Path(grid["source_path"]),
+        location=f"sheet_{grid['sheet_name']}_regression_coefficients",
+    )
+
+
 def build_spreadsheet_state_context(
     question: str, project_name: str, store: StructuredArtifactStore
 ) -> list[ScoredDocument]:
@@ -705,6 +811,14 @@ def build_spreadsheet_state_context(
             docs.append(ScoredDocument(document=doc, score=1.0, retrieval_method="structured_spreadsheet_state"))
 
     if question_mentions_spreadsheet(question):
+        regression_doc = _regression_coefficient_context_doc(
+            question, store.small_sheet_cells_for(project_name)
+        )
+        if regression_doc is not None:
+            docs.append(
+                ScoredDocument(document=regression_doc, score=1.0, retrieval_method="structured_spreadsheet_state")
+            )
+
         pivot_docs = _pivot_cache_aggregate_docs(question, store.pivot_aggregates_for(project_name))
         if not pivot_docs:
             pivot_docs = _pivot_argmax_docs(question, store.small_sheet_cells_for(project_name))
