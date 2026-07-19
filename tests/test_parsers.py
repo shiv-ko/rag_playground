@@ -1,16 +1,23 @@
 """Parserコンポーネントのテスト (TDD)"""
 from __future__ import annotations
 
+import io
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import msoffcrypto
+import pytest
+
+import src.parsers.office_parser as office_parser_mod
 from src.models import Document
 from src.parsers.dispatcher import ParserDispatcher
 from src.parsers.image_parser import ImageParser
 from src.parsers.office_parser import OfficeParser
 from src.parsers.pdf_parser import PDFParser
 from src.parsers.text_parser import TextParser
+from src.utils.office_crypto import derive_office_password
 
 # ─────────────────────── TextParser ───────────────────────
 
@@ -97,6 +104,236 @@ class TestPDFParser:
 
 
 # ─────────────────────── OfficeParser ───────────────────────
+
+# msoffcrypto-tool 6.0.0のOLEコンテナ書き込みは、暗号化payloadが小さい(<=4096バイト)と
+# mini-FAT/regular-FATの不整合で壊れることがある（tests/test_office_crypto.pyで裏取り済み）。
+# xlsxは十分な行数を足して4KB超のペイロードにする。
+def _build_padded_xlsx_bytes() -> bytes:
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "スケジュール"
+    ws.append(["タスクID", "担当者", "開始日"])
+    for i in range(300):
+        ws.append([f"T{i:03d}", "テスト担当者", f"padding padding padding padding {i}"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _build_padded_docx_bytes(marker_text: str) -> bytes:
+    import docx
+
+    doc = docx.Document()
+    doc.add_paragraph(marker_text)
+    for i in range(50):
+        doc.add_paragraph(f"padding paragraph {i} " * 10)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _write_encrypted_office_file(dest: Path, password: str, plaintext_bytes: bytes) -> None:
+    plain_buf = io.BytesIO(plaintext_bytes)
+    office_file = msoffcrypto.OfficeFile(plain_buf)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "wb") as f:
+        office_file.encrypt(password, f)
+
+
+def _write_registry_and_contracts(
+    tmp_path: Path, project_name: str, alias: str, start_date: str
+) -> tuple[Path, Path]:
+    registry_path = tmp_path / "project_registry.json"
+    registry_path.write_text(
+        json.dumps(
+            [{"project_name": project_name, "primary_alias": alias}], ensure_ascii=False
+        ),
+        encoding="utf-8",
+    )
+    contracts_path = tmp_path / "contracts.jsonl"
+    contracts_path.write_text(
+        json.dumps(
+            {"project_name": project_name, "start_date": start_date}, ensure_ascii=False
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return registry_path, contracts_path
+
+
+class TestOfficeParserEncryptedContentDetection:
+    """暗号化検知をファイル名`pw-`規則からファイル内容(CDFV2/OLEマジックナンバー)ベースへ
+    一般化する回帰テスト。KAEDEのスケジュール.xlsx（ファイル名に`pw-`マーカーが一切無い
+    CDFV2暗号化ファイル）が復号されずインデックスから完全欠落していた問題(Q79)に対応する。
+    """
+
+    def test_xlsx_decrypts_via_content_signature_without_pw_filename_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ファイル名に`pw-`が無くてもCDFV2署名だけで暗号化と判定し、DA-規則パスワード
+        (案件レジストリのprimary_alias + contracts.jsonlの開始日)を導出して復号できる。"""
+        project_dir = tmp_path / "プロジェクト" / "テスト案件" / "02.計画"
+        xlsx_path = project_dir / "スケジュール.xlsx"
+        password = derive_office_password("KAEDE", "2025-09-02", ".xlsx")
+        _write_encrypted_office_file(xlsx_path, password, _build_padded_xlsx_bytes())
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "KAEDE", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        docs = OfficeParser().parse(xlsx_path)
+
+        assert not any("解析失敗" in d.text for d in docs)
+        assert any("テスト担当者" in d.text for d in docs)
+
+    def test_docx_decrypts_via_content_signature_without_pw_filename_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """xlsxと同じ内容ベース検知・DA-規則復号がdocxにも汎用的に効くことの確認。"""
+        project_dir = tmp_path / "プロジェクト" / "テスト案件" / "05.会議"
+        docx_path = project_dir / "会議録.docx"
+        password = derive_office_password("KAEDE", "2025-09-02", ".docx")
+        _write_encrypted_office_file(
+            docx_path, password, _build_padded_docx_bytes("会議の要点マーカーテキスト")
+        )
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "KAEDE", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        docs = OfficeParser().parse(docx_path)
+
+        assert not any("解析失敗" in d.text for d in docs)
+        assert any("会議の要点マーカーテキスト" in d.text for d in docs)
+
+    def test_xlsx_still_decrypts_via_pw_filename_literal_password(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """既存の`pw-<トークン>`命名慣習（リテラルパスワード）が退行していないことの確認。"""
+        xlsx_path = tmp_path / "スケジュール_pw-testtoken123.xlsx"
+        _write_encrypted_office_file(xlsx_path, "testtoken123", _build_padded_xlsx_bytes())
+
+        # 案件レジストリ/contracts側は存在しなくてもリテラル候補だけで復号できること
+        monkeypatch.setattr(
+            office_parser_mod, "PROJECT_REGISTRY_PATH", tmp_path / "no_registry.json"
+        )
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", tmp_path / "no_contracts.jsonl")
+
+        docs = OfficeParser().parse(xlsx_path)
+
+        assert not any("解析失敗" in d.text for d in docs)
+        assert any("テスト担当者" in d.text for d in docs)
+
+    def test_docx_pw_filename_falls_back_from_literal_to_da_rule_password(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """実データの契約書_pw-kaede20250902.docx型の命名: ファイル名の`pw-`トークンを
+        素直にリテラルパスワードとして試すと失敗するが（実際の暗号化パスワードはDA-規則側）、
+        同じマーカーから抽出した日付でDA-規則パスワードにフォールバックして復号できること。
+        """
+        project_dir = tmp_path / "プロジェクト" / "テスト案件" / "01.契約"
+        docx_path = project_dir / "契約書_pw-kaede20250902.docx"
+        da_rule_password = derive_office_password("KAEDE", "20250902", ".docx")
+        _write_encrypted_office_file(
+            docx_path, da_rule_password, _build_padded_docx_bytes("契約条件マーカーテキスト")
+        )
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "KAEDE", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        docs = OfficeParser().parse(docx_path)
+
+        assert not any("解析失敗" in d.text for d in docs)
+        assert any("契約条件マーカーテキスト" in d.text for d in docs)
+
+    def test_xlsx_decrypt_falls_back_to_stub_when_no_password_candidate_matches(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CDFV2署名はあるが導出できるどの候補パスワードでも復号できない場合、
+        例外を出さず既存のstub Documentへフォールバックすること。"""
+        project_dir = tmp_path / "プロジェクト" / "テスト案件" / "02.計画"
+        xlsx_path = project_dir / "スケジュール.xlsx"
+        real_password = derive_office_password("REAL", "2025-01-01", ".xlsx")
+        _write_encrypted_office_file(xlsx_path, real_password, _build_padded_xlsx_bytes())
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "WRONG", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        docs = OfficeParser().parse(xlsx_path)
+
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
+
+    def test_xlsx_generic_decryption_error_on_one_candidate_still_tries_next(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """msoffcryptoが`InvalidKeyError`(パスワード誤り)ではなくその親クラス
+        `DecryptionError`を送出するケース（暗号化情報ストリームの解釈失敗等）でも、
+        その候補で例外を伝播させず次の候補に進めること。"""
+        from msoffcrypto.exceptions import DecryptionError
+
+        # 候補を2つ以上用意する: (1)ファイル名の`pw-`リテラル候補（実際の正解ではない）を
+        # 1回目のDecryptionErrorで潰し、(2)DA規則候補（実際の正解）を2回目で使う。
+        project_dir = tmp_path / "プロジェクト" / "テスト案件" / "02.計画"
+        xlsx_path = project_dir / "スケジュール_pw-irrelevanttoken.xlsx"
+        password = derive_office_password("KAEDE", "2025-09-02", ".xlsx")
+        _write_encrypted_office_file(xlsx_path, password, _build_padded_xlsx_bytes())
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "KAEDE", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        real_decrypt = office_parser_mod.decrypt_office_file
+        calls: list[str] = []
+
+        def flaky_decrypt(path, pw, output_path):
+            calls.append(pw)
+            if len(calls) == 1:
+                raise DecryptionError("simulated non-InvalidKeyError decryption failure")
+            return real_decrypt(path, pw, output_path)
+
+        monkeypatch.setattr(office_parser_mod, "decrypt_office_file", flaky_decrypt)
+
+        docs = OfficeParser().parse(xlsx_path)
+
+        assert len(calls) >= 2, "1回目のDecryptionErrorで打ち切らず次の候補を試していない"
+        assert not any("解析失敗" in d.text for d in docs)
+        assert any("テスト担当者" in d.text for d in docs)
+
+    def test_xlsx_non_cdfv2_corruption_does_not_attempt_decrypt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CDFV2署名の無い単なる破損ファイルは、復号を試みず従来どおりstubを返すこと
+        （暗号化以外の破損原因まで復号フォールバックの対象にしないための回帰確認）。"""
+        xlsx_path = tmp_path / "プロジェクト" / "テスト案件" / "02.計画" / "スケジュール.xlsx"
+        xlsx_path.parent.mkdir(parents=True)
+        xlsx_path.write_bytes(b"not a real xlsx file, just garbage bytes")
+
+        registry_path, contracts_path = _write_registry_and_contracts(
+            tmp_path, "テスト案件", "KAEDE", "2025-09-02"
+        )
+        monkeypatch.setattr(office_parser_mod, "PROJECT_REGISTRY_PATH", registry_path)
+        monkeypatch.setattr(office_parser_mod, "CONTRACTS_PATH", contracts_path)
+
+        docs = OfficeParser().parse(xlsx_path)
+
+        assert len(docs) == 1
+        assert "解析失敗" in docs[0].text
+
 
 class TestOfficeParser:
     def test_can_handle_docx(self, tmp_path: Path) -> None:

@@ -28,6 +28,26 @@ def _default_code_dirs() -> list[Path]:
     return [Path(__file__).resolve().parent.parent / "parsers"]
 
 
+def _default_code_files() -> list[Path]:
+    """_default_code_dirs()（src/parsers/配下のディレクトリ走査）だけでは拾えない、
+    パース結果に影響する個別ファイル群。
+
+    office_parser.pyの暗号化ファイル対応(_decrypt_via_password_candidates)は
+    src/utils/office_crypto.py（src/parsers/配下ではないためディレクトリ走査の対象外）と、
+    artifacts/project_registry.json・artifacts/contracts.jsonl（パスワード導出に使う
+    機械生成レジストリ。中身が変わると同じ暗号化ファイルでも復号成否＝パース結果が
+    変わりうる）に依存する。これらをfingerprintに含めないと、office_crypto.pyや
+    artifactsだけを直しても古いキャッシュがヒットし続けて修正が無効化される
+    （src/parsers/配下のコード変更にしか追随しなかった既存の罠と同型）。
+    """
+    root = Path(__file__).resolve().parent.parent.parent
+    return [
+        root / "src" / "utils" / "office_crypto.py",
+        root / "artifacts" / "project_registry.json",
+        root / "artifacts" / "contracts.jsonl",
+    ]
+
+
 def _hash_code_dirs(code_dirs: list[Path]) -> str:
     """コードディレクトリ配下の全.pyファイルの内容ハッシュを集約する。
     mtimeではなくファイル内容のハッシュを使うため、gitチェックアウト等で
@@ -46,10 +66,23 @@ def _hash_code_dirs(code_dirs: list[Path]) -> str:
     return hashlib.sha256("\n".join(sorted(entries)).encode("utf-8")).hexdigest()
 
 
+def _hash_code_files(code_files: list[Path]) -> str:
+    """個別ファイル群の内容ハッシュを集約する。存在しないファイル（例: run_pipeline未実行で
+    contracts.jsonlがまだ無い）は空バイト列として扱い、欠落そのものではキーが不安定に
+    ならないようにする（生成された瞬間にはじめて内容が反映され、以後の変更も追随する）。"""
+    entries = []
+    for p in code_files:
+        content = p.read_bytes() if p.is_file() else b""
+        content_hash = hashlib.sha256(content).hexdigest()
+        entries.append(f"{normalized_resolved_posix(p)}|{content_hash}")
+    return hashlib.sha256("\n".join(sorted(entries)).encode("utf-8")).hexdigest()
+
+
 def compute_fingerprint(
     data_dir: Path,
     exclude_dirs: list[Path] | None = None,
     code_dirs: list[Path] | None = None,
+    code_files: list[Path] | None = None,
 ) -> str:
     excluded = [normalized_resolved_posix(d) for d in (exclude_dirs or [])]
     entries = []
@@ -72,6 +105,9 @@ def compute_fingerprint(
     # パーサー/チャンカーのコード内容をキーに混ぜる。コードを直しても古い
     # キャッシュがヒットし続けて修正が無効化される罠を防ぐため。
     entries.append("code:" + _hash_code_dirs(code_dirs if code_dirs is not None else _default_code_dirs()))
+    # src/parsers/配下のディレクトリ走査だけでは拾えない個別ファイル（office_crypto.py・
+    # artifacts/project_registry.json・contracts.jsonl等）もキーに混ぜる。
+    entries.append("files:" + _hash_code_files(code_files if code_files is not None else _default_code_files()))
     digest = hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
     return digest[:16]
 

@@ -161,3 +161,83 @@ def test_fingerprint_uses_real_parsers_dir_by_default():
     fp1 = compute_fingerprint(data_dir)
     fp2 = compute_fingerprint(data_dir)
     assert fp1 == fp2
+
+
+# --- code_files: office_crypto.py・artifacts(project_registry.json/contracts.jsonl)への追随 ---
+#
+# office_parser.pyの暗号化ファイル対応はsrc/utils/office_crypto.py（src/parsers/配下ではない
+# ためcode_dirsの走査対象外）とartifacts/project_registry.json・artifacts/contracts.jsonl
+# （機械生成レジストリ、パース結果に影響しうる）に依存するようになったが、これらは
+# 従来のfingerprintに一切反映されていなかった（office_crypto.py側だけ直してもキャッシュが
+# 古いパース結果を返し続ける罠）。code_dirsと並ぶ第2の入力としてcode_filesを追加する。
+
+
+def test_fingerprint_changes_when_code_file_content_changes(tmp_path):
+    data_dir = _make_data_dir(tmp_path)
+    extra_file = tmp_path / "office_crypto.py"
+    extra_file.write_text("PASSWORD_RULE = 'DA'\n", encoding="utf-8")
+    fp1 = compute_fingerprint(data_dir, code_files=[extra_file])
+
+    extra_file.write_text("PASSWORD_RULE = 'DA2'  # 内容変更\n", encoding="utf-8")
+    fp2 = compute_fingerprint(data_dir, code_files=[extra_file])
+    assert fp1 != fp2
+
+
+def test_fingerprint_changes_when_artifact_file_content_changes(tmp_path):
+    """artifacts側(project_registry.json相当)の変更もfingerprintに反映される。"""
+    data_dir = _make_data_dir(tmp_path)
+    artifact = tmp_path / "project_registry.json"
+    artifact.write_text("[]", encoding="utf-8")
+    fp1 = compute_fingerprint(data_dir, code_files=[artifact])
+
+    artifact.write_text('[{"project_name": "x", "primary_alias": "X"}]', encoding="utf-8")
+    fp2 = compute_fingerprint(data_dir, code_files=[artifact])
+    assert fp1 != fp2
+
+
+def test_fingerprint_stable_when_code_file_missing(tmp_path):
+    """指定した追加ファイルが存在しなくても例外を出さず安定したfingerprintになる
+    （contracts.jsonl未生成時点でも壊れないこと）。"""
+    data_dir = _make_data_dir(tmp_path)
+    missing = tmp_path / "does_not_exist.jsonl"
+    fp1 = compute_fingerprint(data_dir, code_files=[missing])
+    fp2 = compute_fingerprint(data_dir, code_files=[missing])
+    assert fp1 == fp2
+
+
+def test_fingerprint_unaffected_by_code_files_when_omitted_matches_explicit_empty(tmp_path):
+    """code_files=[]（追加ファイルなし）はcode_dirsのみのfingerprintと独立して安定する。"""
+    data_dir = _make_data_dir(tmp_path)
+    assert compute_fingerprint(data_dir, code_files=[]) == compute_fingerprint(
+        data_dir, code_files=[]
+    )
+
+
+def test_default_code_files_includes_office_crypto_and_artifacts():
+    """code_files省略時のデフォルトが、office_parser.pyが実際に依存する
+    src/utils/office_crypto.py・artifacts/project_registry.json・artifacts/contracts.jsonl
+    を含んでいること（配線の確認）。"""
+    from src.utils.parse_cache import _default_code_files
+
+    files = _default_code_files()
+    name_pairs = {(p.parent.name, p.name) for p in files}
+    assert ("utils", "office_crypto.py") in name_pairs
+    assert ("artifacts", "project_registry.json") in name_pairs
+    assert ("artifacts", "contracts.jsonl") in name_pairs
+
+
+def test_fingerprint_uses_default_code_files_when_omitted(tmp_path, monkeypatch):
+    """code_files省略時は_default_code_files()の中身がfingerprintに反映される
+    （実ファイルを汚さず、差し替えたデフォルトの内容変更で検証する）。"""
+    import src.utils.parse_cache as pc
+
+    working_copy = tmp_path / "office_crypto.py"
+    working_copy.write_text("PASSWORD_RULE = 'DA'\n", encoding="utf-8")
+    monkeypatch.setattr(pc, "_default_code_files", lambda: [working_copy])
+
+    data_dir = _make_data_dir(tmp_path)
+    fp1 = compute_fingerprint(data_dir)
+
+    working_copy.write_text("PASSWORD_RULE = 'DA2'  # 内容変更\n", encoding="utf-8")
+    fp2 = compute_fingerprint(data_dir)
+    assert fp1 != fp2

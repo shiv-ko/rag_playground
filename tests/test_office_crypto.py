@@ -11,13 +11,23 @@ decryptのテストはmsoffcrypto-tool自身のencrypt APIで作った合成フ�
 from __future__ import annotations
 
 import io
+import json
+import unicodedata
 import zipfile
 from pathlib import Path
 
 import msoffcrypto
 import pytest
 
-from src.utils.office_crypto import decrypt_office_file, derive_office_password
+from src.utils.office_crypto import (
+    candidate_start_dates_from_contracts,
+    decrypt_office_file,
+    derive_office_password,
+    load_primary_aliases,
+    normalize_project_text,
+    password_candidates_for_file,
+    project_name_from_path,
+)
 
 PASSWORD = "DA-KAEDE-20250902-docx"
 PLAINTEXT_MEMBER = "word/document.xml"
@@ -135,3 +145,131 @@ def test_decrypt_office_file_does_not_write_to_source_directory(tmp_path):
 
     source_dir_entries_after = sorted(p.name for p in source_path.parent.iterdir())
     assert source_dir_entries_after == source_dir_entries_before
+
+
+# --- normalize_project_text ---
+
+
+def test_normalize_project_text_replaces_fullwidth_space():
+    assert normalize_project_text("かえで　総合病院") == "かえで 総合病院"
+
+
+def test_normalize_project_text_normalizes_nfd_to_nfc():
+    nfd = unicodedata.normalize("NFD", "かえで総合病院")
+    assert normalize_project_text(nfd) == unicodedata.normalize("NFC", "かえで総合病院")
+
+
+# --- load_primary_aliases ---
+
+
+def test_load_primary_aliases_maps_normalized_project_name_to_alias(tmp_path):
+    registry_path = tmp_path / "project_registry.json"
+    registry_path.write_text(
+        json.dumps(
+            [{"project_name": "かえで　総合病院", "primary_alias": "KAEDE"}],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    aliases = load_primary_aliases(registry_path)
+    assert aliases == {"かえで 総合病院": "KAEDE"}
+
+
+def test_load_primary_aliases_skips_rows_without_primary_alias(tmp_path):
+    registry_path = tmp_path / "project_registry.json"
+    registry_path.write_text(
+        json.dumps([{"project_name": "案件A"}], ensure_ascii=False), encoding="utf-8"
+    )
+    assert load_primary_aliases(registry_path) == {}
+
+
+def test_load_primary_aliases_empty_when_file_missing(tmp_path):
+    assert load_primary_aliases(tmp_path / "no_registry.json") == {}
+
+
+# --- candidate_start_dates_from_contracts ---
+
+
+def test_candidate_start_dates_from_contracts_reads_matching_project(tmp_path):
+    contracts_path = tmp_path / "contracts.jsonl"
+    contracts_path.write_text(
+        json.dumps({"project_name": "テスト案件", "start_date": "2025-09-02"}, ensure_ascii=False)
+        + "\n",
+        encoding="utf-8",
+    )
+    assert candidate_start_dates_from_contracts("テスト案件", contracts_path) == ["20250902"]
+
+
+def test_candidate_start_dates_from_contracts_empty_when_no_match(tmp_path):
+    contracts_path = tmp_path / "contracts.jsonl"
+    contracts_path.write_text(
+        json.dumps({"project_name": "他の案件", "start_date": "2025-09-02"}, ensure_ascii=False)
+        + "\n",
+        encoding="utf-8",
+    )
+    assert candidate_start_dates_from_contracts("テスト案件", contracts_path) == []
+
+
+def test_candidate_start_dates_from_contracts_empty_when_file_missing(tmp_path):
+    assert candidate_start_dates_from_contracts("テスト案件", tmp_path / "missing.jsonl") == []
+
+
+# --- project_name_from_path ---
+
+
+def test_project_name_from_path_extracts_segment_after_marker():
+    path = Path("/root/data/raw/share/共有ドライブ/プロジェクト/かえで総合病院/02.計画/スケジュール.xlsx")
+    assert project_name_from_path(path) == "かえで総合病院"
+
+
+def test_project_name_from_path_none_when_marker_absent():
+    path = Path("/root/data/raw/share/共有ドライブ/社内管理/座席表.pptx")
+    assert project_name_from_path(path) is None
+
+
+def test_project_name_from_path_matches_nfd_marker_segment():
+    # macOS/zip展開由来のNFD分解パスでも"プロジェクト"マーカーを検知できること
+    nfd_marker = unicodedata.normalize("NFD", "プロジェクト")
+    nfd_project = unicodedata.normalize("NFD", "かえで総合病院")
+    path = Path(f"/root/{nfd_marker}/{nfd_project}/02.計画/スケジュール.xlsx")
+    assert project_name_from_path(path) == "かえで総合病院"
+
+
+# --- password_candidates_for_file ---
+
+
+def test_password_candidates_for_file_prefers_literal_filename_token(tmp_path):
+    path = tmp_path / "契約書_pw-testtoken123.docx"
+    candidates = password_candidates_for_file(path, "無関係案件", {}, tmp_path / "no_contracts.jsonl")
+    assert candidates[0] == "testtoken123"
+
+
+def test_password_candidates_for_file_derives_da_rule_from_filename_date(tmp_path):
+    path = tmp_path / "契約書_pw-kaede20250902.docx"
+    candidates = password_candidates_for_file(
+        path, "かえで総合病院", {"かえで総合病院": "KAEDE"}, tmp_path / "no_contracts.jsonl"
+    )
+    assert "DA-KAEDE-20250902-docx" in candidates
+
+
+def test_password_candidates_for_file_falls_back_to_contracts_date_without_filename_marker(tmp_path):
+    # KAEDEの実データ相当: ファイル名に`pw-`マーカーが一切無いケース
+    path = tmp_path / "スケジュール.xlsx"
+    contracts_path = tmp_path / "contracts.jsonl"
+    contracts_path.write_text(
+        json.dumps(
+            {"project_name": "かえで総合病院", "start_date": "2025-09-02"}, ensure_ascii=False
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    candidates = password_candidates_for_file(
+        path, "かえで総合病院", {"かえで総合病院": "KAEDE"}, contracts_path
+    )
+    assert candidates == ["DA-KAEDE-20250902-xlsx"]
+
+
+def test_password_candidates_for_file_empty_when_no_marker_and_no_alias(tmp_path):
+    path = tmp_path / "スケジュール.xlsx"
+    candidates = password_candidates_for_file(path, "不明案件", {}, tmp_path / "no_contracts.jsonl")
+    assert candidates == []

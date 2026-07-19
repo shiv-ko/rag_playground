@@ -22,6 +22,7 @@ from src.utils.office_crypto import (
     decrypt_office_file,
     derive_office_password,
     literal_password_from_filename,
+    load_primary_aliases,
     looks_like_encrypted_office_file,
 )
 
@@ -82,16 +83,10 @@ def read_pdf_text(path: Path) -> str:
     return normalize_text("\n".join(page.extract_text() or "" for page in reader.pages))
 
 
-def load_primary_aliases(project_registry_path: Path = PROJECT_REGISTRY_PATH) -> dict[str, str]:
-    """project_registry.jsonから`project_name(NFC正規化) -> primary_alias`の対応表を作る。"""
-    if not project_registry_path.exists():
-        return {}
-    data = json.loads(project_registry_path.read_text(encoding="utf-8"))
-    return {
-        normalize_text(row["project_name"]): row["primary_alias"]
-        for row in data
-        if row.get("primary_alias")
-    }
+# load_primary_aliases はextract_spreadsheets.pyと独立実装が分岐していたため
+# src/utils/office_crypto.py へ統合済み（DA規則やレジストリ仕様の変更時に片方だけ直る
+# 事故を防ぐ）。normalize_text（NFC正規化＋全角スペース→半角）と同一ロジックを内部で使う
+# ため、この関数の返り値・挙動は従来のローカル実装と変わらない。
 
 
 def candidate_dates_from_schedule(

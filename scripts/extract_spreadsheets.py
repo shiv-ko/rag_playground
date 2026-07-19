@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 import tempfile
-import unicodedata
 from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
@@ -22,11 +20,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.utils.office_crypto import (
-    candidate_dates_from_filename,
+    candidate_start_dates_from_contracts,
     decrypt_office_file,
-    derive_office_password,
-    literal_password_from_filename,
+    load_primary_aliases,
     looks_like_encrypted_office_file,
+    normalize_project_text,
+    password_candidates_for_file,
 )
 PROJECT_ROOT = ROOT / "data" / "raw" / "share" / "共有ドライブ" / "プロジェクト"
 ARTIFACTS = ROOT / "artifacts"
@@ -171,58 +170,10 @@ def sheet_dimensions(ws: Worksheet) -> dict[str, Any]:
     }
 
 
-def normalize_project_text(text: str) -> str:
-    """build_contract_registry.pyのnormalize_textと同一ロジック（NFC正規化＋全角スペース→半角）。
-
-    scripts/build_*.py群は意図的に自己完結スタイルなのでcross-script importはせず複製する。
-    """
-    return unicodedata.normalize("NFC", text).replace("　", " ")
-
-
-def load_primary_aliases(project_registry_path: Path = PROJECT_REGISTRY_PATH) -> dict[str, str]:
-    """project_registry.jsonから`project_name(正規化済み) -> primary_alias`の対応表を作る。"""
-    if not project_registry_path.exists():
-        return {}
-    data = json.loads(project_registry_path.read_text(encoding="utf-8"))
-    return {
-        normalize_project_text(row["project_name"]): row["primary_alias"]
-        for row in data
-        if row.get("primary_alias")
-    }
-
-
-def candidate_start_dates_from_contracts(
-    project_name: str, contracts_path: Path = CONTRACTS_PATH
-) -> list[str]:
-    """同一案件のcontracts.jsonlから開始日候補(YYYYMMDD)を抽出する。
-
-    スケジュールxlsx自身の復号に使うため、schedule_tasks.jsonl由来の日付候補
-    （build_contract_registry.pyのcandidate_dates_from_schedule）は循環参照になり使えない。
-    かえで案件の契約書は既に復号済み・contracts.jsonlにstart_dateが載っているため、
-    こちらを日付候補源にする。
-    """
-    if not contracts_path.exists():
-        return []
-    normalized_project = normalize_project_text(project_name)
-    candidates: list[str] = []
-    seen: set[str] = set()
-    with contracts_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            if normalize_project_text(row.get("project_name", "")) != normalized_project:
-                continue
-            for key in ("start_date", "end_date"):
-                value = row.get(key)
-                if not value:
-                    continue
-                digits = re.sub(r"[^0-9]", "", str(value))[:8]
-                if len(digits) == 8 and digits not in seen:
-                    seen.add(digits)
-                    candidates.append(digits)
-    return candidates
+# normalize_project_text / load_primary_aliases / candidate_start_dates_from_contracts は
+# build_contract_registry.pyのload_primary_aliasesと独立実装が3箇所に分岐していたため
+# src/utils/office_crypto.py へ統合済み（DA規則やcontracts.jsonlパース仕様の変更時に
+# 一部だけ直る事故を防ぐ）。この行より下で使用する名前はそちらからのimportで解決される。
 
 
 def attempt_decrypt_workbook(
@@ -234,30 +185,15 @@ def attempt_decrypt_workbook(
 ) -> bool:
     """暗号化されたxlsxに対し、候補パスワードを順に試して復号し、output_pathに平文コピーを書く。
 
-    build_contract_registry.pyのattempt_decrypt_contract_textと同じ2系統の候補:
-    (1) ファイル名`pw-<トークン>`のトークン自体をリテラルパスワードとして試す。
-    (2) DA-規則`DA-[案件略号]-[開始年月日8桁]-[拡張子]`。開始年月日はファイル名の
-        `pw-...<8桁>`命名慣習、無ければ同一案件のcontracts.jsonl（既に復号済みの契約書）
-        のstart_date/end_dateを候補にする。
+    候補生成はsrc.utils.office_crypto.password_candidates_for_file に委譲する
+    （build_contract_registry.pyのattempt_decrypt_contract_textと同じ2系統の優先順位:
+    (1) ファイル名`pw-<トークン>`のリテラルパスワード、(2) DA-規則。開始年月日はファイル名の
+    `pw-...<8桁>`命名慣習、無ければ同一案件のcontracts.jsonl（既に復号済みの契約書）の
+    start_date/end_dateを候補にする）。
     全候補が`InvalidKeyError`（パスワード誤り）で失敗した場合はFalseを返す。
     """
-    literal_password = literal_password_from_filename(path)
-    if literal_password is not None:
-        try:
-            decrypt_office_file(path, literal_password, output_path)
-            return True
-        except InvalidKeyError:
-            pass
-
-    alias = primary_aliases.get(normalize_project_text(project_name))
-    if not alias:
-        return False
-    candidates = candidate_dates_from_filename(path)
-    if not candidates:
-        candidates = candidate_start_dates_from_contracts(project_name, contracts_path)
-    ext = path.suffix
-    for candidate in candidates:
-        password = derive_office_password(alias, candidate, ext)
+    candidates = password_candidates_for_file(path, project_name, primary_aliases, contracts_path)
+    for password in candidates:
         try:
             decrypt_office_file(path, password, output_path)
             return True
@@ -432,7 +368,7 @@ def main() -> None:
     all_highlights: list[dict[str, Any]] = []
     all_schedule_rows: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
-    primary_aliases = load_primary_aliases()
+    primary_aliases = load_primary_aliases(PROJECT_REGISTRY_PATH)
 
     for path in xlsx_files:
         print(f"extracting {path.relative_to(ROOT)}", flush=True)
